@@ -5,10 +5,9 @@ import pandas as pd
 import requests
 import base64
 import datetime
-import io
 
 # --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v31.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v31.1", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
@@ -27,6 +26,7 @@ st.markdown("""
     }
     .total-summary { background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }
     .month-container { min-height: 180px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: white; margin-bottom: 15px; }
+    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -103,7 +103,7 @@ week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days
 tabs = st.tabs(["📋 교적부", "✅ 출석체크", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "📊 통합통계"])
 
 # ==========================================
-# [탭 1] 교적부 관리 (🔥 일괄 업데이트 로직 적용)
+# [탭 1] 교적부 관리 (🔥 일괄 업데이트 로직 유지)
 # ==========================================
 with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
@@ -181,7 +181,7 @@ with tabs[0]:
                     fetch_sheet_data.clear(); st.success("등록 완료!"); st.rerun()
 
 # ==========================================
-# [탭 2] 출석체크 (🔥 429 API 에러 원천 차단 완벽 일괄 저장)
+# [탭 2] 출석체크 (🔥 API 에러 원천 차단 일괄 저장)
 # ==========================================
 with tabs[1]:
     st.subheader("📅 주간 출석 & 통계")
@@ -216,7 +216,7 @@ with tabs[1]:
     guest_in = cs4.number_input("기타 방문", min_value=0, value=saved_guest)
     st.markdown(f"<div class='total-summary'>✅ 최종 합계: {s_p + t_p + guest_in}명</div>", unsafe_allow_html=True)
 
-    # 1. 모바일 주간 출석체크
+    # 모바일 주간 출석체크
     with st.form("att_toggle_form_v31"):
         new_att = {}
         grouped = att_df.sort_values(by=['이름']).groupby(class_col)
@@ -249,7 +249,7 @@ with tabs[1]:
                 
                 fetch_sheet_data.clear(); st.success("안전하게 일괄 저장되었습니다!"); st.rerun()
 
-    # 2. 연간 통계 에디터
+    # 연간 통계 에디터
     with st.expander("📊 연간 전체 출석 현황 및 일괄 수정"):
         week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
         annual_df = df[df[status_col] != '이사'][[class_col, '이름', 'sheet_row'] + week_cols].copy()
@@ -272,7 +272,7 @@ with tabs[1]:
                 fetch_sheet_data.clear(); st.success("에러 없이 완벽하게 업데이트 되었습니다!"); st.rerun()
 
 # ==========================================
-# [탭 7] 통합 통계 & 엑셀 다운로드
+# [탭 7] 통합 통계 & 다운로드 (🔥CSV 모듈로 변경)
 # ==========================================
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
@@ -291,13 +291,17 @@ with tabs[6]:
         st.dataframe(df_stat, use_container_width=True, hide_index=True)
 
     st.divider()
-    if st.button("📥 통계 데이터를 엑셀로 만들기"):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            report_df.to_excel(writer, sheet_name='개인별통계', index=False)
-            df_stat.to_excel(writer, sheet_name='주차별통계', index=False)
-            df.to_excel(writer, sheet_name='전체교적부', index=False)
-        st.download_button(label="🚀 엑셀 파일 다운로드", data=output.getvalue(), file_name=f"유년부_통계_{datetime.date.today()}.xlsx", mime="application/vnd.ms-excel")
+    st.write("📥 **통계 데이터 엑셀/CSV 다운로드** (에러 없이 안전하게 받아보세요)")
+    
+    c_csv1, c_csv2 = st.columns(2)
+    with c_csv1:
+        # 개인별 통계 CSV 변환 (한글 깨짐 방지 utf-8-sig)
+        csv_personal = report_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(label="📊 개인별 통계 다운로드", data=csv_personal, file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
+    with c_csv2:
+        # 주차별 통계 CSV 변환
+        csv_weekly = df_stat.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(label="📅 주차별 통계 다운로드", data=csv_weekly, file_name=f"주차별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
 
 # ==========================================
 # 나머지 탭 (반편성, 생일표, 새친구, 행사)
@@ -338,17 +342,25 @@ with tabs[4]: # 새친구
     if not news.empty: st.dataframe(news[available_cols], use_container_width=True, hide_index=True)
     else: st.info("새친구가 없습니다.")
 
-with tabs[5]: # 행사 (🔥 행사도 일괄 업데이트 적용)
+with tabs[5]: # 행사 (🔥 행사 뷰 레이아웃 복구)
     st.subheader("⚙️ 행사 관리")
     e_mode = st.radio("행사", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
+    
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
             with st.container():
-                st.markdown(f"<div class='event-card'><b>📅 {row['날짜']} | {row['활동명']}</b><br>{row['세부내용']}</div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class='event-card'>
+                    <h3 style='margin-top:0;'>📅 {row.get('날짜', '')} | {row.get('활동명', '')}</h3>
+                    <p><b>내용:</b> {row.get('세부내용', '')}</p>
+                    <p style='color: #d32f2f;'><b>공지:</b> {row.get('공지사항', '')}</p>
+                </div>
+                """, unsafe_allow_html=True)
                 p_cols = st.columns(4)
                 for i in range(1, 5):
                     url = row.get(f'사진{i}', "")
                     if url and str(url).startswith('http'): p_cols[i-1].image(url, use_container_width=True)
+                    
     elif e_mode == "📝 수정" and not df_act.empty:
         act_sh_headers = ws_act.row_values(1)
         v_act_cols = [c for c in ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"] if c in df_act.columns]
@@ -362,11 +374,13 @@ with tabs[5]: # 행사 (🔥 행사도 일괄 업데이트 적용)
                             cells_to_update.append(gspread.Cell(int(df_act.iloc[r]['sheet_row']), act_sh_headers.index(c)+1, str(edited_events.iloc[r][c])))
                 if cells_to_update: ws_act.update_cells(cells_to_update)
                 fetch_sheet_data.clear(); st.success("저장완료"); st.rerun()
+                
     elif e_mode == "🚨 삭제" and not df_act.empty:
         sel_del = st.selectbox("삭제할 행사", df_act['활동명'].tolist())
         if st.button("🚨 삭제 실행"):
             ws_act.delete_rows(int(df_act[df_act['활동명']==sel_del].iloc[0]['sheet_row']))
             fetch_sheet_data.clear(); st.success("삭제됨"); st.rerun()
+            
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_f = st.file_uploader("사진", accept_multiple_files=True)
