@@ -7,13 +7,12 @@ import base64
 import datetime
 
 # --- 1. SETTINGS & CSS ---
-st.set_page_config(page_title="유년부 통합 관리 v24.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v24.1", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
     .attendance-box { border: 1px solid #ddd; padding: 10px; border-radius: 8px; background-color: #f9f9f9; margin-bottom: 10px; text-align: center; }
     .stCheckbox { transform: scale(1.2); }
-    /* Month grid styling for alignment */
     .month-container { min-height: 200px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: white; margin-bottom: 15px; }
     </style>
     """, unsafe_allow_html=True)
@@ -45,7 +44,12 @@ def get_all_data():
         df_m = pd.DataFrame(vals[1:], columns=headers) if len(vals) > 1 else pd.DataFrame()
         df_m['sheet_row'] = range(2, len(df_m) + 2)
         
-        # 2. Events Sheet (Renamed to "행사" logic internally, using "활동간식" tab)
+        # 유연한 컬럼명 대응 (상태 -> 학교상태)
+        if '상태' in df_m.columns and '학교상태' not in df_m.columns:
+            df_m.rename(columns={'상태': '학교상태'}, inplace=True)
+            headers = [h if h != '상태' else '학교상태' for h in headers]
+            
+        # 2. Events Sheet (활동간식)
         try:
             ws_a = sh.worksheet("활동간식")
             a_vals = ws_a.get_all_values()
@@ -76,7 +80,6 @@ def upload_photo(file, name):
         return res.get("fileUrl", "")
     except: return ""
 
-# Map Column Names Flexible (학년(담임) <-> 반)
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 
 # --- 4. WEEK & DATE GENERATION ---
@@ -90,8 +93,7 @@ for i in range(1, 53):
     week_display_map[w_name] = w_disp
     start_date += datetime.timedelta(days=7)
 
-# --- 5. TAB CONFIGURATION (REORDERED v24.0) ---
-# Order: 교적부, 출석체크, 반편성, 생일표, 새친구, 행사
+# --- 5. TAB CONFIGURATION ---
 tabs = st.tabs(["📋 교적부", "✅ 출석체크", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사"])
 
 if df.empty:
@@ -99,48 +101,139 @@ if df.empty:
     st.stop()
 
 # ==========================================
-# [탭 1] 교적부 관리 (SPECIFIED COLUMNS)
+# [탭 1] 교적부 관리 (🔥 5가지 개선사항 완벽 적용 CRUD)
 # ==========================================
 with tabs[0]:
-    st.subheader("📋 교적부 통합 관리")
+    st.subheader("📋 교적부 통합 데이터베이스")
     
-    # Specific Columns Required: 학년(담임), 이름, 사진, 생년월일, 주소, 부모(아빠/엄마), 연락처, 학교상태, 비고, 전도자
-    req_cols = [class_col, '이름', '사진', '생년월일', '주소', '부모(아빠/엄마)', '연락처', '학교상태', '비고', '전도자']
-    # Mapping and checking existence
+    # 1. 직관적인 모드 분리
+    manage_mode = st.radio("작업 모드 선택", ["👀 전체 명단 보기", "📝 개별 상세 조회 및 수정/삭제", "➕ 신규 인원 추가"], horizontal=True)
+    
+    # 필수 출력 항목 (관리자님 요청 순서)
+    req_cols = ['학년(담임)', '이름', '사진', '생년월일', '주소', '부모(아빠/엄마)', '연락처', '학교상태', '비고', '전도자']
     available_cols = [c for c in req_cols if c in df.columns]
-    
-    # Data Editor for Registry
-    edited_members = st.data_editor(
-        df[available_cols],
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "사진": st.column_config.ImageColumn("사진", width="small"),
-            "학년(담임)": st.column_config.Column(width="medium"),
-            "이름": st.column_config.Column(width="small")
-        },
-        num_rows="dynamic"
-    )
-    
-    if st.button("💾 교적부 변경사항 저장"):
-        with st.spinner("구글 시트 업데이트 중..."):
-            try:
-                # Optimized Cell Update Logic
-                for r_idx in range(len(edited_members)):
-                    for c_name in available_cols:
-                        old_val = str(df.iloc[r_idx][c_name]).strip()
-                        new_val = str(edited_members.iloc[r_idx][c_name]).strip()
-                        if old_val != new_val:
-                            sheet_r = df.iloc[r_idx]['sheet_row']
-                            sheet_c = headers.index(c_name) + 1
-                            ws.update_cell(sheet_r, sheet_c, new_val)
-                st.success("교적부 정보가 성공적으로 저장되었습니다!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"저장 에러: {e}")
+
+    st.markdown("---")
+
+    if manage_mode == "👀 전체 명단 보기":
+        st.write(f"현재 등록된 총 인원: **{len(df)}명**")
+        st.dataframe(
+            df[available_cols], 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={"사진": st.column_config.ImageColumn("사진")}
+        )
+
+    elif manage_mode == "📝 개별 상세 조회 및 수정/삭제":
+        st.info("💡 수정 또는 삭제할 학생을 아래에서 검색하여 선택하세요.")
+        target_list = ["선택 안함"] + list(df['이름'] + " (" + df[class_col].astype(str) + ")")
+        selected_member = st.selectbox("학생 검색", target_list)
+        
+        if selected_member != "선택 안함":
+            target_name = selected_member.split(" (")[0]
+            target_class = selected_member.split(" (")[1].replace(")", "")
+            target_data = df[(df['이름'] == target_name) & (df[class_col] == target_class)].iloc[0]
+            sheet_row = target_data['sheet_row']
+            
+            st.markdown(f"#### 👤 {target_name} 학생 상세 프로필")
+            
+            col_img, col_form = st.columns([1, 2])
+            with col_img:
+                photo_url = target_data.get('사진', '')
+                if isinstance(photo_url, str) and photo_url.startswith('http'):
+                    st.image(photo_url, use_container_width=True)
+                else:
+                    st.info("등록된 사진이 없습니다.")
+                    
+            with col_form:
+                with st.form("edit_member_form"):
+                    e_class = st.text_input("학년(담임)", value=target_data.get('학년(담임)', ''))
+                    e_name = st.text_input("이름", value=target_data.get('이름', ''))
+                    e_birth = st.text_input("생년월일", value=target_data.get('생년월일', ''))
+                    e_addr = st.text_input("주소", value=target_data.get('주소', ''))
+                    e_parents = st.text_input("부모(아빠/엄마)", value=target_data.get('부모(아빠/엄마)', ''))
+                    e_phone = st.text_input("연락처", value=target_data.get('연락처', ''))
+                    
+                    status_opts = ["일반", "새친구", "이사", "교사"]
+                    curr_status = target_data.get('학교상태', '일반')
+                    e_status = st.selectbox("학교상태", status_opts, index=status_opts.index(curr_status) if curr_status in status_opts else 0)
+                    
+                    e_memo = st.text_input("비고", value=target_data.get('비고', ''))
+                    e_evangelist = st.text_input("전도자", value=target_data.get('전도자', ''))
+                    e_photo = st.file_uploader("사진 변경 (유지하려면 비워두세요)", type=["jpg", "png", "jpeg"])
+                    
+                    c1, c2 = st.columns(2)
+                    btn_update = c1.form_submit_button("💾 정보 수정", use_container_width=True)
+                    btn_delete = c2.form_submit_button("🚨 완전 삭제", use_container_width=True)
+                    
+                    if btn_update:
+                        with st.spinner("정보 업데이트 중..."):
+                            new_photo_url = photo_url
+                            if e_photo:
+                                new_photo_url = upload_photo(e_photo, e_name)
+                                
+                            # 헤더 기준으로 인덱스 찾아 개별 업데이트
+                            update_map = {
+                                '학년(담임)': e_class, '이름': e_name, '생년월일': e_birth,
+                                '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone,
+                                '학교상태': e_status, '비고': e_memo, '전도자': e_evangelist, '사진': new_photo_url
+                            }
+                            
+                            for col_name, new_val in update_map.items():
+                                if col_name in headers:
+                                    ws.update_cell(sheet_row, headers.index(col_name) + 1, new_val)
+                            
+                            st.success("수정이 완료되었습니다!")
+                            st.rerun()
+                            
+                    if btn_delete:
+                        ws.delete_rows(sheet_row)
+                        st.success(f"{target_name} 학생의 정보가 완전히 삭제되었습니다.")
+                        st.rerun()
+
+    elif manage_mode == "➕ 신규 인원 추가":
+        st.markdown("#### ✨ 새로운 인원 (새친구/교사 등) 등록")
+        with st.form("add_member_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                n_class = st.text_input("학년(담임) (필수, 예: 1-1(홍길동))")
+                n_name = st.text_input("이름 (필수)")
+                n_birth = st.text_input("생년월일 (예: 19.02.26)")
+                n_parents = st.text_input("부모(아빠/엄마)")
+                n_phone = st.text_input("연락처")
+            with col2:
+                n_addr = st.text_input("주소")
+                n_status = st.selectbox("학교상태", ["일반", "새친구", "이사", "교사"], index=1)
+                n_memo = st.text_input("비고 (등록일 등)")
+                n_evangelist = st.text_input("전도자")
+                n_photo = st.file_uploader("학생 사진 첨부", type=["jpg", "png", "jpeg"])
+                
+            if st.form_submit_button("✨ 교적부에 등록하기", use_container_width=True):
+                if not n_name or not n_class:
+                    st.error("이름과 학년(담임)은 필수 입력 사항입니다.")
+                else:
+                    with st.spinner("데이터베이스에 등록 중..."):
+                        photo_url = upload_photo(n_photo, n_name)
+                        new_row = [""] * len(headers)
+                        h_map = {str(h).strip(): i for i, h in enumerate(headers)}
+                        
+                        if '학년(담임)' in h_map: new_row[h_map['학년(담임)']] = n_class
+                        if '이름' in h_map: new_row[h_map['이름']] = n_name
+                        if '생년월일' in h_map: new_row[h_map['생년월일']] = n_birth
+                        if '주소' in h_map: new_row[h_map['주소']] = n_addr
+                        if '부모(아빠/엄마)' in h_map: new_row[h_map['부모(아빠/엄마)']] = n_parents
+                        if '연락처' in h_map: new_row[h_map['연락처']] = n_phone
+                        if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
+                        if '비고' in h_map: new_row[h_map['비고']] = n_memo
+                        if '전도자' in h_map: new_row[h_map['전도자']] = n_evangelist
+                        if '사진' in h_map: new_row[h_map['사진']] = photo_url
+                        
+                        ws.append_row(new_row)
+                        st.success(f"[{n_class}] {n_name} 등록 완료!")
+                        st.rerun()
 
 # ==========================================
-# [탭 2] 출석체크 (3-COLUMN & DATE DISPLAY)
+# [탭 2] 출석체크 (기존 기능 유지)
 # ==========================================
 with tabs[1]:
     st.subheader("📅 주차별 출석 관리")
@@ -151,7 +244,7 @@ with tabs[1]:
     classes = ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()])
     sel_class = st.selectbox("반 필터", classes, key="att_class_sel")
 
-    att_df = df[df['상태'] != '이사'].copy()
+    att_df = df[df['학교상태' if '학교상태' in df.columns else '상태'] != '이사'].copy()
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     att_df = att_df.sort_values(by=[class_col, '이름'])
 
@@ -175,22 +268,23 @@ with tabs[1]:
                 st.rerun()
 
 # ==========================================
-# [탭 3] 반편성 현황
+# [탭 3] 반편성 현황 (기존 기능 유지)
 # ==========================================
 with tabs[2]:
     st.subheader("🏫 반별 명단 현황")
     if not df.empty:
-        grouped = df[df['상태'] != '이사'].groupby(class_col)
+        status_col = '학교상태' if '학교상태' in df.columns else '상태'
+        grouped = df[df[status_col] != '이사'].groupby(class_col)
         cols = st.columns(3)
         for i, (name, group) in enumerate(grouped):
             with cols[i % 3]:
                 with st.container(border=True):
                     st.markdown(f"**{name}** ({len(group)}명)")
-                    names = [f"🔴{n}" if s == '새친구' else n for n, s in zip(group['이름'], group['상태'])]
+                    names = [f"🔴{n}" if s == '새친구' else n for n, s in zip(group['이름'], group[status_col])]
                     st.write(", ".join(names))
 
 # ==========================================
-# [탭 4] 월별 생일표 (ALIGNED GRID)
+# [탭 4] 월별 생일표 (기존 기능 유지)
 # ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
@@ -205,7 +299,6 @@ with tabs[3]:
                     b_map[m].append(f"**{r['이름']}** ({r[class_col]}) - {d}일")
                 except: pass
         
-        # Consistent 3-column grid for alignment
         cols = st.columns(3)
         for i in range(1, 13):
             with cols[(i-1)%3]:
@@ -219,25 +312,24 @@ with tabs[3]:
                 st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# [탭 5] 새친구 목록
+# [탭 5] 새친구 목록 (기존 기능 유지)
 # ==========================================
 with tabs[4]:
     st.subheader("🌱 최근 등록 새친구")
-    news = df[df['상태'] == '새친구']
+    status_col = '학교상태' if '학교상태' in df.columns else '상태'
+    news = df[df[status_col] == '새친구']
     if not news.empty:
         st.dataframe(news[available_cols], use_container_width=True, hide_index=True)
     else: st.info("새친구가 없습니다.")
 
 # ==========================================
-# [탭 6] 행사 (EDITABLE DATA)
+# [탭 6] 행사 (기존 기능 유지)
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 및 활동 관리")
     
-    # Existing History with Edit Capability
     st.write("📂 **활동 내역 수정 및 관리**")
     if not df_act.empty:
-        # Use Data Editor to allow editing existing event records
         act_headers = ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"]
         valid_act_cols = [c for c in act_headers if c in df_act.columns]
         
@@ -257,7 +349,6 @@ with tabs[5]:
                         n_v = str(edited_events.iloc[r_idx][c_name]).strip()
                         if o_v != n_v:
                             s_row = df_act.iloc[r_idx]['sheet_row']
-                            # Map act columns to actual index in the "활동간식" sheet
                             act_sh_headers = ws_act.row_values(1)
                             s_col = act_sh_headers.index(c_name) + 1
                             ws_act.update_cell(s_row, s_col, n_v)
