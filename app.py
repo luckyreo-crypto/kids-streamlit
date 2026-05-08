@@ -7,7 +7,7 @@ import base64
 import datetime
 
 # --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v28.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v28.1", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
@@ -16,12 +16,28 @@ st.markdown("""
         color: #0366d6; font-weight: 800; font-size: 1.1rem;
         margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6;
     }
-    .att-card {
-        border: 2px solid #e0e0e0; padding: 10px; border-radius: 12px;
-        background-color: #ffffff; margin-bottom: 8px; text-align: center;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+    
+    /* 🔥 세련된 토글 스위치 카드 디자인 (빈 박스 문제 완벽 해결) */
+    div[data-testid="stToggle"] {
+        border: 2px solid #eef2f6;
+        padding: 12px 18px;
+        border-radius: 16px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        transition: all 0.2s ease-in-out;
+        margin-bottom: 10px;
     }
-    .stCheckbox label, .stToggle label { font-size: 1.1rem !important; font-weight: bold !important; }
+    div[data-testid="stToggle"]:hover {
+        border-color: #0366d6;
+        background-color: #f8fbff;
+        box-shadow: 0 4px 8px rgba(3,102,214,0.1);
+    }
+    div[data-testid="stToggle"] label p {
+        font-size: 1.15rem !important;
+        font-weight: 800 !important;
+        color: #2c3e50 !important;
+    }
+
     .month-container { min-height: 180px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: white; margin-bottom: 15px; }
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     </style>
@@ -95,7 +111,7 @@ week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days
 tabs = st.tabs(["📋 교적부", "✅ 출석체크", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사"])
 
 # ==========================================
-# [탭 1] 교적부 관리
+# [탭 1] 교적부 관리 (기존 유지)
 # ==========================================
 with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
@@ -163,7 +179,7 @@ with tabs[0]:
                         st.success("등록 완료!"); st.rerun()
 
 # ==========================================
-# [탭 2] 출석체크 (🔥토글 스위치 적용 & 연동 유지)
+# [탭 2] 출석체크 (🔥 껍데기 벗긴 깔끔한 토글 UI)
 # ==========================================
 with tabs[1]:
     st.subheader("📅 주간 출석 및 통계 관리")
@@ -191,7 +207,7 @@ with tabs[1]:
     guest_in = cs3.number_input("기타 인원", min_value=0, value=saved_guest)
     cs4.metric("총 합계", f"{present_cnt + guest_in}명")
 
-    with st.form("att_form_v28"):
+    with st.form("att_form_v28_1"):
         grouped = att_df.sort_values(by=['이름']).groupby(class_col)
         new_att = {}
         for c_name, group in sorted(grouped):
@@ -199,12 +215,10 @@ with tabs[1]:
             cols = st.columns(3)
             for i, (idx, row) in enumerate(group.iterrows()):
                 with cols[i % 3]:
-                    st.markdown("<div class='att-card'>", unsafe_allow_html=True)
+                    # 어설픈 HTML 박스를 제거하고 토글 자체에 예쁜 CSS 카드를 씌웠습니다!
                     is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
                     label = f"🌱 {row['이름']}" if row.get('학교상태') == '새친구' else row['이름']
-                    # ★ 변경포인트: st.checkbox -> st.toggle 변경 (키값 연동 완벽 유지)
                     new_att[row['sheet_row']] = st.toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
-                    st.markdown("</div>", unsafe_allow_html=True)
         
         if st.form_submit_button("💾 출석 및 주간 통계 저장", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
@@ -214,7 +228,6 @@ with tabs[1]:
                     ws.update_cell(r, target_c, "1" if v else "")
                     if v: final_p += 1
                 
-                # 통계 시트 업데이트
                 rate = int((final_p/total_reg)*100) if total_reg > 0 else 0
                 target_stat_row = -1
                 if not df_stat.empty and '주차' in df_stat.columns:
@@ -290,11 +303,10 @@ with tabs[4]:
     st.dataframe(news[['학년(담임)', '이름', '생년월일', '연락처', '비고']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 6] 행사 관리 (🔥삭제 기능 추가)
+# [탭 6] 행사 관리 (기존 유지)
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 및 활동 관리")
-    # ★ 변경포인트: 삭제 모드 추가
     e_mode = st.radio("행사 작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
     
     if e_mode == "📂 보기" and not df_act.empty:
@@ -307,16 +319,10 @@ with tabs[5]:
                     if url and str(url).startswith('http'): p_cols[i-1].image(url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
-        st.info("💡 표 안의 내용을 클릭하여 직접 수정하세요. (사진 컬럼은 이미지로 미리보기가 제공됩니다.)")
+        st.info("💡 표 안의 내용을 클릭하여 직접 수정하세요.")
         act_headers = ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"]
         v_act_cols = [c for c in act_headers if c in df_act.columns]
-        
-        edited_events = st.data_editor(
-            df_act, 
-            use_container_width=True, 
-            hide_index=True, 
-            column_config={f"사진{i}": st.column_config.ImageColumn() for i in range(1, 5)}
-        )
+        edited_events = st.data_editor(df_act, use_container_width=True, hide_index=True, column_config={f"사진{i}": st.column_config.ImageColumn() for i in range(1, 5)})
         if st.button("📝 행사 저장"):
             with st.spinner("업데이트 중..."):
                 act_sh_headers = ws_act.row_values(1)
@@ -328,25 +334,20 @@ with tabs[5]:
                 st.success("업데이트 완료!"); st.rerun()
 
     elif e_mode == "🚨 삭제" and not df_act.empty:
-        st.info("💡 삭제할 행사를 선택하세요. 삭제된 데이터는 복구할 수 없습니다.")
+        st.info("💡 삭제할 행사를 선택하세요.")
         search_list = ["행사 선택"] + df_act.apply(lambda r: f"[{r['날짜']}] {r['활동명']}", axis=1).tolist()
         sel_idx = st.selectbox("삭제할 행사 선택", range(len(search_list)), format_func=lambda x: search_list[x])
-        
         if sel_idx > 0:
             target_act = df_act.iloc[sel_idx - 1]
             st.warning(f"정말로 '{target_act['활동명']}' 행사를 삭제하시겠습니까?")
             if st.button("🚨 완전히 삭제하기", type="primary"):
-                with st.spinner("삭제 중..."):
-                    ws_act.delete_rows(int(target_act['sheet_row']))
-                    st.success("행사가 삭제되었습니다!")
-                    st.rerun()
+                ws_act.delete_rows(int(target_act['sheet_row']))
+                st.success("행사가 삭제되었습니다!"); st.rerun()
                     
     elif e_mode == "➕ 등록":
         with st.form("new_event"):
             a_date = st.date_input("날짜"); a_title = st.text_input("행사명"); a_desc = st.text_area("내용"); a_files = st.file_uploader("사진", accept_multiple_files=True)
             if st.form_submit_button("등록"):
-                with st.spinner("업로드 중..."):
-                    urls = ["", "", "", ""]
-                    for i, f in enumerate(a_files[:4]): urls[i] = upload_photo(f, a_title)
-                    ws_act.append_row([str(a_date), a_title, a_desc, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())])
-                    st.success("등록완료!"); st.rerun()
+                urls = ["", "", "", ""]; [urls.__setitem__(i, upload_photo(f, a_title)) for i, f in enumerate(a_files[:4])]
+                ws_act.append_row([str(a_date), a_title, a_desc, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())])
+                st.success("등록완료!"); st.rerun()
