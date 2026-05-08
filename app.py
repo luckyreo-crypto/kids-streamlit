@@ -7,7 +7,7 @@ import base64
 import datetime
 
 # --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v23.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v23.1", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
@@ -50,14 +50,19 @@ def get_all_data():
         df_m = pd.DataFrame(vals[1:], columns=headers) if len(vals) > 1 else pd.DataFrame()
         df_m['sheet_row'] = range(2, len(df_m) + 2)
         
-        # 2. 활동간식 로드 (명칭 변경 반영)
+        # 2. 활동간식 로드 (빈 시트일 경우 대비 에러 방지 강화)
         try:
             ws_a = sh.worksheet("활동간식")
+            a_vals = ws_a.get_all_values()
+            # 시트가 만들어져있으나 텅 비어있을 경우 헤더 강제 주입
+            if not a_vals:
+                ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4", "등록일"])
+                a_vals = ws_a.get_all_values()
         except:
             ws_a = sh.add_worksheet(title="활동간식", rows="500", cols="10")
             ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4", "등록일"])
-        
-        a_vals = ws_a.get_all_values()
+            a_vals = ws_a.get_all_values()
+            
         df_a = pd.DataFrame(a_vals[1:], columns=a_vals[0]) if len(a_vals) > 1 else pd.DataFrame()
         
         return ws_m, df_m, headers, ws_a, df_a
@@ -76,10 +81,10 @@ def upload_photo(file, name):
         return res.get("fileUrl", "")
     except: return ""
 
-# 컬럼명 자동 매칭 (학년(담임) -> 반 등으로 유연하게 처리)
+# 컬럼명 자동 매칭
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 
-# --- 4. 주차 및 날짜 생성 (2026년 기준) ---
+# --- 4. 주차 및 날짜 생성 ---
 start_date = datetime.date(2026, 1, 4)
 weeks_list = []
 week_display_map = {}
@@ -98,7 +103,7 @@ if df.empty:
     st.stop()
 
 # ==========================================
-# [탭 1] 출석체크 (3열 배치 & 연간 통계 수정)
+# [탭 1] 출석체크
 # ==========================================
 with tabs[0]:
     st.subheader("📅 주차별 출석 관리")
@@ -113,10 +118,10 @@ with tabs[0]:
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     att_df = att_df.sort_values(by=[class_col, '이름'])
 
-    # 1. 3열 카드형 출석체크
+    # 3열 카드형 출석체크
     with st.form("quick_att_form"):
         st.write(f"### {week_display_map[sel_w]} - {sel_class}")
-        cols = st.columns(3) # ★ 3열 배치
+        cols = st.columns(3)
         new_att_values = {}
         
         for i, (idx, row) in enumerate(att_df.iterrows()):
@@ -136,13 +141,12 @@ with tabs[0]:
 
     st.markdown("---")
     
-    # 2. 연간 통계 및 일괄 수정
+    # 연간 통계 및 일괄 수정
     with st.expander("📊 연간 전체 출석 통계 및 일괄 수정", expanded=False):
         st.write("표에서 직접 '1'(출석) 또는 공백(결석)을 입력하여 대규모 수정이 가능합니다.")
         week_cols = [w for w in weeks_list if w in df.columns]
         stat_df = df[df['상태'] != '이사'][[class_col, '이름'] + week_cols + ['sheet_row']].copy()
         
-        # 출석률 계산
         def get_rate(row):
             count = sum([1 for w in week_cols if str(row[w]).strip() == "1"])
             return f"{int(count/52*100)}%" if len(week_cols)>0 else "0%"
@@ -157,11 +161,10 @@ with tabs[0]:
             st.info("데이터 에디터를 통한 대량 수정은 '교적부 관리' 탭의 일괄 저장 방식을 권장합니다.")
 
 # ==========================================
-# [탭 2] 교적부 관리 (데이터 가시화)
+# [탭 2] 교적부 관리
 # ==========================================
 with tabs[1]:
     st.subheader("📋 교적부 상세 관리")
-    # 보여줄 컬럼 필터링
     core_cols = [class_col, '이름', '상태', '연락처', '부모(아빠/엄마)', '주소', '비고']
     valid_cols = [c for c in core_cols if c in df.columns]
     
@@ -182,7 +185,7 @@ with tabs[1]:
             st.rerun()
 
 # ==========================================
-# [탭 3] 반편성 현황 (데이터 복구)
+# [탭 3] 반편성 현황
 # ==========================================
 with tabs[2]:
     st.subheader("🏫 반별 명단 현황")
@@ -197,7 +200,7 @@ with tabs[2]:
                     st.write(", ".join(names))
 
 # ==========================================
-# [탭 4] 월별 생일표 (이름|반|생일)
+# [탭 4] 월별 생일표
 # ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
@@ -228,7 +231,7 @@ with tabs[4]:
         st.dataframe(news[valid_cols], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 6] 행사&간식 (기존 "활동기록" 대체)
+# [탭 6] 행사&간식 (에러 방지 .get() 적용)
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 및 간식 활동 기록")
@@ -253,12 +256,19 @@ with tabs[5]:
     if not df_act.empty:
         for _, row in df_act[::-1].iterrows():
             with st.container(border=True):
-                st.info(f"**{row['날짜']}** - {row['활동명']}")
-                st.write(row['세부내용'])
-                if row['공지사항']: st.warning(f"공지: {row['공지사항']}")
+                # 안전한 호출 방식으로 KeyError 완벽 차단!
+                act_date = row.get('날짜', '날짜 미상')
+                act_title = row.get('활동명', '제목 없음')
+                act_desc = row.get('세부내용', '')
+                act_note = row.get('공지사항', '')
+                
+                st.info(f"**{act_date}** - {act_title}")
+                st.write(act_desc)
+                if act_note: st.warning(f"공지: {act_note}")
+                
                 p_cols = st.columns(4)
                 for i in range(1, 5):
                     url = row.get(f'사진{i}', "")
                     if url: p_cols[i-1].image(url, use_container_width=True)
     else:
-        st.info("기록된 내역이 없습니다. '활동간식' 시트를 확인해주세요.")
+        st.info("기록된 내역이 없습니다. '활동간식' 시트의 첫 번째 줄(제목)이 잘 적혀있는지 확인해주세요.")
