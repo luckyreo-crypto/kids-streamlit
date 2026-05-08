@@ -7,7 +7,7 @@ import base64
 import datetime
 
 # --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v27.1", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v28.0", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
@@ -21,7 +21,7 @@ st.markdown("""
         background-color: #ffffff; margin-bottom: 8px; text-align: center;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
     }
-    .stCheckbox label { font-size: 1.1rem !important; font-weight: bold !important; }
+    .stCheckbox label, .stToggle label { font-size: 1.1rem !important; font-weight: bold !important; }
     .month-container { min-height: 180px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: white; margin-bottom: 15px; }
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     </style>
@@ -91,11 +91,11 @@ start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') })" for i in range(1, 53)}
 
-# --- 4. 탭 구성 (교적부 첫 번째 이동) ---
+# --- 4. 탭 구성 ---
 tabs = st.tabs(["📋 교적부", "✅ 출석체크", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사"])
 
 # ==========================================
-# [탭 1] 교적부 관리 (🔥인원추가 블록 완벽 복구)
+# [탭 1] 교적부 관리
 # ==========================================
 with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
@@ -124,7 +124,6 @@ with tabs[0]:
                     ws.update_cell(target['sheet_row'], headers.index('학교상태')+1, e_status)
                     if '사진' in headers: ws.update_cell(target['sheet_row'], headers.index('사진')+1, p_url)
                     st.success("수정완료!"); st.rerun()
-    # [수정포인트 1] 빠져있던 '인원추가' 로직 복구
     elif manage_mode == "➕ 인원추가":
         st.markdown("#### ✨ 새로운 인원 등록")
         with st.form("add_member_form", clear_on_submit=True):
@@ -161,11 +160,10 @@ with tabs[0]:
                         if '전도자' in h_map: new_row[h_map['전도자']] = n_evangelist
                         if '사진' in h_map: new_row[h_map['사진']] = photo_url
                         ws.append_row(new_row)
-                        st.success("등록 완료!")
-                        st.rerun()
+                        st.success("등록 완료!"); st.rerun()
 
 # ==========================================
-# [탭 2] 출석체크 (🔥주차별 연동 오류 해결)
+# [탭 2] 출석체크 (🔥토글 스위치 적용 & 연동 유지)
 # ==========================================
 with tabs[1]:
     st.subheader("📅 주간 출석 및 통계 관리")
@@ -178,12 +176,10 @@ with tabs[1]:
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
     
-    # 상단 주간 통계
     st.markdown("---")
     total_reg = len(att_df)
     present_cnt = len(att_df[att_df[sel_w].astype(str).str.strip() == "1"])
     
-    # 기존 기타인원 로드
     saved_guest = 0
     if not df_stat.empty:
         match = df_stat[df_stat['주차'] == sel_w]
@@ -195,8 +191,7 @@ with tabs[1]:
     guest_in = cs3.number_input("기타 인원", min_value=0, value=saved_guest)
     cs4.metric("총 합계", f"{present_cnt + guest_in}명")
 
-    # 모바일용 카드 출석부
-    with st.form("att_form_v27"):
+    with st.form("att_form_v28"):
         grouped = att_df.sort_values(by=['이름']).groupby(class_col)
         new_att = {}
         for c_name, group in sorted(grouped):
@@ -206,8 +201,9 @@ with tabs[1]:
                 with cols[i % 3]:
                     st.markdown("<div class='att-card'>", unsafe_allow_html=True)
                     is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                    # [수정포인트 2] key에 sel_w를 붙여 주차가 바뀌면 체크박스가 새로고침 되도록 수정
-                    new_att[row['sheet_row']] = st.checkbox(row['이름'], value=is_on, key=f"att_{row['sheet_row']}_{sel_w}")
+                    label = f"🌱 {row['이름']}" if row.get('학교상태') == '새친구' else row['이름']
+                    # ★ 변경포인트: st.checkbox -> st.toggle 변경 (키값 연동 완벽 유지)
+                    new_att[row['sheet_row']] = st.toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
                     st.markdown("</div>", unsafe_allow_html=True)
         
         if st.form_submit_button("💾 출석 및 주간 통계 저장", type="primary", use_container_width=True):
@@ -217,12 +213,24 @@ with tabs[1]:
                 for r, v in new_att.items():
                     ws.update_cell(r, target_c, "1" if v else "")
                     if v: final_p += 1
+                
                 # 통계 시트 업데이트
                 rate = int((final_p/total_reg)*100) if total_reg > 0 else 0
-                ws_stat.append_row([sel_w, total_reg, final_p, total_reg-final_p, guest_in, final_p+guest_in, f"{rate}%", str(datetime.datetime.now())])
+                target_stat_row = -1
+                if not df_stat.empty and '주차' in df_stat.columns:
+                    match_stat = df_stat[df_stat['주차'] == sel_w]
+                    if not match_stat.empty:
+                        target_stat_row = match_stat.index[0] + 2
+                
+                stat_data = [sel_w, total_reg, final_p, total_reg-final_p, guest_in, final_p+guest_in, f"{rate}%", str(datetime.datetime.now())]
+                
+                if target_stat_row != -1:
+                    ws_stat.update(f"A{target_stat_row}:H{target_stat_row}", [stat_data])
+                else:
+                    ws_stat.append_row(stat_data)
+                
                 st.success("저장되었습니다!"); st.rerun()
 
-    # 하단 연간 통합 수정 (체크박스 UI)
     with st.expander("📊 연간 전체 출석 현황 및 일괄 수정"):
         week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
         annual_df = df[df['학교상태'] != '이사'][[class_col, '이름', 'sheet_row'] + week_cols].copy()
@@ -238,7 +246,7 @@ with tabs[1]:
             st.success("업데이트 완료!"); st.rerun()
 
 # ==========================================
-# [탭 3] 반편성 현황 (기존 기능 유지)
+# [탭 3] 반편성 현황
 # ==========================================
 with tabs[2]:
     st.subheader("🏫 반별 명단 현황")
@@ -251,7 +259,7 @@ with tabs[2]:
                 st.write(", ".join([f"🔴{n}" if s == '새친구' else n for n, s in zip(group['이름'], group['학교상태'])]))
 
 # ==========================================
-# [탭 4] 월별 생일표 (기존 가로 정렬 기능 유지)
+# [탭 4] 월별 생일표
 # ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
@@ -282,11 +290,13 @@ with tabs[4]:
     st.dataframe(news[['학년(담임)', '이름', '생년월일', '연락처', '비고']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 6] 행사 관리 (기존 기능 유지)
+# [탭 6] 행사 관리 (🔥삭제 기능 추가)
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 및 활동 관리")
-    e_mode = st.radio("행사 작업", ["📂 보기", "📝 수정", "➕ 등록"], horizontal=True)
+    # ★ 변경포인트: 삭제 모드 추가
+    e_mode = st.radio("행사 작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
+    
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
             with st.container():
@@ -295,13 +305,48 @@ with tabs[5]:
                 for i in range(1, 5):
                     url = row.get(f'사진{i}', "")
                     if url and str(url).startswith('http'): p_cols[i-1].image(url, use_container_width=True)
+                    
     elif e_mode == "📝 수정" and not df_act.empty:
-        st.data_editor(df_act, use_container_width=True, hide_index=True, column_config={f"사진{i}": st.column_config.ImageColumn() for i in range(1, 5)})
+        st.info("💡 표 안의 내용을 클릭하여 직접 수정하세요. (사진 컬럼은 이미지로 미리보기가 제공됩니다.)")
+        act_headers = ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"]
+        v_act_cols = [c for c in act_headers if c in df_act.columns]
+        
+        edited_events = st.data_editor(
+            df_act, 
+            use_container_width=True, 
+            hide_index=True, 
+            column_config={f"사진{i}": st.column_config.ImageColumn() for i in range(1, 5)}
+        )
+        if st.button("📝 행사 저장"):
+            with st.spinner("업데이트 중..."):
+                act_sh_headers = ws_act.row_values(1)
+                for r in range(len(edited_events)):
+                    for c in v_act_cols:
+                        if str(df_act.iloc[r][c]) != str(edited_events.iloc[r][c]):
+                            col_idx = act_sh_headers.index(c) + 1
+                            ws_act.update_cell(df_act.iloc[r]['sheet_row'], col_idx, str(edited_events.iloc[r][c]))
+                st.success("업데이트 완료!"); st.rerun()
+
+    elif e_mode == "🚨 삭제" and not df_act.empty:
+        st.info("💡 삭제할 행사를 선택하세요. 삭제된 데이터는 복구할 수 없습니다.")
+        search_list = ["행사 선택"] + df_act.apply(lambda r: f"[{r['날짜']}] {r['활동명']}", axis=1).tolist()
+        sel_idx = st.selectbox("삭제할 행사 선택", range(len(search_list)), format_func=lambda x: search_list[x])
+        
+        if sel_idx > 0:
+            target_act = df_act.iloc[sel_idx - 1]
+            st.warning(f"정말로 '{target_act['활동명']}' 행사를 삭제하시겠습니까?")
+            if st.button("🚨 완전히 삭제하기", type="primary"):
+                with st.spinner("삭제 중..."):
+                    ws_act.delete_rows(int(target_act['sheet_row']))
+                    st.success("행사가 삭제되었습니다!")
+                    st.rerun()
+                    
     elif e_mode == "➕ 등록":
         with st.form("new_event"):
             a_date = st.date_input("날짜"); a_title = st.text_input("행사명"); a_desc = st.text_area("내용"); a_files = st.file_uploader("사진", accept_multiple_files=True)
             if st.form_submit_button("등록"):
-                urls = ["", "", "", ""]
-                for i, f in enumerate(a_files[:4]): urls[i] = upload_photo(f, a_title)
-                ws_act.append_row([str(a_date), a_title, a_desc, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())])
-                st.success("등록완료!"); st.rerun()
+                with st.spinner("업로드 중..."):
+                    urls = ["", "", "", ""]
+                    for i, f in enumerate(a_files[:4]): urls[i] = upload_photo(f, a_title)
+                    ws_act.append_row([str(a_date), a_title, a_desc, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())])
+                    st.success("등록완료!"); st.rerun()
