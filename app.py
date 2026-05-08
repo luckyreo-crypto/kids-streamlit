@@ -32,11 +32,19 @@ def get_data():
         sh = client.open_by_key(sheet_id)
         ws = sh.worksheet("교적부")
         rows = ws.get_all_records()
-        return ws, pd.DataFrame(rows)
+        df = pd.DataFrame(rows)
+        
+        # ★ 구글 시트의 실제 제목을 파이썬 코드의 기준에 맞게 번역(이름 변경)합니다.
+        df.rename(columns={
+            '학년(담임)': '반',
+            '부모(아빠/엄마)': '부모님',
+            '비고': '등록일/기타'
+        }, inplace=True)
+        
+        return ws, df
     except Exception as e:
         st.error(f"시트 로드 에러: {e}")
         return None, pd.DataFrame()
-
 ws, df = get_data()
 
 # --- 3. 헤더 영역 ---
