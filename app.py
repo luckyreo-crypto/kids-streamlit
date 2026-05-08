@@ -111,73 +111,133 @@ week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days
 tabs = st.tabs(["📋 교적부", "✅ 출석체크", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사"])
 
 # ==========================================
-# [탭 1] 교적부 관리 (기존 유지)
+# [탭 1] 교적부 관리 (🔥학교 항목 복구 및 11개 항목 완벽 연동)
 # ==========================================
 with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
     manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/삭제", "➕ 인원추가"], horizontal=True)
-    req_cols = ['학년(담임)', '이름', '사진', '생년월일', '주소', '부모(아빠/엄마)', '연락처', '학교상태', '비고', '전도자']
-    available_cols = [c for c in req_cols if c in df.columns]
+    
+    # 관리자님이 요청하신 11개 핵심 항목 (순서 조정 완료)
+    req_cols = ['학년(담임)', '이름', '사진', '생년월일', '학교', '주소', '부모(아빠/엄마)', '연락처', '상태', '비고', '전도자']
+    
+    # 시트 내 실제 컬럼 존재 여부 확인 (학교상태/상태 유연하게 대응)
+    available_cols = []
+    for c in req_cols:
+        if c in df.columns:
+            available_cols.append(c)
+        elif c == '상태' and '학교상태' in df.columns:
+            available_cols.append('학교상태')
 
     if manage_mode == "👀 전체보기":
-        st.dataframe(df[available_cols], use_container_width=True, hide_index=True, column_config={"사진": st.column_config.ImageColumn("사진")})
+        st.write(f"현재 등록된 총 인원: **{len(df)}명**")
+        st.dataframe(
+            df[available_cols], 
+            use_container_width=True, 
+            hide_index=True, 
+            column_config={"사진": st.column_config.ImageColumn("사진")}
+        )
+    
     elif manage_mode == "📝 수정/삭제":
         search_list = ["학생 선택"] + df.apply(lambda r: f"{r['이름']} | {r.get(class_col,'')}", axis=1).tolist()
         sel_idx = st.selectbox("학생 선택", range(len(search_list)), format_func=lambda x: search_list[x])
+        
         if sel_idx > 0:
             target = df.iloc[sel_idx - 1]
-            with st.form("edit_form"):
+            with st.form("edit_form_final"):
                 col_i, col_f = st.columns([1, 2])
-                if target.get('사진') and str(target['사진']).startswith('http'): col_i.image(target['사진'], use_container_width=True)
-                e_name = col_f.text_input("이름", value=target['이름'])
-                e_class = col_f.text_input("학년(담임)", value=target.get(class_col,''))
-                e_status = col_f.selectbox("학교상태", ["일반", "새친구", "이사", "교사"], index=0)
-                e_photo = col_f.file_uploader("사진변경")
-                if st.form_submit_button("💾 수정사항 저장"):
-                    p_url = upload_photo(e_photo, e_name) if e_photo else target.get('사진','')
-                    ws.update_cell(target['sheet_row'], headers.index('이름')+1, e_name)
-                    ws.update_cell(target['sheet_row'], headers.index(class_col)+1, e_class)
-                    ws.update_cell(target['sheet_row'], headers.index('학교상태')+1, e_status)
-                    if '사진' in headers: ws.update_cell(target['sheet_row'], headers.index('사진')+1, p_url)
-                    st.success("수정완료!"); st.rerun()
+                if target.get('사진') and str(target['사진']).startswith('http'): 
+                    col_i.image(target['사진'], use_container_width=True)
+                
+                # 좌우로 나누어 입력 폼 배치
+                c1, c2 = col_f.columns(2)
+                e_name = c1.text_input("이름", value=target.get('이름', ''))
+                e_class = c2.text_input("학년(담임)", value=target.get(class_col, ''))
+                e_birth = c1.text_input("생년월일", value=target.get('생년월일', ''))
+                e_school = c2.text_input("학교", value=target.get('학교', ''))
+                e_phone = c1.text_input("연락처", value=target.get('연락처', ''))
+                e_parents = c2.text_input("부모(아빠/엄마)", value=target.get('부모(아빠/엄마)', ''))
+                
+                # 상태 항목 처리
+                current_status = target.get('상태', target.get('학교상태', '일반'))
+                status_opts = ["일반", "새친구", "이사", "교사"]
+                e_status = col_f.selectbox("상태", status_opts, index=status_opts.index(current_status) if current_status in status_opts else 0)
+                
+                e_addr = col_f.text_input("주소", value=target.get('주소', ''))
+                e_memo = col_f.text_input("비고", value=target.get('비고', ''))
+                e_evangelist = col_f.text_input("전도자", value=target.get('전도자', ''))
+                e_photo = col_f.file_uploader("사진변경 (선택)")
+                
+                if st.form_submit_button("💾 모든 정보 수정 저장", use_container_width=True):
+                    with st.spinner("저장 중..."):
+                        p_url = upload_photo(e_photo, e_name) if e_photo else target.get('사진','')
+                        actual_headers = ws.row_values(1)
+                        r_idx = target['sheet_row']
+                        
+                        # 맵핑 기반 자동 업데이트
+                        update_map = {
+                            '이름': e_name, '학년(담임)': e_class, '반': e_class,
+                            '생년월일': e_birth, '학교': e_school, '주소': e_addr,
+                            '부모(아빠/엄마)': e_parents, '연락처': e_phone,
+                            '비고': e_memo, '전도자': e_evangelist, '사진': p_url
+                        }
+                        
+                        for k, v in update_map.items():
+                            if k in actual_headers:
+                                ws.update_cell(r_idx, actual_headers.index(k)+1, str(v))
+                        
+                        # 상태 필드 (상태 또는 학교상태)
+                        if '상태' in actual_headers: ws.update_cell(r_idx, actual_headers.index('상태')+1, e_status)
+                        elif '학교상태' in actual_headers: ws.update_cell(r_idx, actual_headers.index('학교상태')+1, e_status)
+                        
+                        st.success("정보가 성공적으로 수정되었습니다!")
+                        st.rerun()
+                        
     elif manage_mode == "➕ 인원추가":
         st.markdown("#### ✨ 새로운 인원 등록")
-        with st.form("add_member_form", clear_on_submit=True):
+        with st.form("add_member_form_final", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
                 n_class = st.text_input("학년(담임) (필수)", placeholder="예: 1-1(권은주)")
                 n_name = st.text_input("이름 (필수)")
                 n_birth = st.text_input("생년월일", placeholder="예: 19.02.26")
-                n_parents = st.text_input("부모(아빠/엄마)")
-                n_phone = st.text_input("연락처", placeholder="예: 010-1234-5678")
+                n_school = st.text_input("학교")
+                n_phone = st.text_input("연락처", placeholder="010-1234-5678")
             with col2:
+                n_parents = st.text_input("부모(아빠/엄마)")
                 n_addr = st.text_input("주소")
-                n_status = st.selectbox("학교상태", ["일반", "새친구", "이사", "교사"], index=1)
+                n_status = st.selectbox("상태", ["일반", "새친구", "이사", "교사"], index=1)
                 n_memo = st.text_input("비고")
                 n_evangelist = st.text_input("전도자")
-                n_photo = st.file_uploader("사진 첨부", type=["jpg", "png", "jpeg"])
+            
+            n_photo = st.file_uploader("학생 사진 첨부", type=["jpg", "png", "jpeg"])
                 
-            if st.form_submit_button("✨ 등록하기", use_container_width=True):
+            if st.form_submit_button("✨ 교적부에 새 인원 등록하기", use_container_width=True):
                 if not n_name or not n_class:
                     st.error("이름과 학년(담임)은 필수입니다.")
                 else:
                     with st.spinner("등록 중..."):
                         photo_url = upload_photo(n_photo, n_name)
-                        new_row = [""] * len(headers)
-                        h_map = {str(h).strip(): i for i, h in enumerate(headers)}
+                        actual_headers = ws.row_values(1)
+                        new_row = [""] * len(actual_headers)
+                        h_map = {str(h).strip(): i for i, h in enumerate(actual_headers)}
+                        
+                        # 시트 헤더에 맞게 데이터 배치
                         if '학년(담임)' in h_map: new_row[h_map['학년(담임)']] = n_class
                         if '이름' in h_map: new_row[h_map['이름']] = n_name
                         if '생년월일' in h_map: new_row[h_map['생년월일']] = n_birth
+                        if '학교' in h_map: new_row[h_map['학교']] = n_school
                         if '주소' in h_map: new_row[h_map['주소']] = n_addr
                         if '부모(아빠/엄마)' in h_map: new_row[h_map['부모(아빠/엄마)']] = n_parents
                         if '연락처' in h_map: new_row[h_map['연락처']] = n_phone
-                        if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
+                        if '상태' in h_map: new_row[h_map['상태']] = n_status
+                        elif '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
                         if '비고' in h_map: new_row[h_map['비고']] = n_memo
                         if '전도자' in h_map: new_row[h_map['전도자']] = n_evangelist
                         if '사진' in h_map: new_row[h_map['사진']] = photo_url
+                        
                         ws.append_row(new_row)
-                        st.success("등록 완료!"); st.rerun()
-
+                        st.success(f"{n_name} 학생이 등록되었습니다!")
+                        st.rerun()
 # ==========================================
 # [탭 2] 출석체크 (🔥 껍데기 벗긴 깔끔한 토글 UI)
 # ==========================================
