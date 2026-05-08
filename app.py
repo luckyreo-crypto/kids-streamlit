@@ -174,27 +174,6 @@ with tabs[1]:
                         ws.update_cell(row_idx, col_idx, str(edited_annual.iloc[r][w]))
             st.success("연간 데이터 업데이트 완료!"); st.rerun()
 
-# --- 나머지 탭 기능 유지 ---
-with tabs[0]: # 교적부
-    st.subheader("📋 교적부 관리")
-    manage_mode = st.radio("작업", ["보기", "수정/삭제", "추가"], horizontal=True)
-    if manage_mode == "보기":
-        st.dataframe(df[['학년(담임)', '이름', '생년월일', '연락처', '학교상태', '비고']], use_container_width=True, hide_index=True)
-    elif manage_mode == "수정/삭제":
-        st.info("개별 수정은 v24.4의 기능을 그대로 사용하세요.")
-    elif manage_mode == "추가":
-        with st.form("add_new"):
-            n_class = st.text_input("학년(담임)", placeholder="1-1(홍길동)")
-            n_name = st.text_input("이름")
-            if st.form_submit_button("등록"):
-                new_row = [""] * len(headers)
-                new_row[headers.index('학년(담임)')] = n_class
-                new_row[headers.index('이름')] = n_name
-                ws.append_row(new_row); st.success("등록완료"); st.rerun()
-
-# (이하 반편성, 생일, 새친구, 행사 탭은 v24.4 소스 유지)
-
-# --- 교적부 등 나머지 탭은 v24.3의 기능을 100% 유지 ---
 with tabs[0]: # 교적부
     st.subheader("📋 교적부 통합 데이터베이스")
     manage_mode = st.radio("작업 모드 선택", ["👀 전체 명단 보기", "📝 개별 상세 조회 및 수정/삭제", "➕ 신규 인원 추가"], horizontal=True)
