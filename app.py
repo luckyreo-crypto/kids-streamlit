@@ -344,19 +344,33 @@ with tabs[5]:
                         st.success("새로운 행사가 등록되었습니다!"); st.rerun()
 
 # --- 나머지 탭(교적부, 반편성, 생일, 새친구)은 v26.0과 동일 유지 ---
-with tabs[1]: # 교적부
+with tabs[1]:
     st.subheader("📋 교적부 통합 관리")
-    m_mode = st.radio("작업", ["👀 보기", "📝 수정/삭제", "➕ 추가"], horizontal=True)
-    if m_mode == "👀 보기":
-        st.dataframe(df[['학년(담임)', '이름', '생년월일', '연락처', '학교상태', '비고']], use_container_width=True, hide_index=True)
-    elif m_mode == "📝 수정/삭제":
-        st.info("개별 상세 수정 모드를 이용하세요.")
-    elif m_mode == "➕ 추가":
-        with st.form("add"):
-            n_name = st.text_input("이름")
-            n_class = st.text_input("학년(담임)")
-            if st.form_submit_button("등록"):
-                ws.append_row([n_class, n_name, "", "", "", "", "일반", ""]); st.rerun()
+    manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/삭제", "➕ 인원추가"], horizontal=True)
+    req_cols = ['학년(담임)', '이름', '사진', '생년월일', '주소', '부모(아빠/엄마)', '연락처', '학교상태', '비고', '전도자']
+    available_cols = [c for c in req_cols if c in df.columns]
+
+    if manage_mode == "👀 전체보기":
+        st.dataframe(df[available_cols], use_container_width=True, hide_index=True, column_config={"사진": st.column_config.ImageColumn("사진")})
+    elif manage_mode == "📝 수정/삭제":
+        search_list = ["학생 선택"] + df.apply(lambda r: f"{r['이름']} | {r.get(class_col,'')}", axis=1).tolist()
+        sel_idx = st.selectbox("학생 선택", range(len(search_list)), format_func=lambda x: search_list[x])
+        if sel_idx > 0:
+            target = df.iloc[sel_idx - 1]
+            with st.form("edit_form"):
+                col_i, col_f = st.columns([1, 2])
+                if target.get('사진') and str(target['사진']).startswith('http'): col_i.image(target['사진'], use_container_width=True)
+                e_name = col_f.text_input("이름", value=target['이름'])
+                e_class = col_f.text_input("학년(담임)", value=target.get(class_col,''))
+                e_status = col_f.selectbox("학교상태", ["일반", "새친구", "이사", "교사"], index=0)
+                e_photo = col_f.file_uploader("사진변경")
+                if st.form_submit_button("💾 수정사항 저장"):
+                    p_url = upload_photo(e_photo, e_name) if e_photo else target.get('사진','')
+                    ws.update_cell(target['sheet_row'], headers.index('이름')+1, e_name)
+                    ws.update_cell(target['sheet_row'], headers.index(class_col)+1, e_class)
+                    ws.update_cell(target['sheet_row'], headers.index('학교상태')+1, e_status)
+                    if '사진' in headers: ws.update_cell(target['sheet_row'], headers.index('사진')+1, p_url)
+                    st.success("수정완료!"); st.rerun()
 
 with tabs[2]: # 반편성
     st.subheader("🏫 반별 명단 현황")
