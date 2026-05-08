@@ -7,7 +7,7 @@ import base64
 import datetime
 
 # --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v29.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v29.1", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
@@ -93,7 +93,7 @@ def get_all_data():
 
 ws, df, headers, ws_act, df_act, ws_stat, df_stat = get_all_data()
 
-# ★ 안전 장치 복구: 구글 API 에러나 빈 데이터일 경우 시스템 정지하여 에러(AttributeError) 차단
+# ★ 안전 장치: 구글 API 에러나 빈 데이터일 경우 시스템 정지하여 에러(AttributeError) 차단
 if df is None or df.empty:
     st.warning("⚠️ 구글 시트 요청 한도(API Quota)를 초과했거나 데이터가 비어있습니다. 약 1분 후 새로고침 해주세요.")
     st.stop()
@@ -321,27 +321,50 @@ with tabs[2]:
                 st.write(", ".join([f"🔴{n}" if s == '새친구' else n for n, s in zip(group['이름'], group['학교상태' if '학교상태' in df.columns else '상태'])]))
 
 # ==========================================
-# [탭 4] 월별 생일표
+# [탭 4] 월별 생일표 (🔥 디자인 개선)
 # ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
     b_map = {i: [] for i in range(1, 13)}
+    
+    # 데이터 수집
     for _, r in df.iterrows():
         b = str(r.get('생년월일', ''))
         if len(b.split('.')) >= 3:
-            try: m=int(b.split('.')[1]); d=int(b.split('.')[2]); b_map[m].append({"name": r['이름'], "class": r.get(class_col,''), "day":d})
-            except: pass
+            try: 
+                m = int(b.split('.')[1])
+                d = int(b.split('.')[2])
+                b_map[m].append({"name": r['이름'], "class": r.get(class_col,''), "day": d})
+            except: 
+                pass
+                
+    # 4열 3행으로 출력 (모바일 가로 정렬 문제 완벽 해결 유지)
     for row_idx in range(4):
         cols = st.columns(3)
         for col_idx in range(3):
             m = row_idx * 3 + col_idx + 1
             with cols[col_idx]:
                 with st.container(border=True):
-                    st.markdown(f"<b>📅 {m}월</b>", unsafe_allow_html=True); st.divider()
+                    # 타이틀
+                    st.markdown(f"<h4 style='color:#0366d6; margin-bottom:0;'>📅 {m}월</h4>", unsafe_allow_html=True)
+                    st.divider()
+                    
                     sorted_b = sorted(b_map[m], key=lambda x: x["day"])
                     if sorted_b:
-                        for p in sorted_b: st.write(f"🎈 {p['name']} ({p['class']}) - {p['day']}일")
-                    else: st.caption("생일자 없음")
+                        for p in sorted_b: 
+                            # 이름, 날짜 크게 / 반 작게 표시
+                            st.markdown(
+                                f"<div style='margin-bottom: 6px; display: flex; align-items: baseline; justify-content: space-between;'>"
+                                f"<div>"
+                                f"🎈 <span style='font-size: 1.25rem; font-weight: 900; color: #2c3e50;'>{p['name']}</span> "
+                                f"<span style='font-size: 0.85rem; color: #888;'>({p['class']})</span>"
+                                f"</div>"
+                                f"<span style='font-size: 1.25rem; font-weight: 900; color: #e65100;'>{p['day']}일</span>"
+                                f"</div>", 
+                                unsafe_allow_html=True
+                            )
+                    else: 
+                        st.caption("생일자 없음")
 
 # ==========================================
 # [탭 5] 새친구 목록
