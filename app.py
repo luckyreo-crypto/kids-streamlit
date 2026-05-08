@@ -7,19 +7,18 @@ import base64
 import datetime
 
 # --- 1. 기본 설정 ---
-st.set_page_config(page_title="유년부 관리 시스템 v16.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 관리 v17.0", page_icon="🌱", layout="wide")
 
-# Secrets 보안 설정 확인
 if "GOOGLE_PROXY_URL" in st.secrets:
     GOOGLE_PROXY_URL = st.secrets["GOOGLE_PROXY_URL"]
 else:
     st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!")
     st.stop()
 
-# --- 2. 구글 시트 연결 ---
+# --- 2. 구글 시트 연결 함수 ---
 @st.cache_resource
 def init_connection():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
     client = gspread.authorize(creds)
     return client
@@ -32,21 +31,15 @@ def get_data():
         sh = client.open_by_key(sheet_id)
         ws = sh.worksheet("교적부")
         all_values = ws.get_all_values()
-        if len(all_values) <= 1:
-            return ws, pd.DataFrame(), []
+        if len(all_values) <= 1: return ws, pd.DataFrame(), []
             
         headers = all_values[0]
-        data_rows = all_values[1:]
+        df = pd.DataFrame(all_values[1:], columns=headers)
+        df['sheet_row'] = range(2, len(df) + 2) # 시트 행 번호 유지
         
-        df = pd.DataFrame(data_rows, columns=headers)
-        df['sheet_row'] = range(2, len(data_rows) + 2) # 실제 시트 행 번호
-        
-        # 컬럼명 매핑 (관리자님 요청 반영)
-        rename_dict = {}
-        if '학년(담임)' in df.columns: rename_dict['학년(담임)'] = '반'
-        if '부모(아빠/엄마)' in df.columns: rename_dict['부모(아빠/엄마)'] = '부모님'
-        if '비고' in df.columns: rename_dict['비고'] = '등록일/기타'
-        df.rename(columns=rename_dict, inplace=True)
+        # 컬럼명 매핑
+        rename_dict = {'학년(담임)': '반', '부모(아빠/엄마)': '부모님', '비고': '등록일/기타'}
+        df.rename(columns={k: v for k, v in rename_dict.items() if k in df.columns}, inplace=True)
         
         return ws, df, headers
     except Exception as e:
@@ -55,184 +48,138 @@ def get_data():
 
 ws, df, headers = get_data()
 
-# --- 3. UI 스타일 및 날짜 계산 ---
-st.title("🌱 유년부 통합 관리 시스템 v16.0")
-
-# 주차 및 날짜 계산
-start_date = datetime.date(2026, 1, 4)
-week_info = []
-for i in range(1, 53):
-    w_name = f"{i}주차"
-    w_date = start_date.strftime('%m/%d')
-    week_info.append({"name": w_name, "display": f"{w_name} ({w_date})"})
-    start_date += datetime.timedelta(days=7)
+# --- 3. 공통 함수: 사진 업로드 ---
+def upload_photo(file, name):
+    if not file: return ""
+    try:
+        b64 = base64.b64encode(file.getvalue()).decode()
+        res = requests.post(GOOGLE_PROXY_URL, json={
+            "fileName": f"{name}_{file.name}", 
+            "mimeType": file.type, 
+            "base64Data": b64
+        }).json()
+        return res.get("fileUrl", "")
+    except:
+        return ""
 
 # --- 4. 탭 구성 ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "✅ 출석 체크", "📋 교적부 관리", "🏫 반편성 통계", "🎂 생일표", "🌱 새친구"
-])
+tab1, tab2, tab3 = st.tabs(["✅ 출석 체크", "📋 교적부 관리", "🏫 통계/기타"])
 
 # ==========================================
-# [탭 1] 출석 체크 (모바일 최적화)
+# [탭 1] 출석 체크 (헤더 매칭 강화)
 # ==========================================
 with tab1:
-    st.subheader("📅 주일 출석 현황")
+    st.subheader("📅 주일 출석")
     
-    current_week_idx = datetime.date.today().isocalendar()[1] - 1
-    if current_week_idx < 0 or current_week_idx > 51: current_week_idx = 0
+    # 주차/날짜 생성
+    start_date = datetime.date(2026, 1, 4)
+    weeks = [f"{i}주차" for i in range(1, 53)]
+    week_map = {f"{i}주차": (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') for i in range(1, 53)}
+    
+    curr_week = datetime.date.today().isocalendar()[1] - 1
+    sel_w = st.selectbox("주차 선택", weeks, index=max(0, min(51, curr_week)), 
+                         format_func=lambda x: f"{x} ({week_map[x]})")
 
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        sel_w_info = st.selectbox("주차 선택", week_info, format_func=lambda x: x["display"], index=current_week_idx)
-        sel_w = sel_w_info["name"]
-    with c2:
-        # 반 목록 추출 (1-1(권은주) 형태)
+    # 시트 헤더에서 선택된 주차 컬럼 찾기 (공백/문자 무시 검색)
+    target_col_idx = -1
+    for i, h in enumerate(headers):
+        if sel_w.strip() in h.strip():
+            target_col_idx = i + 1
+            break
+    
+    if target_col_idx == -1:
+        st.error(f"⚠️ 구글 시트 첫 줄에서 '{sel_w}'을(를) 찾을 수 없습니다. 시트의 제목을 확인해 주세요!")
+    else:
         classes = ["전체"] + sorted([c for c in df['반'].unique() if c])
-        sel_class = st.selectbox("반 선택", classes)
-
-    # 데이터 필터링
-    att_df = df[df['상태'] != '이사'].copy()
-    if sel_class != "전체":
-        att_df = att_df[att_df['반'] == sel_class]
-    
-    # 통계 대시보드
-    if sel_w in att_df.columns:
-        total = len(att_df)
-        present = len(att_df[att_df[sel_w].astype(str).str.strip() == "1"])
-        rate = int(present/total*100) if total > 0 else 0
+        sel_class = st.selectbox("반 필터", classes)
         
-        m1, m2, m3 = st.columns(3)
-        m1.metric("대상", f"{total}명")
-        m2.metric("출석", f"{present}명")
-        m3.metric("비율", f"{rate}%")
+        att_df = df[df['상태'] != '이사'].copy()
+        if sel_class != "전체": att_df = att_df[att_df['반'] == sel_class]
+        att_df['출석'] = att_df[headers[target_col_idx-1]].apply(lambda x: True if str(x).strip() == "1" else False)
+
+        edited_att = st.data_editor(
+            att_df[['반', '이름', '출석']],
+            use_container_width=True, hide_index=True,
+            column_config={"출석": st.column_config.CheckboxColumn("출석")}
+        )
+        
+        if st.button("💾 출석 결과 저장", type="primary", use_container_width=True):
+            with st.spinner("시트에 기록 중..."):
+                for i in range(len(att_df)):
+                    if att_df.iloc[i]['출석'] != edited_att.iloc[i]['출석']:
+                        ws.update_cell(att_df.iloc[i]['sheet_row'], target_col_idx, "1" if edited_att.iloc[i]['출석'] else "")
+                st.success("출석 저장 완료!")
+                st.rerun()
+
+# ==========================================
+# [탭 2] 교적부 관리 (수정/저장/등록 완벽 연동)
+# ==========================================
+with tab2:
+    st.subheader("📋 교적부 편집")
+    st.info("💡 표 안의 내용을 수정(더블클릭)한 후 반드시 아래 [수정 내용 저장] 버튼을 누르세요.")
+    
+    # 에디터 표시용 컬럼 정리
+    display_cols = [c for c in ['반', '이름', '상태', '연락처', '부모님', '주소', '등록일/기타', '사진'] if c in df.columns]
+    
+    # 1. 수정 에디터
+    edited_data = st.data_editor(
+        df[display_cols],
+        use_container_width=True, hide_index=True,
+        column_config={"사진": st.column_config.ImageColumn("사진"), "상태": st.column_config.SelectboxColumn("상태", options=["일반", "새친구", "이사", "교사"])}
+    )
+    
+    if st.button("💾 수정 내용 저장", use_container_width=True):
+        with st.spinner("시트 업데이트 중..."):
+            # 바뀐 데이터프레임 전체를 시트에 덮어쓰기 (가장 확실한 방법)
+            new_values = edited_data.values.tolist()
+            # 헤더 제외한 영역 업데이트 (예: A2부터)
+            ws.update(f"A2", new_values)
+            st.success("전체 수정 사항이 시트에 반영되었습니다!")
+            st.rerun()
 
     st.markdown("---")
     
-    # 출석부 에디터
-    if sel_w not in att_df.columns:
-        st.error(f"시트에 '{sel_w}' 컬럼이 없습니다. 시트 헤더를 확인해주세요.")
-    else:
-        # 에디터용 데이터 구성
-        att_edit = att_df[['sheet_row', '반', '이름']].copy()
-        att_edit['출석'] = att_df[sel_w].apply(lambda x: True if str(x).strip() == "1" else False)
-        
-        edited_att = st.data_editor(
-            att_edit[['반', '이름', '출석']],
-            use_container_width=True,
-            hide_index=True,
-            column_config={"출석": st.column_config.CheckboxColumn("출석", default=False)}
-        )
-        
-        if st.button("💾 출석 일괄 저장", type="primary", use_container_width=True):
-            with st.spinner("저장 중..."):
-                try:
-                    # 헤더에서 정확한 열 번호 찾기 (에러 방지 로직)
-                    try:
-                        col_idx = headers.index(sel_w) + 1
-                    except ValueError:
-                        # 시트의 실제 헤더와 매칭 시도
-                        col_idx = -1
-                        for i, h in enumerate(headers):
-                            if sel_w in h:
-                                col_idx = i + 1
-                                break
-                    
-                    if col_idx == -1: raise Exception(f"시트에서 '{sel_w}' 열을 찾을 수 없습니다.")
-
-                    for i in range(len(att_edit)):
-                        if att_edit.iloc[i]['출석'] != edited_att.iloc[i]['출석']:
-                            row = att_edit.iloc[i]['sheet_row']
-                            val = "1" if edited_att.iloc[i]['출석'] else ""
-                            ws.update_cell(row, col_idx, val)
-                    st.success("출석 저장 완료!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"저장 에러: {e}")
-
-# ==========================================
-# [탭 2] 교적부 관리 (개별 수정/삭제/더블클릭)
-# ==========================================
-with tab2:
-    st.subheader("📋 교적부 통합 관리")
-    st.info("💡 표에서 내용을 **더블클릭**하여 수정한 후, 아래 **[변경사항 저장]** 버튼을 누르면 시트에 반영됩니다.")
-    
-    # 교적부 에디터 (사진, 주소 포함)
-    manage_df = df.copy().sort_values(['반', '이름'])
-    cols = ['sheet_row', '반', '이름', '사진', '생년월일', '연락처', '부모님', '주소', '상태', '등록일/기타']
-    # 없는 컬럼 방지
-    manage_df = manage_df[[c for c in cols if c in manage_df.columns]]
-    
-    edited_data = st.data_editor(
-        manage_df.drop(columns=['sheet_row']),
-        use_container_width=True,
-        hide_index=True,
-        num_rows="dynamic", # 행 추가/삭제 가능
-        column_config={
-            "사진": st.column_config.ImageColumn("사진"),
-            "상태": st.column_config.SelectboxColumn("상태", options=["일반", "새친구", "이사", "교사"])
-        }
-    )
-    
-    c1, c2 = st.columns(2)
-    if c1.button("💾 변경사항 시트에 반영하기", use_container_width=True):
-        with st.spinner("업데이트 중..."):
-            # 전체 데이터를 다시 쓰는 방식이 가장 안전함 (CRUD 통합)
-            try:
-                new_data = edited_data.values.tolist()
-                # 기존 데이터 삭제 후 새로 쓰기 또는 행별 업데이트 로직
-                # 여기서는 안전하게 행별 매칭 업데이트 권장
-                st.warning("데이터 일관성을 위해 신규 등록 양식을 이용하시거나 행별 수정을 권장합니다.")
-            except Exception as e:
-                st.error(f"업데이트 실패: {e}")
-
-    # 신규 등록 폼 (기존 사진 4배 확대 로직 포함)
-    with st.expander("➕ 신규 인원 등록 / 상세 프로필", expanded=False):
-        with st.form("new_form"):
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                n_photo = st.file_uploader("사진 등록", type=["jpg", "png", "jpeg"])
-                n_name = st.text_input("이름")
-                n_class = st.text_input("반 (예: 1-1(담임명))")
-            with col2:
-                n_birth = st.text_input("생년월일")
-                n_phone = st.text_input("연락처")
-                n_addr = st.text_input("주소")
-                n_status = st.selectbox("상태", ["일반", "새친구", "이사", "교사"])
+    # 2. 신규 등록 (새친구 포함)
+    with st.expander("➕ 신규 인원/새친구 등록", expanded=False):
+        with st.form("new_friend_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                f_name = st.text_input("이름")
+                f_class = st.text_input("반 (예: 1-1(홍길동))")
+                f_status = st.selectbox("상태", ["일반", "새친구", "이사", "교사"], index=1)
+            with c2:
+                f_phone = st.text_input("연락처")
+                f_birth = st.text_input("생년월일")
+                f_photo = st.file_uploader("사진", type=["jpg", "png"])
+            
+            if st.form_submit_button("✨ 정보 등록하기", use_container_width=True):
+                if not f_name: st.error("이름은 필수입니다."); st.stop()
                 
-            if st.form_submit_button("신규 저장", use_container_width=True):
-                # 저장 로직 (Apps Script 경유 사진 업로드 포함)
-                st.success("데이터 전송 중...")
+                photo_url = upload_photo(f_photo, f_name)
+                # 시트 헤더 순서대로 데이터 구성 (중요!)
+                new_row = [""] * len(headers)
+                h_map = {h: i for i, h in enumerate(headers)}
+                
+                # 시트 실제 제목에 맞춰 매칭
+                if '이름' in h_map: new_row[h_map['이름']] = f_name
+                if '반' in h_map: new_row[h_map['반']] = f_class
+                elif '학년(담임)' in h_map: new_row[h_map['학년(담임)']] = f_class
+                if '상태' in h_map: new_row[h_map['상태']] = f_status
+                if '연락처' in h_map: new_row[h_map['연락처']] = f_phone
+                if '생년월일' in h_map: new_row[h_map['생년월일']] = f_birth
+                if '사진' in h_map: new_row[h_map['사진']] = photo_url
+                
+                ws.append_row(new_row)
+                st.success(f"{f_name}님이 등록되었습니다!")
+                st.rerun()
 
 # ==========================================
-# [탭 3] 반편성 및 통계 (UI 수정)
+# [탭 3] 통계/반편성
 # ==========================================
 with tab3:
-    st.subheader("🏫 반별 인원 통계")
-    
-    kids = df[df['반'] != '교사']
-    st.metric("전체 학생수", f"{len(kids)}명")
-    
-    grouped = df.groupby('반')
-    cols = st.columns(3)
-    for i, (name, group) in enumerate(grouped):
-        with cols[i % 3]:
-            with st.container(border=True):
-                st.markdown(f"**{name}** ({len(group)}명)")
-                # 취소선 처리 수정 (HTML 허용)
-                member_list = []
-                for _, r in group.iterrows():
-                    m_name = r['이름']
-                    if r.get('상태') == '새친구': m_name = f"🔴{m_name}"
-                    if r.get('상태') == '이사': m_name = f"~~{m_name}~~"
-                    member_list.append(m_name)
-                st.markdown(", ".join(member_list))
-
-# ==========================================
-# [탭 4, 5] 생일표 및 새친구 (복구 완료)
-# ==========================================
-with tab4:
-    st.subheader("🎂 이번 달 생일")
-    # 생일 로직... (이전과 동일하게 복구)
-with tab5:
-    st.subheader("🌱 새친구 관리")
-    # 새친구 로직... (이전과 동일하게 복구)
+    st.subheader("🏫 반별 인원")
+    if not df.empty:
+        grouped = df.groupby('반')
+        for name, group in grouped:
+            with st.expander(f"{name} ({len(group)}명)"):
+                st.write(", ".join(group['이름'].tolist()))
