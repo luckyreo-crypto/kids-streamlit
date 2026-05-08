@@ -35,7 +35,6 @@ def get_data():
         if not all_values or len(all_values) <= 1: 
             return ws, pd.DataFrame(), []
             
-        # [핵심 에러 수정] 구글 시트의 들쭉날쭉한 칸 개수를 정사각형으로 딱 맞춤
         headers = all_values[0]
         max_len = max(len(row) for row in all_values)
         
@@ -43,7 +42,6 @@ def get_data():
         while len(headers) < max_len:
             headers.append(f"미지정_컬럼_{len(headers)}")
             
-        # 부족한 데이터 빈칸으로 채우기
         data_rows = []
         for row in all_values[1:]:
             padded_row = row + [""] * (max_len - len(row))
@@ -56,19 +54,16 @@ def get_data():
         rename_dict = {'학년(담임)': '반', '부모(아빠/엄마)': '부모님', '비고': '등록일/기타'}
         df.rename(columns={k: v for k, v in rename_dict.items() if k in df.columns}, inplace=True)
         
-        # 필수 컬럼이 없을 경우 강제 생성 (전체 에러 방지용)
         for essential in ['이름', '반', '상태']:
-            if essential not in df.columns:
-                df[essential] = ""
+            if essential not in df.columns: df[essential] = ""
                 
         return ws, df, headers
     except Exception as e:
-        st.error(f"⚠️ 구글 시트를 불러오는 중 에러가 발생했습니다: {e}")
+        st.error(f"데이터 로드 실패: {e}")
         return None, pd.DataFrame(), []
 
 ws, df, headers = get_data()
 
-# ★ 누락되었던 필수 안전 장치 복구! (데이터가 깨지면 여기서 멈춰서 흰 화면을 방지합니다)
 if df.empty:
     st.error("🚨 구글 시트에 데이터가 없거나 형식이 잘못되었습니다. 시트 내용을 확인해주세요.")
     st.stop()
@@ -92,14 +87,14 @@ for i in range(1, 53):
     weeks_info[w_name] = f"{w_name} ({w_date})"
     start_date += datetime.timedelta(days=7)
 
-# --- 5. 화면 및 탭 구성 (삭제 절대 금지) ---
-st.title("🌱 유년부 통합 관리 시스템 v18.1 (안정화)")
+# --- 5. 화면 및 탭 구성 ---
+st.title("🌱 유년부 통합 관리 시스템 v19.0")
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "01. 출석 & 연간통계", "02. 교적부 관리", "03. 반편성 현황", "04. 월별 생일표", "05. 새친구 목록"
 ])
 
 # ==========================================
-# [탭 1] 출석 & 연간통계
+# [탭 1] 출석 & 연간통계 (오류 완벽 차단)
 # ==========================================
 with tab1:
     st.subheader("📅 주일 출석 체크 및 수정")
@@ -109,23 +104,37 @@ with tab1:
     
     colA, colB, colC = st.columns(3)
     with colA:
-        sel_w = st.selectbox("주차 선택 (과거 내역 수정 가능)", weeks_list, index=max(0, min(51, curr_week)), format_func=lambda x: weeks_info[x])
+        sel_w = st.selectbox("주차 선택 (과거/미래 출석 관리)", weeks_list, index=max(0, min(51, curr_week)), format_func=lambda x: weeks_info[x])
     with colB:
         classes = ["전체보기"] + sorted([str(c) for c in df['반'].unique() if str(c).strip()])
         sel_class = st.selectbox("반 필터", classes)
     with colC:
         search_name = st.text_input("이름 검색")
 
-    # 자동 컬럼 생성
-    if sel_w not in df.columns:
-        with st.spinner(f"시트에 '{sel_w}' 칸을 자동으로 생성하고 있습니다..."):
+    # ★ 핵심 수정: 시트에 주차가 있는지 공백 무시하고 찾기
+    matched_col = None
+    for h in headers:
+        if str(h).strip() == sel_w:
+            matched_col = h
+            break
+
+    # 시트에 없는 주차일 경우 공간 늘리고 안전하게 생성
+    if not matched_col:
+        with st.spinner(f"시트에 '{sel_w}' 칸을 자동으로 생성하고 있습니다 (공간 확장 포함)..."):
             new_col_idx = len(headers) + 1
-            ws.update_cell(1, new_col_idx, sel_w)
+            try:
+                ws.update_cell(1, new_col_idx, sel_w)
+            except:
+                # 구글 시트 기둥(열)이 꽉 찼을 경우 1칸 강제 추가 후 다시 시도
+                ws.add_cols(1)
+                ws.update_cell(1, new_col_idx, sel_w)
+            
             headers.append(sel_w)
             df[sel_w] = ""
             st.rerun()
 
-    target_col_idx = headers.index(sel_w) + 1
+    target_col_name = matched_col if matched_col else sel_w
+    target_col_idx = headers.index(target_col_name) + 1
 
     # 필터링
     att_df = df[df['상태'] != '이사'].copy()
@@ -133,7 +142,7 @@ with tab1:
     if search_name: att_df = att_df[att_df['이름'].str.contains(search_name, na=False)]
     
     total = len(att_df)
-    present = len(att_df[att_df[sel_w].astype(str).str.strip() == "1"])
+    present = len(att_df[att_df[target_col_name].astype(str).str.strip() == "1"])
     absent = total - present
     rate = int((present/total)*100) if total > 0 else 0
     
@@ -147,7 +156,7 @@ with tab1:
     # 출석 에디터
     st.write(f"✔️ **{weeks_info[sel_w]}** 출석을 체크하고 하단의 버튼을 누르세요.")
     edit_att_df = att_df[['sheet_row', '반', '이름']].copy()
-    edit_att_df['✅ 출석'] = att_df[sel_w].apply(lambda x: True if str(x).strip() == "1" else False)
+    edit_att_df['✅ 출석'] = att_df[target_col_name].apply(lambda x: True if str(x).strip() == "1" else False)
     
     edited_att = st.data_editor(
         edit_att_df[['반', '이름', '✅ 출석']], 
@@ -169,6 +178,19 @@ with tab1:
                 st.rerun()
             else:
                 st.info("변경된 출석 내용이 없습니다.")
+
+    st.markdown("---")
+    
+    # ★ 추가: 과거 출석 현황 한눈에 보기
+    with st.expander("📊 전체 연간 출석 현황 보기 (과거 출석 리스트 확인용)", expanded=False):
+        week_cols = [c for c in df.columns if "주차" in str(c)]
+        disp_annual_df = df[df['상태'] != '이사'][['반', '이름'] + week_cols].copy()
+        
+        # 1을 O로, 빈칸을 X로 예쁘게 변환해서 보여주기
+        for w in week_cols:
+            disp_annual_df[w] = disp_annual_df[w].apply(lambda x: "🟢" if str(x).strip() == "1" else "")
+            
+        st.dataframe(disp_annual_df.sort_values(by=['반', '이름']), use_container_width=True, hide_index=True)
 
 # ==========================================
 # [탭 2] 교적부 관리
@@ -238,7 +260,7 @@ with tab2:
                         photo_url = upload_photo(n_photo, n_name)
                         new_row = [""] * len(headers)
                         
-                        h_map = {h: i for i, h in enumerate(headers)}
+                        h_map = {str(h).strip(): i for i, h in enumerate(headers)}
                         if '이름' in h_map: new_row[h_map['이름']] = n_name
                         if '학년(담임)' in h_map: new_row[h_map['학년(담임)']] = n_class
                         elif '반' in h_map: new_row[h_map['반']] = n_class
