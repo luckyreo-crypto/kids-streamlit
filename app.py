@@ -348,27 +348,53 @@ with tabs[2]:
                 st.write(", ".join([f"🔴{n}" if s == '새친구' else n for n, s in zip(group['이름'], group['학교상태'])]))
 
 # ==========================================
-# [탭 4] 월별 생일표 (이전 코드 100% 동일 유지)
+# [탭 4] 월별 생일표 (모바일 정렬 완벽 해결 & 최신 UI)
 # ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
-    b_map = {str(i): [] for i in range(1, 13)}
+    st.info("💡 모바일에서도 1월부터 12월까지 순서대로, 날짜(일)가 빠른 순으로 예쁘게 정렬되어 보입니다.")
+    
+    # 1. 월별 데이터 수집 (날짜 정렬을 위해 딕셔너리 리스트로 저장)
+    b_map = {i: [] for i in range(1, 13)}
+    
     for _, r in df.iterrows():
-        b = str(r['생년월일'])
+        b = str(r.get('생년월일', ''))
         if len(b.split('.')) >= 3:
             try: 
-                m = str(int(b.split('.')[1]))
-                d = str(int(b.split('.')[2]))
-                b_map[m].append(f"**{r['이름']}** ({r[class_col]}) - {d}일")
-            except: pass
-    cols = st.columns(3)
-    for i in range(1, 13):
-        with cols[(i-1)%3]:
-            with st.container(border=True):
-                st.markdown(f"<div class='month-container'><b>📅 {i}월</b><hr>", unsafe_allow_html=True)
-                for p in b_map[str(i)]: st.write(p)
-                if not b_map[str(i)]: st.caption("없음")
-
+                m = int(b.split('.')[1])
+                d = int(b.split('.')[2])
+                if 1 <= m <= 12:
+                    b_map[m].append({
+                        "name": str(r.get('이름', '')), 
+                        "class": str(r.get(class_col, '')), 
+                        "day": d
+                    })
+            except: 
+                pass
+                
+    # 2. 모바일 세로 엉킴 방지: 가로(Row) 단위로 묶어서 그리기
+    for row_idx in range(4):  # 4줄 (4 x 3칸 = 12개월)
+        cols = st.columns(3)
+        for col_idx in range(3):
+            m = row_idx * 3 + col_idx + 1
+            with cols[col_idx]:
+                with st.container(border=True):
+                    # 세련된 카드 헤더
+                    st.markdown(f"<h4 style='color:#0366d6; margin-bottom:0;'>📅 {m}월</h4>", unsafe_allow_html=True)
+                    st.divider() # 깔끔한 가로선
+                    
+                    # 해당 월의 생일자들을 날짜(일) 순으로 오름차순 정렬
+                    sorted_bdays = sorted(b_map[m], key=lambda x: x["day"])
+                    
+                    if sorted_bdays:
+                        for p in sorted_bdays:
+                            # 이름, 반, 날짜를 가독성 좋게 출력
+                            st.markdown(
+                                f"🎈 **{p['name']}** <span style='font-size:0.9em; color:#666;'>({p['class']})</span> &nbsp;→&nbsp; <span style='color:#e65100; font-weight:bold;'>{p['day']}일</span>", 
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.caption("생일자 없음")
 # ==========================================
 # [탭 5] 새친구 목록 (이전 코드 100% 동일 유지)
 # ==========================================
