@@ -6,87 +6,76 @@ import requests
 import base64
 
 # --- 1. 기본 설정 ---
-st.set_page_config(page_title="유년부 통합 관리 시스템", page_icon="🌱", layout="wide")
-st.title("🌱 유년부 통합 관리 시스템 v13.0 (Streamlit)")
+st.set_page_config(page_title="유년부 관리 시스템", page_icon="🌱", layout="wide")
 
-# ★ 아까 만드신 Apps Script 징검다리 주소
-GOOGLE_PROXY_URL = "여기에_복사해둔_웹앱_URL을_넣으세요"
+# 시크릿에서 주소 가져오기
+if "GOOGLE_PROXY_URL" in st.secrets:
+    GOOGLE_PROXY_URL = st.secrets["GOOGLE_PROXY_URL"]
+else:
+    st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!")
+    st.stop()
 
-# --- 2. 구글 시트 연결 (Streamlit Secrets 사용) ---
+# --- 2. 구글 시트 연결 ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    # GitHub에 비밀번호가 노출되지 않도록 Streamlit의 보안 기능(secrets)을 사용합니다.
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
     client = gspread.authorize(creds)
     return client
 
-try:
-    client = init_connection()
-    # 구글 시트 ID (기존과 동일)
-    sheet_id = "1UfoeHFWPoJ3bnkjLJyIwEIURyeKa82i7SrMXK35tq3Q"
-    worksheet = client.open_by_key(sheet_id).worksheet("교적부")
-except Exception as e:
-    st.error(f"구글 시트 연결 실패. Secrets 설정을 확인하세요! 에러: {e}")
-    st.stop()
+client = init_connection()
+sheet_id = "1UfoeHFWPoJ3bnkjLJyIwEIURyeKa82i7SrMXK35tq3Q"
 
-# --- 3. 화면 탭 구성 ---
-tab1, tab2, tab3 = st.tabs(["📋 교적부 명단", "➕ 새 친구 등록", "📊 출석 통계 (준비중)"])
-
-# [탭 1] 교적부 명단 보기
-with tab1:
-    st.subheader("현재 등록된 명단")
+# --- 3. 데이터 불러오기 함수 ---
+def get_data():
     try:
-        data = worksheet.get_all_records()
-        if data:
-            df = pd.DataFrame(data)
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info("등록된 데이터가 없습니다.")
+        sh = client.open_by_key(sheet_id)
+        # '교적부' 시트 가져오기
+        ws = sh.worksheet("교적부")
+        # 데이터 가져오기 (헤더가 1행에 있다고 가정)
+        rows = ws.get_all_records()
+        return ws, rows
     except Exception as e:
-        st.error(f"데이터를 불러오는 중 에러가 발생했습니다: {e}")
+        st.error(f"시트 로드 에러: {e}")
+        return None, []
 
-# [탭 2] 새 친구 등록 및 사진 업로드 테스트
+worksheet, data = get_data()
+
+# --- 4. 화면 구성 ---
+st.title("🌱 유년부 통합 관리 시스템")
+
+tab1, tab2 = st.tabs(["📋 명단 보기", "➕ 사진 및 정보 등록"])
+
+with tab1:
+    if data:
+        df = pd.DataFrame(data)
+        # 불필요한 열 숨기기 또는 필터링 가능
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.warning("데이터가 없습니다. 구글 시트의 '교적부' 탭에 내용이 있는지, 그리고 서비스 계정에 공유가 되었는지 확인해주세요.")
+        if st.button("새로고침"):
+            st.rerun()
+
 with tab2:
-    st.subheader("새 친구 정보 및 사진 등록")
-    with st.form("new_member_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input("이름")
-            grade = st.selectbox("소속 (반)", ["1-1", "1-2", "1-3", "2-1", "교사", "새친구"])
-        with col2:
-            phone = st.text_input("연락처")
-            uploaded_file = st.file_uploader("사진 업로드", type=["jpg", "jpeg", "png"])
-        
-        submit_button = st.form_submit_button("등록하기")
+    st.subheader("새 친구 등록 (사진 포함)")
+    with st.form("upload_form"):
+        name = st.text_input("이름")
+        grade = st.selectbox("반", ["1-1", "1-2", "1-3", "2-1", "2-2", "2-3", "3-1", "3-2", "3-3", "교사"])
+        uploaded_file = st.file_uploader("사진 선택", type=["jpg", "png", "jpeg"])
+        submit = st.form_submit_button("등록")
 
-    if submit_button:
-        if not name:
-            st.warning("이름을 입력해주세요!")
-        else:
+        if submit:
             photo_url = ""
-            # 사진이 업로드 되었다면 구글 징검다리로 전송
-            if uploaded_file is not None:
-                with st.spinner("구글 드라이브에 사진 업로드 중..."):
-                    file_bytes = uploaded_file.getvalue()
-                    base64_encoded = base64.b64encode(file_bytes).decode("utf-8")
-                    
-                    payload = {
-                        "fileName": uploaded_file.name,
-                        "mimeType": uploaded_file.type,
-                        "base64Data": base64_encoded
-                    }
-                    
-                    response = requests.post(GOOGLE_PROXY_URL, json=payload)
-                    res_data = response.json()
-                    
-                    if res_data.get("success"):
-                        photo_url = res_data.get("fileUrl")
-                        st.success("사진 업로드 성공!")
-                    else:
-                        st.error("사진 업로드 실패!")
-
-            # 구글 시트에 데이터 저장 로직 (간단화)
-            new_row = ["", grade, name, photo_url, "", "", "", phone]
-            worksheet.append_row(new_row)
-            st.success(f"{name} 등록 완료! 명단 탭을 확인하세요.")
+            if uploaded_file:
+                with st.spinner("사진 업로드 중..."):
+                    b64 = base64.b64encode(uploaded_file.getvalue()).decode()
+                    payload = {"fileName": uploaded_file.name, "mimeType": uploaded_file.type, "base64Data": b64}
+                    res = requests.post(GOOGLE_PROXY_URL, json=payload).json()
+                    if res.get("success"):
+                        photo_url = res.get("fileUrl")
+                        st.success("사진 업로드 완료!")
+            
+            # 시트에 저장 (순서: 비고, 반, 이름, 사진URL 등 시트 구조에 맞게 수정 필요)
+            worksheet.append_row(["", grade, name, photo_url])
+            st.success(f"{name} 등록 성공!")
+            st.rerun()
