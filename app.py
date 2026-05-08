@@ -7,7 +7,7 @@ import base64
 import datetime
 
 # --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v29.1", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v29.2", page_icon="🌱", layout="wide")
 
 st.markdown("""
     <style>
@@ -29,6 +29,7 @@ st.markdown("""
     }
     .month-container { min-height: 180px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: white; margin-bottom: 15px; }
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
+    .total-summary { background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -93,7 +94,7 @@ def get_all_data():
 
 ws, df, headers, ws_act, df_act, ws_stat, df_stat = get_all_data()
 
-# ★ 안전 장치: 구글 API 에러나 빈 데이터일 경우 시스템 정지하여 에러(AttributeError) 차단
+# ★ 안전 장치: 구글 API 에러나 빈 데이터일 경우 시스템 정지하여 에러 차단
 if df is None or df.empty:
     st.warning("⚠️ 구글 시트 요청 한도(API Quota)를 초과했거나 데이터가 비어있습니다. 약 1분 후 새로고침 해주세요.")
     st.stop()
@@ -225,7 +226,7 @@ with tabs[0]:
                         st.success("등록 완료!"); st.rerun()
 
 # ==========================================
-# [탭 2] 출석체크
+# [탭 2] 출석체크 (🔥 학생/교사 분리 통계)
 # ==========================================
 with tabs[1]:
     st.subheader("📅 주간 출석 및 통계 관리")
@@ -234,11 +235,23 @@ with tabs[1]:
     with c1: sel_w = st.selectbox("기록 주차", weeks_list, index=max(0, min(51, curr_week_idx)), format_func=lambda x: week_display_map[x])
     with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()]))
     
-    att_df = df[df['학교상태' if '학교상태' in df.columns else '상태'] != '이사'].copy()
+    status_col = '학교상태' if '학교상태' in df.columns else '상태'
+    att_df = df[df[status_col] != '이사'].copy()
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
     
     st.markdown("---")
+    
+    # 1. 통계 분리 계산 (학생 vs 교사)
+    student_df = att_df[att_df[status_col] != '교사']
+    teacher_df = att_df[att_df[status_col] == '교사']
+    
+    s_total = len(student_df)
+    s_present = len(student_df[student_df[sel_w].astype(str).str.strip() == "1"])
+    
+    t_total = len(teacher_df)
+    t_present = len(teacher_df[teacher_df[sel_w].astype(str).str.strip() == "1"])
+    
     total_reg = len(att_df)
     present_cnt = len(att_df[att_df[sel_w].astype(str).str.strip() == "1"])
     
@@ -249,11 +262,15 @@ with tabs[1]:
             try: saved_guest = int(match.iloc[0]['기타인원'])
             except: pass
 
+    # 2. 직관적인 대시보드 렌더링
+    st.markdown("#### 📊 이번 주 요약 대시보드")
     cs1, cs2, cs3, cs4 = st.columns(4)
-    cs1.metric("대상", f"{total_reg}명")
-    cs2.metric("출석", f"{present_cnt}명")
-    guest_in = cs3.number_input("기타 인원", min_value=0, value=saved_guest)
-    cs4.metric("총 합계", f"{present_cnt + guest_in}명")
+    cs1.metric("👦👧 학생 출석", f"{s_present}명", f"재적 {s_total}명", delta_color="off")
+    cs2.metric("👨‍🏫 교사 출석", f"{t_present}명", f"재적 {t_total}명", delta_color="off")
+    cs3.metric("📌 전체 출석", f"{present_cnt}명", f"재적 {total_reg}명", delta_color="off")
+    guest_in = cs4.number_input("➕ 기타 방문 인원", min_value=0, value=saved_guest)
+
+    st.markdown(f"<div class='total-summary'>✅ 최종 합계 (전체 출석 + 기타 방문): {present_cnt + guest_in}명</div>", unsafe_allow_html=True)
 
     with st.form("att_form_v29"):
         grouped = att_df.sort_values(by=['이름']).groupby(class_col)
@@ -263,7 +280,7 @@ with tabs[1]:
             cols = st.columns(3)
             for i, (idx, row) in enumerate(group.iterrows()):
                 with cols[i % 3]:
-                    status_val = row.get('상태', row.get('학교상태', ''))
+                    status_val = row.get(status_col, '')
                     is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
                     label = f"🌱 {row['이름']}" if status_val == '새친구' else row['이름']
                     new_att[row['sheet_row']] = st.toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
@@ -293,7 +310,7 @@ with tabs[1]:
 
     with st.expander("📊 연간 전체 출석 현황 및 일괄 수정"):
         week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
-        annual_df = df[df['학교상태' if '학교상태' in df.columns else '상태'] != '이사'][[class_col, '이름', 'sheet_row'] + week_cols].copy()
+        annual_df = df[df[status_col] != '이사'][[class_col, '이름', 'sheet_row'] + week_cols].copy()
         for w in week_cols: annual_df[w] = annual_df[w].apply(lambda x: True if str(x).strip() == "1" else False)
         
         edited_annual = st.data_editor(annual_df, hide_index=True, use_container_width=True, 
@@ -321,13 +338,12 @@ with tabs[2]:
                 st.write(", ".join([f"🔴{n}" if s == '새친구' else n for n, s in zip(group['이름'], group['학교상태' if '학교상태' in df.columns else '상태'])]))
 
 # ==========================================
-# [탭 4] 월별 생일표 (🔥 디자인 개선)
+# [탭 4] 월별 생일표
 # ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
     b_map = {i: [] for i in range(1, 13)}
     
-    # 데이터 수집
     for _, r in df.iterrows():
         b = str(r.get('생년월일', ''))
         if len(b.split('.')) >= 3:
@@ -338,21 +354,18 @@ with tabs[3]:
             except: 
                 pass
                 
-    # 4열 3행으로 출력 (모바일 가로 정렬 문제 완벽 해결 유지)
     for row_idx in range(4):
         cols = st.columns(3)
         for col_idx in range(3):
             m = row_idx * 3 + col_idx + 1
             with cols[col_idx]:
                 with st.container(border=True):
-                    # 타이틀
                     st.markdown(f"<h4 style='color:#0366d6; margin-bottom:0;'>📅 {m}월</h4>", unsafe_allow_html=True)
                     st.divider()
                     
                     sorted_b = sorted(b_map[m], key=lambda x: x["day"])
                     if sorted_b:
                         for p in sorted_b: 
-                            # 이름, 날짜 크게 / 반 작게 표시
                             st.markdown(
                                 f"<div style='margin-bottom: 6px; display: flex; align-items: baseline; justify-content: space-between;'>"
                                 f"<div>"
