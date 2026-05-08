@@ -31,22 +31,47 @@ def get_data():
         sh = client.open_by_key(sheet_id)
         ws = sh.worksheet("교적부")
         all_values = ws.get_all_values()
-        if len(all_values) <= 1: return ws, pd.DataFrame(), []
+        
+        if not all_values or len(all_values) <= 1: 
+            return ws, pd.DataFrame(), []
             
+        # [핵심 에러 수정] 구글 시트의 들쭉날쭉한 칸 개수를 정사각형으로 딱 맞춤
         headers = all_values[0]
-        df = pd.DataFrame(all_values[1:], columns=headers)
-        df['sheet_row'] = range(2, len(df) + 2) # 실제 행 번호
+        max_len = max(len(row) for row in all_values)
+        
+        # 부족한 헤더 강제 채우기
+        while len(headers) < max_len:
+            headers.append(f"미지정_컬럼_{len(headers)}")
+            
+        # 부족한 데이터 빈칸으로 채우기
+        data_rows = []
+        for row in all_values[1:]:
+            padded_row = row + [""] * (max_len - len(row))
+            data_rows.append(padded_row)
+            
+        df = pd.DataFrame(data_rows, columns=headers)
+        df['sheet_row'] = range(2, len(data_rows) + 2) # 실제 행 번호
         
         # 컬럼명 유연성 확보
         rename_dict = {'학년(담임)': '반', '부모(아빠/엄마)': '부모님', '비고': '등록일/기타'}
         df.rename(columns={k: v for k, v in rename_dict.items() if k in df.columns}, inplace=True)
         
+        # 필수 컬럼이 없을 경우 강제 생성 (전체 에러 방지용)
+        for essential in ['이름', '반', '상태']:
+            if essential not in df.columns:
+                df[essential] = ""
+                
         return ws, df, headers
     except Exception as e:
-        st.error(f"데이터 로드 실패: {e}")
+        st.error(f"⚠️ 구글 시트를 불러오는 중 에러가 발생했습니다: {e}")
         return None, pd.DataFrame(), []
 
 ws, df, headers = get_data()
+
+# ★ 누락되었던 필수 안전 장치 복구! (데이터가 깨지면 여기서 멈춰서 흰 화면을 방지합니다)
+if df.empty:
+    st.error("🚨 구글 시트에 데이터가 없거나 형식이 잘못되었습니다. 시트 내용을 확인해주세요.")
+    st.stop()
 
 # --- 3. 공통 함수: 사진 업로드 ---
 def upload_photo(file, name):
@@ -67,8 +92,8 @@ for i in range(1, 53):
     weeks_info[w_name] = f"{w_name} ({w_date})"
     start_date += datetime.timedelta(days=7)
 
-# --- 5. 화면 및 탭 구성 (삭제 금지) ---
-st.title("🌱 유년부 통합 관리 시스템 v18.0")
+# --- 5. 화면 및 탭 구성 (삭제 절대 금지) ---
+st.title("🌱 유년부 통합 관리 시스템 v18.1 (안정화)")
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "01. 출석 & 연간통계", "02. 교적부 관리", "03. 반편성 현황", "04. 월별 생일표", "05. 새친구 목록"
 ])
@@ -79,7 +104,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.subheader("📅 주일 출석 체크 및 수정")
     
-    # 1. 주차 선택
     curr_week = datetime.date.today().isocalendar()[1] - 1
     weeks_list = list(weeks_info.keys())
     
@@ -87,14 +111,14 @@ with tab1:
     with colA:
         sel_w = st.selectbox("주차 선택 (과거 내역 수정 가능)", weeks_list, index=max(0, min(51, curr_week)), format_func=lambda x: weeks_info[x])
     with colB:
-        classes = ["전체보기"] + sorted([c for c in df['반'].unique() if c])
+        classes = ["전체보기"] + sorted([str(c) for c in df['반'].unique() if str(c).strip()])
         sel_class = st.selectbox("반 필터", classes)
     with colC:
         search_name = st.text_input("이름 검색")
 
-    # ★ 자동 컬럼 생성 (에러 완벽 차단)
+    # 자동 컬럼 생성
     if sel_w not in df.columns:
-        with st.spinner(f"시트에 '{sel_w}' 컬럼이 없어서 새로 생성합니다..."):
+        with st.spinner(f"시트에 '{sel_w}' 칸을 자동으로 생성하고 있습니다..."):
             new_col_idx = len(headers) + 1
             ws.update_cell(1, new_col_idx, sel_w)
             headers.append(sel_w)
@@ -103,10 +127,10 @@ with tab1:
 
     target_col_idx = headers.index(sel_w) + 1
 
-    # 2. 필터링 및 통계
+    # 필터링
     att_df = df[df['상태'] != '이사'].copy()
     if sel_class != "전체보기": att_df = att_df[att_df['반'] == sel_class]
-    if search_name: att_df = att_df[att_df['이름'].str.contains(search_name)]
+    if search_name: att_df = att_df[att_df['이름'].str.contains(search_name, na=False)]
     
     total = len(att_df)
     present = len(att_df[att_df[sel_w].astype(str).str.strip() == "1"])
@@ -120,7 +144,7 @@ with tab1:
     m4.metric("📈 출석률", f"{rate}%")
     st.markdown("---")
 
-    # 3. 출석 에디터 (과거 주차도 변경 가능)
+    # 출석 에디터
     st.write(f"✔️ **{weeks_info[sel_w]}** 출석을 체크하고 하단의 버튼을 누르세요.")
     edit_att_df = att_df[['sheet_row', '반', '이름']].copy()
     edit_att_df['✅ 출석'] = att_df[sel_w].apply(lambda x: True if str(x).strip() == "1" else False)
@@ -147,13 +171,12 @@ with tab1:
                 st.info("변경된 출석 내용이 없습니다.")
 
 # ==========================================
-# [탭 2] 교적부 관리 (핀셋 업데이트 로직 적용)
+# [탭 2] 교적부 관리
 # ==========================================
 with tab2:
     st.subheader("📋 교적부 데이터 관리")
     st.info("💡 표에서 글자를 더블클릭해 수정한 후, **[수정 내용 저장]**을 누르면 시트가 안전하게 업데이트됩니다.")
     
-    # 에디터용 컬럼 설정 (순서 꼬임 방지를 위해 원본 이름과 분리)
     disp_cols = ['반', '이름', '상태', '연락처', '부모님', '주소', '등록일/기타', '전도자']
     disp_cols = [c for c in disp_cols if c in df.columns]
     
@@ -164,9 +187,8 @@ with tab2:
         column_config={"상태": st.column_config.SelectboxColumn("상태", options=["일반", "새친구", "이사", "교사"])}
     )
     
-    # ★ 버그 수정: 열 순서 꼬임을 완벽 차단하는 핀셋 업데이트 로직
     if st.button("💾 표 수정 내용 안전하게 저장", use_container_width=True):
-        with st.spinner("변경된 칸만 찾아서 업데이트 중입니다..."):
+        with st.spinner("변경된 칸만 찾아서 핀셋 업데이트 중입니다..."):
             changes_made = False
             for r_idx in range(len(manage_df)):
                 for c_name in disp_cols:
@@ -176,15 +198,15 @@ with tab2:
                     if old_v != new_v:
                         sheet_r = df.iloc[r_idx]['sheet_row']
                         
-                        # 원래 헤더 이름 찾기 (번역된 이름 역추적)
                         orig_h = c_name
                         if c_name == '반' and '학년(담임)' in headers: orig_h = '학년(담임)'
                         elif c_name == '부모님' and '부모(아빠/엄마)' in headers: orig_h = '부모(아빠/엄마)'
                         elif c_name == '등록일/기타' and '비고' in headers: orig_h = '비고'
                         
-                        sheet_c = headers.index(orig_h) + 1
-                        ws.update_cell(sheet_r, sheet_c, new_v)
-                        changes_made = True
+                        if orig_h in headers:
+                            sheet_c = headers.index(orig_h) + 1
+                            ws.update_cell(sheet_r, sheet_c, new_v)
+                            changes_made = True
             
             if changes_made:
                 st.success("데이터가 안전하게 저장되었습니다!")
@@ -194,7 +216,7 @@ with tab2:
 
     st.markdown("---")
     
-    with st.expander("➕ 새친구 / 교적부 신규 인원 등록 (사진 첨부)", expanded=False):
+    with st.expander("➕ 새친구 / 신규 인원 등록 (사진 첨부 가능)", expanded=False):
         with st.form("new_member_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
@@ -208,11 +230,11 @@ with tab2:
                 n_addr = st.text_input("주소")
                 n_photo = st.file_uploader("학생 사진 (선택)", type=["jpg", "png", "jpeg"])
                 
-            if st.form_submit_button("✨ 교적부에 등록하기", use_container_width=True):
+            if st.form_submit_button("✨ 교적부에 새로 등록하기", use_container_width=True):
                 if not n_name or not n_class:
                     st.error("이름과 반은 반드시 입력해야 합니다.")
                 else:
-                    with st.spinner("구글 시트에 데이터를 추가 중입니다..."):
+                    with st.spinner("구글 시트에 추가 중입니다..."):
                         photo_url = upload_photo(n_photo, n_name)
                         new_row = [""] * len(headers)
                         
@@ -229,7 +251,7 @@ with tab2:
                         if '사진' in h_map: new_row[h_map['사진']] = photo_url
                         
                         ws.append_row(new_row)
-                        st.success(f"[{n_class}] {n_name} 학생이 완벽하게 등록되었습니다!")
+                        st.success(f"[{n_class}] {n_name} 학생이 등록되었습니다!")
                         st.rerun()
 
 # ==========================================
@@ -245,7 +267,7 @@ with tab3:
         cols = st.columns(3)
         i = 0
         for name, group in grouped:
-            if not name or name == "교사": continue
+            if not str(name).strip() or name == "교사": continue
             with cols[i % 3]:
                 with st.container(border=True):
                     st.markdown(f"**{name}** ({len(group)}명)")
@@ -254,7 +276,7 @@ with tab3:
                         nm = r['이름']
                         if r.get('상태') == '새친구': nm = f"🔴{nm}"
                         elif r.get('상태') == '이사': nm = f"~~{nm}~~"
-                        members.append(nm)
+                        members.append(str(nm))
                     st.write(", ".join(members))
             i += 1
 
