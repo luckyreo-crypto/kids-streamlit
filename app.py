@@ -218,7 +218,7 @@ with tabs[0]:
             
             # [수정] 생년월일 통일
             n_birth_input = col1.date_input("생년월일", value=datetime.date(2015,1,1), min_value=datetime.date(1900,1,1), max_value=datetime.date.today())
-            n_birth = n_birth_input.strftime("%Y-%m-%d")
+            n_birth = n_birth_input.strftime("%Y.%m.%d")
             
             n_status = col2.selectbox("구분", ["일반", "새친구", "교사"], index=1)
             n_photo = st.file_uploader("사진 첨부")
