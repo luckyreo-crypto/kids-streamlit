@@ -995,14 +995,29 @@ def chunked_update(worksheet, cells, chunk_size=100):
         worksheet.update_cells(chunk)
 
 # [추가] 날짜 파싱 안전 함수
+# [수정] 다양한 형태의 날짜(공백, 홑자리, 마침표 등)를 완벽하게 인식하는 파싱 함수
 def parse_date_safe(date_str):
     if not date_str: return datetime.date(2015, 1, 1)
+    
     try:
-        clean_str = str(date_str).replace('.', '-').strip()
-        if len(clean_str) == 8 and clean_str.count('-') == 0: # 20150101 형태
+        # 1. 모든 공백 제거 (예: "2019. 2. 26" -> "2019.2.26")
+        clean_str = str(date_str).replace(" ", "").strip()
+        
+        # 2. 끝에 잘못 찍힌 마침표 제거 (예: "2019.2.26." -> "2019.2.26")
+        clean_str = clean_str.rstrip('.')
+        
+        # 3. 구분자를 모두 '-'로 통일 (예: "2019.2.26" -> "2019-2-26")
+        clean_str = clean_str.replace('.', '-').replace('/', '-')
+
+        # 4. "YYYYMMDD" 형태 (구분자 없음) 처리
+        if len(clean_str) == 8 and clean_str.count('-') == 0:
             return datetime.datetime.strptime(clean_str, "%Y%m%d").date()
+
+        # 5. 표준 파싱 (strptime의 %Y-%m-%d는 '2019-2-26'처럼 0이 빠진 홑자리 월/일도 완벽하게 인식합니다)
         return datetime.datetime.strptime(clean_str, "%Y-%m-%d").date()
-    except:
+        
+    except Exception as e:
+        # 도저히 파싱 불가능한 이상한 텍스트일 경우 기본값 반환
         return datetime.date(2015, 1, 1)
 
 # --- 3. 구글 시트 연결 ---
