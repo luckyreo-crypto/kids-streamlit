@@ -8,7 +8,7 @@ import datetime
 import uuid
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v33.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v33.1", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 
@@ -96,7 +96,6 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except:
         ws_s = sh.add_worksheet(title="주차별통계", rows="200", cols="10")
-        # [추가] 통계 헤더에 '비고' 컬럼 반영 (9열)
         ws_s.append_row(["주차", "대상인원", "출석", "결석", "기타인원", "총합계", "출석률", "비고", "업데이트일시"])
     return ws_m, ws_a, ws_s
 
@@ -136,19 +135,34 @@ week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days
 tabs = st.tabs(["✅ 출석/행사", "📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사기록", "📊 통합통계"])
 
 # ==========================================
-# [탭 0] 출석체크 & 행사 모드 (첫 번째 탭으로 이동)
+# [탭 0] 출석체크 & 행사 모드 (동적 날짜 입력 포함)
 # ==========================================
 with tabs[0]:
     st.subheader("📅 주간 출석 & 행사 현황")
     curr_week_idx = datetime.date.today().isocalendar()[1] - 1
+    
+    # [수정] 직접 입력 기능 추가
+    extended_weeks_list = weeks_list + ["✏️ 직접 입력 (새 날짜)"]
+    
     c1, c2 = st.columns(2)
-    with c1: sel_w = st.selectbox("출석 주차", weeks_list, index=max(0, min(51, curr_week_idx)), format_func=lambda x: week_display_map[x])
-    with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()]))
+    with c1: 
+        sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, curr_week_idx)), format_func=lambda x: week_display_map.get(x, x))
+        if sel_w_raw == "✏️ 직접 입력 (새 날짜)":
+            custom_date = st.date_input("새로운 날짜 선택", datetime.date.today())
+            sel_w = custom_date.strftime("%Y-%m-%d")
+        else:
+            sel_w = sel_w_raw
+            
+    with c2: 
+        sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()]))
     
     status_col = '학교상태'
     att_df = df[~df[status_col].isin(INACTIVE_STATUS)].copy()
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
-    if sel_w not in att_df.columns: att_df[sel_w] = ""
+    
+    # 동적 생성 열 처리 방어 로직
+    if sel_w not in att_df.columns: 
+        att_df[sel_w] = ""
     
     s_df = att_df[att_df[status_col] != '교사']
     t_df = att_df[att_df[status_col] == '교사']
@@ -164,27 +178,24 @@ with tabs[0]:
             except: pass
             saved_note = match.iloc[0].get('비고', '')
 
-    st.markdown("#### 📊 이번 주 현황")
+    st.markdown("#### 📊 해당 일자 현황")
     cs1, cs2, cs3, cs4 = st.columns(4)
     cs1.metric("학생 출석", f"{s_p}명", f"재적 {len(s_df)}명")
     cs2.metric("교사 출석", f"{t_p}명", f"재적 {len(t_df)}명")
     cs3.metric("기존 출석 합계", f"{s_p + t_p}명")
     guest_in = cs4.number_input("🎉 기타 방문/새친구", min_value=0, value=saved_guest, help="행사 시 방문한 비등록 인원")
     
-    # [추가] 행사(Skip) 모드 UI
     st.markdown("---")
     col_ex1, col_ex2 = st.columns([1, 3])
     is_skip = col_ex1.toggle("⚠️ 출석체크 쉼 (행사/예외)", value=bool(saved_note))
-    note_text = col_ex2.text_input("행사명/비고 (예: 유년부 쿠킹행사)", value=saved_note, placeholder="행사명을 입력하면 통계에 기록됩니다.")
+    note_text = col_ex2.text_input("행사명/비고 (예: 유년부 쿠킹행사)", value=saved_note, placeholder="입력 시 통계 시트 '비고'란에 저장됩니다.")
 
-    # 계산 로직: 행사 모드면 기존 인원 출석은 0, 하지만 새친구(guest_in)는 통계에 반영됨
     calc_total = guest_in if is_skip else (s_p + t_p + guest_in)
-    st.markdown(f"<div class='total-summary'>✅ 이번 주 최종 통계 반영 합계: {calc_total}명</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='total-summary'>✅ 최종 통계 반영 합계: {calc_total}명</div>", unsafe_allow_html=True)
 
-    # [추가] 새친구 간편 등록 퀵-폼
     with st.expander("🌱 행사 중 방문한 새친구 간편 등록 (교적부 즉시 추가)"):
         with st.form("quick_add_newcomer"):
-            st.info("이곳에서 등록하면 교적부에 자동으로 추가되며 다음 주부터 출석 명단에 나타납니다.")
+            st.info("이곳에서 등록하면 교적부에 자동으로 추가되며 명단에 나타납니다.")
             qc1, qc2 = st.columns(2)
             q_name = qc1.text_input("새친구 이름")
             q_class = qc2.text_input("배정할 반", placeholder="예: 새친구반")
@@ -220,12 +231,13 @@ with tabs[0]:
                     label = f"🌱 {row['이름']}" if row[status_col] == '새친구' else row['이름']
                     new_att[row['sheet_row']] = cols[i%3].toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
-        if st.form_submit_button("💾 출석/행사 통계 저장", type="primary", use_container_width=True):
+        if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("안전하게 일괄 저장 중..."):
+                # [핵심] 시트에 없는 새로운 날짜(sel_w)가 들어오면 헤더 끝에 새 열(Column)을 생성
                 target_c = headers.index(sel_w) + 1 if sel_w in headers else len(headers) + 1
-                if sel_w not in headers: ws.update_cell(1, target_c, sel_w)
+                if sel_w not in headers: 
+                    ws.update_cell(1, target_c, sel_w)
                 
-                # 명단 출석 업데이트 (행사 모드가 아닐 때만)
                 final_p = 0
                 cells_to_update = []
                 if not is_skip:
@@ -234,27 +246,24 @@ with tabs[0]:
                         if v: final_p += 1
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
-                # 통계 시트 업데이트 분기 처리
                 save_p = 0 if is_skip else final_p
                 rate_val = 0 if len(att_df) == 0 else int((final_p/len(att_df))*100)
                 save_rate = "0%" if is_skip else f"{rate_val}%"
                 save_absent = len(att_df) if is_skip else len(att_df) - final_p
                 
-                # 9개 컬럼: 주차, 대상, 출석, 결석, 기타, 총합계, 출석률, 비고, 일시
+                # 9개 컬럼: 주차/날짜, 대상, 출석, 결석, 기타, 총합계, 출석률, 비고, 일시
                 stat_data = [sel_w, len(att_df), save_p, save_absent, guest_in, save_p + guest_in, save_rate, note_text, str(datetime.datetime.now())]
                 
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
                 if not match_stat.empty: 
-                    # A열부터 I열(9번째 열)까지 업데이트
                     ws_stat.update(f"A{match_stat.index[0]+2}:I{match_stat.index[0]+2}", [stat_data])
                 else: 
                     ws_stat.append_row(stat_data)
                 
-                fetch_sheet_data.clear(); st.success("통계 및 데이터 저장 완료!"); st.rerun()
+                fetch_sheet_data.clear(); st.success(f"[{sel_w}] 데이터가 성공적으로 저장되었습니다!"); st.rerun()
 
-    # 연간 통계 (접기)
     with st.expander("📊 연간 전체 출석 현황 및 일괄 수정"):
-        week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
+        week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
         annual_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', 'sheet_row'] + week_cols].copy()
         for w in week_cols: annual_df[w] = annual_df[w].apply(lambda x: True if str(x).strip() == "1" else False)
         
@@ -274,7 +283,7 @@ with tabs[0]:
                 fetch_sheet_data.clear(); st.success("업데이트 완료!"); st.rerun()
 
 # ==========================================
-# [탭 1] 교적부 관리 (순서 변경)
+# [탭 1] 교적부 관리
 # ==========================================
 with tabs[1]:
     st.subheader("📋 교적부 통합 관리")
@@ -461,7 +470,7 @@ with tabs[5]:
 # ==========================================
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
-    week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
+    week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
     report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
     report_df['출석률'] = report_df['출석수'].apply(lambda x: f"{int(x/len(week_cols)*100)}%" if len(week_cols)>0 else "0%")
@@ -471,7 +480,7 @@ with tabs[6]:
         st.write("👤 **개인별 누적 출석 현황**")
         st.dataframe(report_df[[class_col, '이름', '학교상태', '출석수', '출석률']], use_container_width=True, hide_index=True)
     with col_dl2:
-        st.write("📅 **주차별 인원 흐름**")
+        st.write("📅 **주차별/날짜별 인원 흐름**")
         st.dataframe(df_stat, use_container_width=True, hide_index=True)
 
     st.divider()
