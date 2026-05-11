@@ -7,8 +7,10 @@ import base64
 import datetime
 import uuid
 
-# --- 1. 기본 설정 및 스타일 ---
-st.set_page_config(page_title="유년부 통합 관리 v32.0", page_icon="🌱", layout="wide")
+# --- 1. 전역 설정 및 상수 ---
+st.set_page_config(page_title="유년부 통합 관리 v32.1", page_icon="🌱", layout="wide")
+
+INACTIVE_STATUS = ['이사', '비활성', '졸업']
 
 st.markdown("""
     <style>
@@ -21,7 +23,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- [추가] 접근 제어 (비밀번호) ---
+# --- 2. 시스템 접근 제어 ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
@@ -33,8 +35,8 @@ if not st.session_state["authenticated"]:
             st.session_state["authenticated"] = True
             st.rerun()
         else:
-            st.error("비밀번호가 일치하지 않거나, Secrets에 admin_password가 설정되지 않았습니다.")
-    st.stop() # 인증 전 실행 차단
+            st.error("비밀번호가 일치하지 않습니다.")
+    st.stop()
 
 if "GOOGLE_PROXY_URL" in st.secrets:
     GOOGLE_PROXY_URL = st.secrets["GOOGLE_PROXY_URL"]
@@ -42,8 +44,7 @@ else:
     st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!")
     st.stop()
 
-# --- 2. 공통 유틸리티 함수 ---
-# [추가] 프록시 업로드 고도화 (Timeout, 오류처리)
+# --- 3. 공통 유틸리티 함수 ---
 def upload_photo(file, name):
     if not file: return ""
     try:
@@ -56,7 +57,7 @@ def upload_photo(file, name):
             GOOGLE_PROXY_URL, 
             json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64},
             headers=headers,
-            timeout=10 # 10초 타임아웃
+            timeout=10
         )
         res.raise_for_status()
         return res.json().get("fileUrl", "")
@@ -67,39 +68,23 @@ def upload_photo(file, name):
         st.error(f"사진 업로드 실패: {e}")
         return ""
 
-# [추가] 대량 업데이트 청크 처리 함수
 def chunked_update(worksheet, cells, chunk_size=100):
     for i in range(0, len(cells), chunk_size):
         chunk = cells[i:i + chunk_size]
         worksheet.update_cells(chunk)
 
-# [추가] 날짜 파싱 안전 함수
-# [수정] 다양한 형태의 날짜(공백, 홑자리, 마침표 등)를 완벽하게 인식하는 파싱 함수
 def parse_date_safe(date_str):
     if not date_str: return datetime.date(2015, 1, 1)
-    
     try:
-        # 1. 모든 공백 제거 (예: "2019. 2. 26" -> "2019.2.26")
-        clean_str = str(date_str).replace(" ", "").strip()
-        
-        # 2. 끝에 잘못 찍힌 마침표 제거 (예: "2019.2.26." -> "2019.2.26")
-        clean_str = clean_str.rstrip('.')
-        
-        # 3. 구분자를 모두 '-'로 통일 (예: "2019.2.26" -> "2019-2-26")
+        clean_str = str(date_str).replace(" ", "").strip().rstrip('.')
         clean_str = clean_str.replace('.', '-').replace('/', '-')
-
-        # 4. "YYYYMMDD" 형태 (구분자 없음) 처리
         if len(clean_str) == 8 and clean_str.count('-') == 0:
             return datetime.datetime.strptime(clean_str, "%Y%m%d").date()
-
-        # 5. 표준 파싱 (strptime의 %Y-%m-%d는 '2019-2-26'처럼 0이 빠진 홑자리 월/일도 완벽하게 인식합니다)
         return datetime.datetime.strptime(clean_str, "%Y-%m-%d").date()
-        
-    except Exception as e:
-        # 도저히 파싱 불가능한 이상한 텍스트일 경우 기본값 반환
+    except Exception:
         return datetime.date(2015, 1, 1)
 
-# --- 3. 구글 시트 연결 ---
+# --- 4. 구글 시트 데이터 연동 ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -153,34 +138,33 @@ start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') })" for i in range(1, 53)}
 
-# --- 4. 탭 구성 ---
+# --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["📋 교적부", "✅ 출석체크", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "📊 통합통계"])
 
 # ==========================================
-# [탭 1] 교적부 관리 
+# [탭 1] 교적부 관리
 # ==========================================
 with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
-    manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/삭제", "➕ 인원추가"], horizontal=True)
+    manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"], horizontal=True)
     req_cols = ['학생ID', '학년(담임)', '이름', '사진', '생년월일', '학교', '주소', '부모(아빠/엄마)', '연락처', '학교상태', '비고', '전도자']
     available_cols = [c for c in req_cols if c in df.columns]
     
     if manage_mode == "👀 전체보기":
         st.dataframe(df[available_cols], use_container_width=True, hide_index=True, column_config={"사진": st.column_config.ImageColumn("사진")})
         
-    elif manage_mode == "📝 수정/삭제":
+    elif manage_mode == "📝 수정/비활성":
         search_list = ["학생 선택"] + df.apply(lambda r: f"{r['이름']} | {r.get(class_col,'')} ({r.get('학교상태','일반')})", axis=1).tolist()
         sel_idx = st.selectbox("수정할 인원 선택", range(len(search_list)), format_func=lambda x: search_list[x])
         if sel_idx > 0:
             target = df.iloc[sel_idx - 1]
-            with st.form("edit_form_v32"):
+            with st.form("edit_form"):
                 col_i, col_f = st.columns([1, 2])
                 if target.get('사진') and str(target['사진']).startswith('http'): col_i.image(target['사진'], use_container_width=True)
                 c1, c2 = col_f.columns(2)
                 e_name = c1.text_input("이름", value=target.get('이름',''))
                 e_class = c2.text_input("학년(담임)", value=target.get(class_col,''))
                 
-                # [수정] 생년월일 Date Input 통일
                 default_bday = parse_date_safe(target.get('생년월일', ''))
                 e_birth_input = c1.date_input("생년월일", value=default_bday, min_value=datetime.date(1900,1,1), max_value=datetime.date.today())
                 e_birth = e_birth_input.strftime("%Y-%m-%d")
@@ -188,7 +172,8 @@ with tabs[0]:
                 e_school = c2.text_input("학교", value=target.get('학교',''))
                 e_phone = c1.text_input("연락처", value=target.get('연락처',''))
                 e_parents = c2.text_input("부모", value=target.get('부모(아빠/엄마)',''))
-                status_opts = ["일반", "새친구", "이사", "교사", "비활성"]
+                
+                status_opts = ["일반", "새친구", "교사", "이사", "비활성", "졸업"]
                 curr_s = target.get('학교상태', '일반')
                 e_status = col_f.selectbox("구분 (상태)", status_opts, index=status_opts.index(curr_s) if curr_s in status_opts else 0)
                 e_addr = col_f.text_input("주소", value=target.get('주소',''))
@@ -198,7 +183,7 @@ with tabs[0]:
                 
                 c_btn1, c_btn2 = st.columns(2)
                 if c_btn1.form_submit_button("💾 정보 수정 저장"):
-                    with st.spinner("서버에 일괄 저장 중..."):
+                    with st.spinner("저장 중..."):
                         p_url = upload_photo(e_photo, e_name) if e_photo else target.get('사진','')
                         actual_headers = ws.row_values(1)
                         r_idx = int(target['sheet_row'])
@@ -212,18 +197,14 @@ with tabs[0]:
                         if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
                         elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
                         
-                        # [수정] 청크 업데이트
                         if cells_to_update: chunked_update(ws, cells_to_update)
-                        fetch_sheet_data.clear()
-                        st.success("수정 완료!"); st.rerun()
+                        fetch_sheet_data.clear(); st.success("수정 완료!"); st.rerun()
                         
-                # [수정] 삭제 대신 비활성화 (이사) 처리
-                if c_btn2.form_submit_button("🚨 비활성화 (이사 처리)"):
+                if c_btn2.form_submit_button("🚨 비활성화 (졸업 처리)"):
                     actual_headers = ws.row_values(1)
                     status_col_idx = actual_headers.index('학교상태') + 1 if '학교상태' in actual_headers else actual_headers.index('상태') + 1
-                    ws.update_cell(int(target['sheet_row']), status_col_idx, "이사")
-                    fetch_sheet_data.clear()
-                    st.success("해당 인원이 비활성화(이사) 처리되었습니다!"); st.rerun()
+                    ws.update_cell(int(target['sheet_row']), status_col_idx, "졸업")
+                    fetch_sheet_data.clear(); st.success("비활성화(졸업) 처리되었습니다!"); st.rerun()
                     
     elif manage_mode == "➕ 인원추가":
         with st.form("add_new"):
@@ -231,7 +212,6 @@ with tabs[0]:
             n_name = col1.text_input("이름 (필수)")
             n_class = col1.text_input("학년(담임) (필수)")
             
-            # [수정] 생년월일 통일
             n_birth_input = col1.date_input("생년월일", value=datetime.date(2015,1,1), min_value=datetime.date(1900,1,1), max_value=datetime.date.today())
             n_birth = n_birth_input.strftime("%Y-%m-%d")
             
@@ -244,7 +224,6 @@ with tabs[0]:
                     new_row = [""] * len(headers)
                     h_map = {str(h): i for i, h in enumerate(headers)}
                     
-                    # [수정] 학생 고유 ID 발급
                     new_id = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
                     
                     if '학생ID' in h_map: new_row[h_map['학생ID']] = new_id
@@ -259,7 +238,7 @@ with tabs[0]:
                     fetch_sheet_data.clear(); st.success(f"등록 완료! (발급된 ID: {new_id})"); st.rerun()
 
 # ==========================================
-# [탭 2] 출석체크 
+# [탭 2] 출석체크
 # ==========================================
 with tabs[1]:
     st.subheader("📅 주간 출석 & 통계")
@@ -269,8 +248,7 @@ with tabs[1]:
     with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()]))
     
     status_col = '학교상태'
-    # 이사/비활성 인원 제외
-    att_df = df[~df[status_col].isin(['이사', '비활성'])].copy()
+    att_df = df[~df[status_col].isin(INACTIVE_STATUS)].copy()
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
     
@@ -294,7 +272,7 @@ with tabs[1]:
     guest_in = cs4.number_input("기타 방문", min_value=0, value=saved_guest)
     st.markdown(f"<div class='total-summary'>✅ 최종 합계: {s_p + t_p + guest_in}명</div>", unsafe_allow_html=True)
 
-    with st.form("att_toggle_form_v32"):
+    with st.form("att_toggle_form"):
         new_att = {}
         grouped = att_df.sort_values(by=['이름']).groupby(class_col)
         for c_name, group in sorted(grouped):
@@ -305,8 +283,8 @@ with tabs[1]:
                 label = f"🌱 {row['이름']}" if row[status_col] == '새친구' else row['이름']
                 new_att[row['sheet_row']] = cols[i%3].toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
-        if st.form_submit_button("💾 출석 정보 일괄 저장", type="primary", use_container_width=True):
-            with st.spinner("구글 서버에 저장 중..."):
+        if st.form_submit_button("💾 출석 일괄 저장", type="primary", use_container_width=True):
+            with st.spinner("안전하게 일괄 저장 중..."):
                 target_c = headers.index(sel_w) + 1 if sel_w in headers else len(headers) + 1
                 if sel_w not in headers: ws.update_cell(1, target_c, sel_w)
                 
@@ -316,7 +294,6 @@ with tabs[1]:
                     cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
                     if v: final_p += 1
                 
-                # [수정] 청크 업데이트
                 if cells_to_update: chunked_update(ws, cells_to_update)
                 
                 rate = int((final_p/len(att_df))*100) if len(att_df)>0 else 0
@@ -325,17 +302,17 @@ with tabs[1]:
                 if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:H{match_stat.index[0]+2}", [stat_data])
                 else: ws_stat.append_row(stat_data)
                 
-                fetch_sheet_data.clear(); st.success("안전하게 일괄 저장되었습니다!"); st.rerun()
+                fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
 
     with st.expander("📊 연간 전체 출석 현황 및 일괄 수정"):
         week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
-        annual_df = df[~df[status_col].isin(['이사', '비활성'])][[class_col, '이름', 'sheet_row'] + week_cols].copy()
+        annual_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', 'sheet_row'] + week_cols].copy()
         for w in week_cols: annual_df[w] = annual_df[w].apply(lambda x: True if str(x).strip() == "1" else False)
         
         edited_annual = st.data_editor(annual_df, hide_index=True, use_container_width=True, 
                                        column_config={w: st.column_config.CheckboxColumn(w) for w in week_cols})
-        if st.button("📝 연간 데이터 수정사항 한 번에 반영"):
-            with st.spinner("초고속 일괄 동기화 중..."):
+        if st.button("📝 연간 데이터 수정사항 반영"):
+            with st.spinner("동기화 중..."):
                 cells_to_update = []
                 for r in range(len(annual_df)):
                     for w in week_cols:
@@ -345,43 +322,15 @@ with tabs[1]:
                             val = "1" if edited_annual.iloc[r][w] else ""
                             cells_to_update.append(gspread.Cell(row_idx, col_idx, val))
                 
-                # [수정] 청크 업데이트
                 if cells_to_update: chunked_update(ws, cells_to_update, chunk_size=200)
-                fetch_sheet_data.clear(); st.success("업데이트 되었습니다!"); st.rerun()
+                fetch_sheet_data.clear(); st.success("업데이트 완료!"); st.rerun()
 
 # ==========================================
-# [탭 7] 통합 통계 & 다운로드
-# ==========================================
-with tabs[6]:
-    st.subheader("📊 사역 통합 통계 및 다운로드")
-    week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
-    report_df = df[~df[status_col].isin(['이사', '비활성'])][[class_col, '이름', '학교상태'] + week_cols].copy()
-    report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
-    report_df['출석률'] = report_df['출석수'].apply(lambda x: f"{int(x/len(week_cols)*100)}%" if len(week_cols)>0 else "0%")
-    
-    col_dl1, col_dl2 = st.columns(2)
-    with col_dl1:
-        st.write("👤 **개인별 누적 출석 현황**")
-        st.dataframe(report_df[[class_col, '이름', '학교상태', '출석수', '출석률']], use_container_width=True, hide_index=True)
-    with col_dl2:
-        st.write("📅 **주차별 인원 흐름**")
-        st.dataframe(df_stat, use_container_width=True, hide_index=True)
-
-    st.divider()
-    c_csv1, c_csv2 = st.columns(2)
-    with c_csv1:
-        csv_personal = report_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📊 개인별 통계 다운로드", data=csv_personal, file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
-    with c_csv2:
-        csv_weekly = df_stat.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📅 주차별 통계 다운로드", data=csv_weekly, file_name=f"주차별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
-
-# ==========================================
-# 나머지 탭 (반편성, 생일표, 새친구, 행사)
+# [탭 3] 반편성
 # ==========================================
 with tabs[2]:
     st.subheader("🏫 반별 명단 현황")
-    grouped = df[~df[status_col].isin(['이사', '비활성'])].groupby(class_col)
+    grouped = df[~df[status_col].isin(INACTIVE_STATUS)].groupby(class_col)
     cols = st.columns(3)
     for i, (name, group) in enumerate(grouped):
         with cols[i%3]:
@@ -389,12 +338,14 @@ with tabs[2]:
                 st.markdown(f"**{name}** ({len(group)}명)")
                 st.write(", ".join([f"🔴{n}" if s=='새친구' else n for n,s in zip(group['이름'], group[status_col])]))
 
+# ==========================================
+# [탭 4] 생일표
+# ==========================================
 with tabs[3]:
     st.subheader("🎂 월별 생일 명단")
     b_map = {i: [] for i in range(1, 13)}
-    for _, r in df[~df[status_col].isin(['이사', '비활성'])].iterrows():
+    for _, r in df[~df[status_col].isin(INACTIVE_STATUS)].iterrows():
         b = str(r.get('생년월일', ''))
-        # 표준화된 YYYY-MM-DD 포맷 파싱
         if '-' in b and len(b.split('-')) == 3:
             try: m, d = int(b.split('-')[1]), int(b.split('-')[2]); b_map[m].append({"name": r['이름'], "class": r.get(class_col,''), "day": d})
             except: pass
@@ -410,15 +361,21 @@ with tabs[3]:
                                     f"<span>🎈 <b>{p['name']}</b> <span style='font-size:0.8rem; color:gray;'>({p['class']})</span></span>"
                                     f"<strong style='color:#e65100;'>{p['day']}일</strong></div>", unsafe_allow_html=True)
 
+# ==========================================
+# [탭 5] 새친구
+# ==========================================
 with tabs[4]:
     st.subheader("🌱 최근 등록 새친구")
     news = df[df[status_col] == '새친구']
     if not news.empty: st.dataframe(news[available_cols], use_container_width=True, hide_index=True)
     else: st.info("새친구가 없습니다.")
 
+# ==========================================
+# [탭 6] 행사 관리
+# ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 관리")
-    e_mode = st.radio("행사", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
+    e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
     
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
@@ -440,24 +397,22 @@ with tabs[5]:
         v_act_cols = [c for c in ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"] if c in df_act.columns]
         edited_events = st.data_editor(df_act, use_container_width=True, hide_index=True, column_config={f"사진{i}": st.column_config.ImageColumn() for i in range(1, 5)})
         if st.button("📝 행사 저장"):
-            with st.spinner("일괄 업데이트 중..."):
+            with st.spinner("수정 중..."):
                 cells_to_update = []
                 for r in range(len(edited_events)):
                     for c in v_act_cols:
                         if str(df_act.iloc[r][c]) != str(edited_events.iloc[r][c]):
                             cells_to_update.append(gspread.Cell(int(df_act.iloc[r]['sheet_row']), act_sh_headers.index(c)+1, str(edited_events.iloc[r][c])))
-                if cells_to_update: chunked_update(ws_act, cells_to_update) # 청크 업데이트 적용
-                fetch_sheet_data.clear(); st.success("저장완료"); st.rerun()
+                if cells_to_update: chunked_update(ws_act, cells_to_update)
+                fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
                 
     elif e_mode == "🚨 삭제" and not df_act.empty:
-        # [수정] 행사 이름 대신 sheet_row를 매핑하여 고유 식별
         event_options = df_act.apply(lambda r: f"{r['활동명']} | 날짜:{r.get('날짜','')} (ID:{r['sheet_row']})", axis=1).tolist()
         sel_del = st.selectbox("삭제할 행사", event_options)
         if st.button("🚨 삭제 실행"):
-            # 선택된 문자열에서 ID 추출
             target_row = int(sel_del.split("(ID:")[1].replace(")", ""))
             ws_act.delete_rows(target_row)
-            fetch_sheet_data.clear(); st.success("안전하게 삭제되었습니다!"); st.rerun()
+            fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
             
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
@@ -465,4 +420,31 @@ with tabs[5]:
             if st.form_submit_button("저장"):
                 urls = ["", "", "", ""]; [urls.__setitem__(i, upload_photo(f, a_t)) for i, f in enumerate(a_f[:4])]
                 ws_act.append_row([str(a_d), a_t, a_c, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())])
-                fetch_sheet_data.clear(); st.success("저장완료"); st.rerun()
+                fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
+
+# ==========================================
+# [탭 7] 통합 통계 & 다운로드
+# ==========================================
+with tabs[6]:
+    st.subheader("📊 사역 통합 통계 및 다운로드")
+    week_cols = [f"{i}주" for i in range(1, 53) if f"{i}주" in df.columns]
+    report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
+    report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
+    report_df['출석률'] = report_df['출석수'].apply(lambda x: f"{int(x/len(week_cols)*100)}%" if len(week_cols)>0 else "0%")
+    
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
+        st.write("👤 **개인별 누적 출석 현황**")
+        st.dataframe(report_df[[class_col, '이름', '학교상태', '출석수', '출석률']], use_container_width=True, hide_index=True)
+    with col_dl2:
+        st.write("📅 **주차별 인원 흐름**")
+        st.dataframe(df_stat, use_container_width=True, hide_index=True)
+
+    st.divider()
+    c_csv1, c_csv2 = st.columns(2)
+    with c_csv1:
+        csv_personal = report_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📊 개인별 통계 다운로드", data=csv_personal, file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
+    with c_csv2:
+        csv_weekly = df_stat.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📅 주차별 통계 다운로드", data=csv_weekly, file_name=f"주차별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
