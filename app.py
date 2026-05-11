@@ -168,7 +168,7 @@ with tabs[0]:
                 # [수정] 생년월일 Date Input 통일
                 default_bday = parse_date_safe(target.get('생년월일', ''))
                 e_birth_input = c1.date_input("생년월일", value=default_bday, min_value=datetime.date(1900,1,1), max_value=datetime.date.today())
-                e_birth = e_birth_input.strftime("%Y-%m-%d")
+                e_birth = e_birth_input.strftime("%Y.%m.%d")
                 
                 e_school = c2.text_input("학교", value=target.get('학교',''))
                 e_phone = c1.text_input("연락처", value=target.get('연락처',''))
