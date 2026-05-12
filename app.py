@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v39.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v39.1", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
@@ -84,12 +84,15 @@ def natural_sort_key(s):
     clean_s = str(s).replace(" ", "")
     return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', clean_s)]
 
-# [핵심 보완 2] 반편성 고도화 정렬 알고리즘 (일반 반 -> 교사 -> 교역자)
+# [에러 해결!] 반편성 고도화 정렬 알고리즘 (튜플 이중 정렬로 타입 충돌 방지)
 def class_sort_key(c):
     c_str = str(c).replace(" ", "")
-    if any(k in c_str for k in ['교역자', '전도사', '목사']): return [20000]
-    if any(k in c_str for k in ['선생님', '교사']): return [10000]
-    return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', c_str)]
+    priority = 1 # 일반반 기본 순위
+    if any(k in c_str for k in ['교역자', '전도사', '목사']): priority = 3
+    elif any(k in c_str for k in ['선생님', '교사']): priority = 2
+    
+    # 1차로 우선순위 비교, 2차로 자연 정렬 수행
+    return (priority, [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', c_str)])
 
 def get_teacher_rank(name, memo):
     text = str(name) + " " + str(memo)
@@ -136,7 +139,6 @@ def get_role(row):
         return 'teacher'
     return 'student'
 
-# [핵심 보완 5] 날짜 기반 통계 정렬 및 표기용 함수
 def get_date_from_week_str(w_str):
     w_str = str(w_str).strip()
     if w_str.endswith('주'):
@@ -283,7 +285,7 @@ with tabs[0]:
     dash_r1_2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 전도사,목사 {ps_count}명")
     
     dash_r2_1, dash_r2_2 = st.columns(2)
-    dash_r2_1.metric("비활성 총합 (이사/졸업/타교회/비활성)", f"{total_inact}명", f"이사 {mv_count} / 졸업 {gr_count} / 타교회 {other_ch_count} / 단순비활성 {inact_count}")
+    dash_r2_1.metric("비활성 총합 (이사/졸업/타교회/단순비활성)", f"{total_inact}명", f"이사 {mv_count} / 졸업 {gr_count} / 타교회 {other_ch_count} / 단순비활성 {inact_count}")
     
     active_sum_calc = len(df) - total_inact
     dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
@@ -331,7 +333,7 @@ with tabs[0]:
 # ==========================================
 with tabs[1]:
     st.subheader("🏫 반별 명단")
-    # [핵심 보완 2] 반편성 정렬 순서 보장 (class_sort_key 적용)
+    # [수정 확인] 클래스 이름 정렬 (이중 정렬 적용 완료)
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     cols = st.columns(3)
     
@@ -348,8 +350,6 @@ with tabs[1]:
             
         group['sort_key'] = group.apply(get_sort_key, axis=1)
         group = group.sort_values(by=['sort_key', '이름'])
-        
-        # [핵심 보완 3] 반별 사역자/선생님 인원 정상 집계 (역할 상관없이 비활성이 아닌 모든 인원 카운트)
         active_count = len(group[~group[status_col].isin(INACTIVE_STATUS)])
         
         with cols[i % 3]:
@@ -391,7 +391,6 @@ with tabs[2]:
     st.subheader("🎂 월별 생일 명단")
     b_map = {i: [] for i in range(1, 13)}
     
-    # 생일표 렌더링용 임시 DataFrame 
     bd_df = df[~df[status_col].isin(INACTIVE_STATUS)].copy()
     bd_df['role'] = bd_df.apply(get_role, axis=1)
     
@@ -411,7 +410,6 @@ with tabs[2]:
                 with st.container(border=True):
                     st.markdown(f"<h4 style='color:#0366d6; margin-bottom:0px;'>📅 {m}월</h4>", unsafe_allow_html=True); st.divider()
                     for p in sorted(b_map[m], key=lambda x: x["day"]):
-                        # [핵심 보완 1] 생일표 직분 컬러링 로직
                         if p['role'] == 'pastor':
                             n_disp = f"<span style='color:#2E7D32;'>✝️ <b>{p['name']}</b></span>"
                         elif p['role'] == 'teacher':
@@ -598,18 +596,15 @@ with tabs[5]:
 # ==========================================
 # [탭 6] 통합통계 
 # ==========================================
-# [핵심 보완 4] 0명 출석 시 붉은 하이라이트를 위한 함수
 def highlight_zero_attendance(row):
     try: att = int(row['출석'])
     except: att = -1
-    
-    if att == 0:
-        return ['background-color: #ffebee; color: #d32f2f;' for _ in row.index]
+    if att == 0: return ['background-color: #ffebee; color: #d32f2f;' for _ in row.index]
     return ['' for _ in row.index]
 
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
-    show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업/타교회/비활성) 인원 기록 포함하기", value=True)
+    show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     if show_all_stats: report_df = df[[class_col, '이름', '학교상태'] + week_cols].copy()
     else: report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
@@ -620,7 +615,6 @@ with tabs[6]:
     with col_stat: 
         st.write("📅 **주차별 통계 (시계열 역산 적용)**")
         if not df_stat.empty:
-            # [핵심 보완 5] 날짜 기반 시계열 역산 자동 정렬 로직
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
             df_stat_calc = df_stat_calc.sort_values(by='sort_date').drop(columns=['sort_date'])
@@ -638,11 +632,8 @@ with tabs[6]:
                 if c not in actual_order and c != '출석률': actual_order.append(c)
                 
             df_stat_display = df_stat_renamed[actual_order]
-            
-            # [핵심 보완 5] 주차 표시 문자열에 날짜 추가 ("1주" -> "1주 (01/04)")
             df_stat_display['주차'] = df_stat_display['주차'].apply(format_week_display)
             
-            # [핵심 보완 4] Pandas Styling 체인 기법 (0명 붉은색 + 합계 진한파랑 동시 적용)
             style_cols = [c for c in ['유년부 합계', '총합'] if c in df_stat_display.columns]
             
             styled_df = df_stat_display.style.apply(highlight_zero_attendance, axis=1)
@@ -650,8 +641,6 @@ with tabs[6]:
                 styled_df = styled_df.set_properties(subset=style_cols, **{'font-weight': 'bold', 'color': '#0366d6'})
                 
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
-            
-            # 저장용 데이터는 원본 보존
             csv_data_weekly = df_stat_calc.to_csv(index=False).encode('utf-8-sig')
         else:
             st.dataframe(df_stat, use_container_width=True, hide_index=True)
