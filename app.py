@@ -8,7 +8,7 @@ import datetime
 import uuid
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="슈팅스타 통합 관리", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="슈팅스타 통합 관리 V_0.90", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 
@@ -27,8 +27,8 @@ if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
-    st.markdown("## 🔒 SHOOTINGSTAR 시스템 접근 제어 ")
-    pwd = st.text_input("비밀번호8자리(특수문자포함)를 입력하세요", type="password")
+    st.markdown("## 🔒 유년부 시스템 접근 제어")
+    pwd = st.text_input("비밀번호8자리(특수문자포함)를입력하세요", type="password")
     if st.button("로그인"):
         if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
             st.session_state["authenticated"] = True
@@ -503,7 +503,7 @@ with tabs[5]:
 # [탭 6] 통합 통계 & 다운로드
 # ==========================================
 with tabs[6]:
-    st.subheader("📊 사역 통합 통계 및 다운로드")
+    st.subheader("📊 통합 통계 및 다운로드")
     
     show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업) 인원 기록 포함하기", value=True)
     
