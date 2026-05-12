@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v39.2", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v39.3", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
@@ -235,7 +235,6 @@ def edit_student_dialog(target_dict):
         bd_val = parse_date_safe(safe_str(target_dict.get('생년월일', '')))
         e_birth = c1.date_input("생년월일", value=bd_val, min_value=datetime.date(1900,1,1)).strftime("%Y-%m-%d")
         
-        # [핵심 보완] None 이나 nan 방지 처리
         e_reg = c1.text_input("등록일 (YYYY-MM-DD)", value=safe_str(target_dict.get('등록일','')), placeholder="예: 2026-05-10")
         e_change = c2.text_input("변동일 (이사/졸업/타교회 등)", value=safe_str(target_dict.get('변동일','')), placeholder="변동 발생 날짜")
         
@@ -254,7 +253,6 @@ def edit_student_dialog(target_dict):
                 p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                 actual_headers = ws.row_values(1)
                 
-                # [DB 힐링] 등록일과 변동일이 시트에 없으면 자동 생성!
                 missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
                 if missing_headers:
                     for mh in missing_headers:
@@ -579,7 +577,7 @@ with tabs[4]:
                 fetch_sheet_data.clear(); st.success("업데이트 완료!"); st.rerun()
 
 # ==========================================
-# [탭 5] 행사기록
+# [탭 5] 행사기록 
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 기록 관리")
@@ -669,25 +667,22 @@ with tabs[6]:
         st.write("📅 **주차별 통계 (시계열 역산 적용)**")
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
-            
-            # [핵심 보완 5] 시계열 역산 시 날짜 기반으로 데이터프레임 오름차순 자동 정렬
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
             df_stat_calc = df_stat_calc.sort_values(by='sort_date').drop(columns=['sort_date'])
             
-            # [핵심 보완 5] 동적 재적 계산을 위해 루프 돌며 데이터 갱신
             rename_dict = {'비고': '내용(비고)', '학생재적': '유년부 재적', '학생출석': '출석', '새친구(기타)': '추가', '새친구/추가예배': '추가', '총합계': '총합'}
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
             preferred_order = ["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"]
             
-            # 동적 재적 및 합계 재계산
+            # [에러 해결] 타입 에러 방지를 위해 계산값을 string으로 강제 형변환(Casting)하여 저장
             for idx, row_st in df_stat_renamed.iterrows():
                 t_date = get_date_from_week_str(row_st['주차'])
                 v_df = df[df.apply(lambda r: is_enrolled_at_date(r, t_date), axis=1)].copy()
                 v_df['role'] = v_df.apply(get_role, axis=1)
                 s_c = len(v_df[v_df['role'] == 'student'])
                 t_c = len(v_df[v_df['role'] == 'teacher'])
-                df_stat_renamed.at[idx, '유년부 재적'] = s_c
-                df_stat_renamed.at[idx, '교사재적'] = t_c
+                df_stat_renamed.at[idx, '유년부 재적'] = str(s_c)
+                df_stat_renamed.at[idx, '교사재적'] = str(t_c)
             
             if '유년부 합계' not in df_stat_renamed.columns:
                 try: df_stat_renamed['유년부 합계'] = pd.to_numeric(df_stat_renamed['출석'], errors='coerce').fillna(0) + pd.to_numeric(df_stat_renamed['추가'], errors='coerce').fillna(0)
@@ -705,7 +700,6 @@ with tabs[6]:
             
             style_cols = [c for c in ['유년부 합계', '총합'] if c in df_stat_display.columns]
             
-            # [핵심 보완 4] 0명 출석 시 붉은 하이라이트
             styled_df = df_stat_display.style.apply(highlight_zero_attendance, axis=1)
             if style_cols:
                 styled_df = styled_df.set_properties(subset=style_cols, **{'font-weight': 'bold', 'color': '#0366d6'})
