@@ -9,9 +9,8 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v38.6", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v38.7", page_icon="🌱", layout="wide")
 
-# [핵심 보완] 타교회 추가 및 상태 세분화
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
@@ -87,7 +86,7 @@ def get_teacher_rank(name, memo):
     text = str(name) + " " + str(memo)
     match = re.search(r'\[(\d+)\]', text)
     if match: return int(match.group(1))
-    if '전도사' in text or '목사' in text: return 10
+    if any(k in text for k in ['전도사', '목사', '교역자']): return 10
     if '부장' in text: return 20
     if '부감' in text: return 30
     if '총무' in text: return 40
@@ -122,8 +121,13 @@ def get_role(row):
     s = str(row.get('학교상태', '')).strip()
     c = str(row.get('학년(담임)', row.get('반', ''))).strip()
     m = str(row.get('비고', '')).strip()
-    if s in ['교역자', '전도사', '목사']: return 'pastor'
-    if s == '교사' or any(k in c for k in ['교사', '임원']) or any(k in m for k in ['부장','부감','총무','회계']): return 'teacher'
+    
+    if s in ['교역자', '전도사', '목사'] or any(k in m for k in ['전도사', '목사', '교역자']) or any(k in c for k in ['교역자', '전도사']):
+        return 'pastor'
+    
+    if s == '교사' or any(k in c for k in ['교사', '임원']) or any(k in m for k in ['교사', '부장', '부감', '총무', '회계']):
+        return 'teacher'
+    
     return 'student'
 
 # --- 4. 구글 시트 데이터 연동 ---
@@ -142,7 +146,7 @@ def get_worksheets():
     except: ws_a = sh.add_worksheet("활동간식", 500, 10); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4", "등록일"])
     try: ws_s = sh.worksheet("주차별통계")
     except: 
-        ws_s = sh.add_worksheet("주차별통계", 200, 10)
+        ws_s = sh.add_worksheet("주차별통계", 200, 11)
         ws_s.append_row(["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"])
     return ws_m, ws_a, ws_s
 
@@ -160,6 +164,7 @@ def get_all_data():
         if not df_m.empty and '이름' in df_m.columns:
             df_m = df_m[df_m['이름'].astype(str).str.strip() != '']
         if '상태' in df_m.columns and '학교상태' not in df_m.columns: df_m.rename(columns={'상태': '학교상태'}, inplace=True)
+        
         df_a = pd.DataFrame(vals_a[1:], columns=vals_a[0]) if len(vals_a) > 1 else pd.DataFrame()
         df_a['sheet_row'] = range(2, len(df_a) + 2)
         df_s = pd.DataFrame(vals_s[1:], columns=vals_s[0]) if len(vals_s) > 1 else pd.DataFrame()
@@ -169,7 +174,7 @@ def get_all_data():
 ws, df, headers, ws_act, df_act, ws_stat, df_stat = get_all_data()
 
 if df is None or df.empty:
-    st.warning("⚠️ 구글 시트 데이터가 비어있습니다. 약 1분 후 새로고침 해주세요.")
+    st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
     st.stop()
 
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
@@ -189,7 +194,7 @@ start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') })" for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 (비활성화 버튼 삭제, 저장 버튼 단일화) ---
+# --- 모달 팝업용 수정 함수 ---
 @st.dialog("📝 인원 정보 수정 팝업")
 def edit_student_dialog(target_dict):
     st.info(f"💡 **{target_dict.get('이름', '')}** 님의 정보를 수정합니다. '구분'에서 알맞은 상태를 선택 후 저장하세요.")
@@ -197,12 +202,13 @@ def edit_student_dialog(target_dict):
         col_i, col_f = st.columns([1, 2])
         if target_dict.get('사진') and str(target_dict['사진']).startswith('http'): 
             col_i.image(target_dict['사진'], use_container_width=True)
+        
         c1, c2 = col_f.columns(2)
         e_name = c1.text_input("이름", value=target_dict.get('이름',''))
         e_class = c2.text_input("학년(담임)", value=target_dict.get(class_col,''))
         e_birth = c1.date_input("생년월일", value=parse_date_safe(target_dict.get('생년월일', '')), min_value=datetime.date(1900,1,1)).strftime("%Y-%m-%d")
         e_reg = c1.text_input("등록일 (YYYY-MM-DD)", value=target_dict.get('등록일',''), placeholder="예: 2026-05-10")
-        e_change = c2.text_input("변동일 (이사/졸업/타교회)", value=target_dict.get('변동일',''), placeholder="변동 발생 날짜")
+        e_change = c2.text_input("변동일 (이사/졸업/타교회 등)", value=target_dict.get('변동일',''), placeholder="변동 발생 날짜")
         e_school = c1.text_input("학교", value=target_dict.get('학교',''))
         e_phone = c2.text_input("연락처", value=target_dict.get('연락처',''))
         
@@ -213,7 +219,6 @@ def edit_student_dialog(target_dict):
         e_memo = col_f.text_input("비고", value=target_dict.get('비고',''))
         e_photo = col_f.file_uploader("사진변경")
         
-        # [수정] 헷갈리는 비활성화 버튼을 없애고 저장 버튼 하나만 넓게 배치
         if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
                 p_url = upload_photo(e_photo, e_name) if e_photo else target_dict.get('사진','')
@@ -249,11 +254,13 @@ with tabs[0]:
     tc_count = len(active_staff[active_staff['role'] == 'teacher'])
     ps_count = len(active_staff[active_staff['role'] == 'pastor'])
     
-    # 비활성 상태 세분화 (타교회, 비활성 추가 반영)
+    # [핵심 보완] 비활성 사유 4가지 완벽 세분화 계산
     mv_count = len(df[df[status_col] == '이사'])
     gr_count = len(df[df[status_col] == '졸업'])
-    etc_count = len(df[df[status_col].isin(['비활성', '타교회'])])
-    total_inact = mv_count + gr_count + etc_count
+    other_ch_count = len(df[df[status_col] == '타교회'])
+    inact_count = len(df[df[status_col] == '비활성'])
+    
+    total_inact = mv_count + gr_count + other_ch_count + inact_count
     
     st.markdown("##### 👥 전체 인원 현황 (Live)")
     dash_r1_1, dash_r1_2 = st.columns(2)
@@ -261,7 +268,8 @@ with tabs[0]:
     dash_r1_2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 전도사,목사 {ps_count}명")
     
     dash_r2_1, dash_r2_2 = st.columns(2)
-    dash_r2_1.metric("비활성 (이사/졸업/기타)", f"{total_inact}명", f"이사 {mv_count} / 졸업 {gr_count} / 타교회등 {etc_count}")
+    # 비활성 상세 내역 직관적 표시
+    dash_r2_1.metric("비활성 총합 (이사/졸업/타교회/단순비활성)", f"{total_inact}명", f"이사 {mv_count} / 졸업 {gr_count} / 타교회 {other_ch_count} / 단순비활성 {inact_count}")
     
     active_sum_calc = len(df) - total_inact
     dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
@@ -559,7 +567,7 @@ with tabs[5]:
 # ==========================================
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
-    show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업/타교회) 인원 기록 포함하기", value=True)
+    show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업/타교회/단순비활성) 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     if show_all_stats: report_df = df[[class_col, '이름', '학교상태'] + week_cols].copy()
     else: report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
