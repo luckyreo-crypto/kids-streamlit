@@ -8,7 +8,7 @@ import datetime
 import uuid
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v33.2", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="슈팅스타 통합 관리", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 
@@ -27,8 +27,8 @@ if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
-    st.markdown("## 🔒 유년부 시스템 접근 제어")
-    pwd = st.text_input("관리자 비밀번호를 입력하세요", type="password")
+    st.markdown("## 🔒 SHOOTINGSTAR 시스템 접근 제어 ")
+    pwd = st.text_input("비밀번호8자리(특수문자포함)를 입력하세요", type="password")
     if st.button("로그인"):
         if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
             st.session_state["authenticated"] = True
@@ -96,7 +96,8 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except:
         ws_s = sh.add_worksheet(title="주차별통계", rows="200", cols="10")
-        ws_s.append_row(["주차", "대상인원", "출석", "결석", "기타인원", "총합계", "출석률", "비고", "업데이트일시"])
+        # [구조 변경] 10개 컬럼으로 학생/교사 분리
+        ws_s.append_row(["주차", "학생재적", "학생출석", "교사재적", "교사출석", "새친구(기타)", "총합계", "학생출석률", "비고", "업데이트일시"])
     return ws_m, ws_a, ws_s
 
 @st.cache_data(ttl=600)
@@ -135,7 +136,7 @@ week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days
 tabs = st.tabs(["✅ 출석/행사", "📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사기록", "📊 통합통계"])
 
 # ==========================================
-# [탭 0] 출석체크 & 행사 모드 (v33.2 고도화)
+# [탭 0] 출석체크 & 행사 모드
 # ==========================================
 with tabs[0]:
     st.subheader("📅 주간 출석 & 행사 현황")
@@ -154,7 +155,6 @@ with tabs[0]:
     with c2: 
         sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()]))
     
-    # [핵심 보완 1] 비활성 인원 포함 보기 토글
     show_inactive = st.checkbox("👀 비활성(이사/졸업) 인원 명단에 포함하기 (과거 출석 수정 및 확인용)")
     
     status_col = '학교상태'
@@ -168,12 +168,12 @@ with tabs[0]:
     if sel_w not in att_df.columns: 
         att_df[sel_w] = ""
     
+    # [핵심 로직] 학생과 교사 분리
     s_df = att_df[att_df[status_col] != '교사']
     t_df = att_df[att_df[status_col] == '교사']
     s_p = len(s_df[s_df[sel_w].astype(str).str.strip() == "1"])
     t_p = len(t_df[t_df[sel_w].astype(str).str.strip() == "1"])
     
-    # [핵심 보완 2] 스냅샷(Snapshot) 데이터 로드 및 알림
     is_saved_record = False
     saved_guest = 0
     saved_note = ""
@@ -181,18 +181,18 @@ with tabs[0]:
         match = df_stat[df_stat['주차'] == sel_w]
         if not match.empty: 
             is_saved_record = True
-            try: saved_guest = int(match.iloc[0]['기타인원'])
+            # 하위 호환성 유지: 기존 컬럼명(기타인원)이나 새 컬럼명(새친구(기타)) 모두 인식
+            try: saved_guest = int(match.iloc[0].get('새친구(기타)', match.iloc[0].get('기타인원', 0)))
             except: pass
             saved_note = match.iloc[0].get('비고', '')
-            # 스냅샷 안내창
-            st.info(f"💾 **시스템 안내:** [{sel_w}] 당시 저장된 공식 기록은 **총 {match.iloc[0].get('총합계', 0)}명 출석** (출석률 {match.iloc[0].get('출석률', '0%')}) 입니다.")
+            st.info(f"💾 **시스템 안내:** [{sel_w}] 당시 저장된 공식 기록은 **총 {match.iloc[0].get('총합계', 0)}명 출석** (학생출석률 {match.iloc[0].get('학생출석률', match.iloc[0].get('출석률', '0%'))}) 입니다.")
 
     st.markdown("#### 📊 현재 체크 현황 (수정/저장 전)")
     cs1, cs2, cs3, cs4 = st.columns(4)
-    cs1.metric("학생 출석 체크", f"{s_p}명", f"현재 탭 기준 {len(s_df)}명")
-    cs2.metric("교사 출석 체크", f"{t_p}명", f"현재 탭 기준 {len(t_df)}명")
+    cs1.metric("학생 출석 체크", f"{s_p}명", f"재적 {len(s_df)}명")
+    cs2.metric("교사 출석 체크", f"{t_p}명", f"재적 {len(t_df)}명")
     cs3.metric("기존 출석 합계", f"{s_p + t_p}명")
-    guest_in = cs4.number_input("🎉 기타 방문/새친구", min_value=0, value=saved_guest, help="행사 시 방문한 비등록 인원")
+    guest_in = cs4.number_input("🎉 새친구(기타 방문)", min_value=0, value=saved_guest, help="비등록 인원 수")
     
     st.markdown("---")
     col_ex1, col_ex2 = st.columns([1, 3])
@@ -223,7 +223,7 @@ with tabs[0]:
                     fetch_sheet_data.clear(); st.success(f"{q_name} 새친구가 등록되었습니다!"); st.rerun()
 
     if is_skip:
-        st.warning("⚠️ 행사 모드 활성화: 기존 인원 명단은 숨겨지며, '기타 방문/새친구' 숫자만 최종 통계에 반영됩니다.")
+        st.warning("⚠️ 행사 모드 활성화: 기존 인원 명단은 숨겨지며, '새친구(기타 방문)' 숫자만 최종 통계에 반영됩니다.")
 
     with st.form("att_toggle_form"):
         new_att = {}
@@ -234,7 +234,6 @@ with tabs[0]:
                 cols = st.columns(3)
                 for i, (idx, row) in enumerate(group.iterrows()):
                     is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                    # 비활성 인원인 경우 이름 앞에 표시 추가
                     prefix = f"🚫[{row[status_col]}] " if row[status_col] in INACTIVE_STATUS else ("🌱 " if row[status_col] == '새친구' else "")
                     label = f"{prefix}{row['이름']}"
                     new_att[row['sheet_row']] = cols[i%3].toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
@@ -245,32 +244,56 @@ with tabs[0]:
                 if sel_w not in headers: 
                     ws.update_cell(1, target_c, sel_w)
                 
-                final_p = 0
+                final_s_p = 0
+                final_t_p = 0
                 cells_to_update = []
+                
                 if not is_skip:
                     for r, v in new_att.items():
+                        # 해당 row_idx의 데이터를 찾아서 학생/교사 구분
+                        row_data = att_df[att_df['sheet_row'] == r]
+                        is_teacher = False
+                        if not row_data.empty and row_data.iloc[0][status_col] == '교사':
+                            is_teacher = True
+                            
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
-                        if v: final_p += 1
+                        if v:
+                            if is_teacher: final_t_p += 1
+                            else: final_s_p += 1
+                            
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
-                save_p = 0 if is_skip else final_p
-                rate_val = 0 if len(att_df) == 0 else int((final_p/len(att_df))*100)
-                save_rate = "0%" if is_skip else f"{rate_val}%"
-                save_absent = len(att_df) if is_skip else len(att_df) - final_p
+                save_s_p = 0 if is_skip else final_s_p
+                save_t_p = 0 if is_skip else final_t_p
                 
-                stat_data = [sel_w, len(att_df), save_p, save_absent, guest_in, save_p + guest_in, save_rate, note_text, str(datetime.datetime.now())]
+                # [핵심 로직] 출석률은 순수하게 '학생'만을 기준으로 계산
+                student_count = len(s_df)
+                rate_val = 0 if student_count == 0 else int((final_s_p / student_count) * 100)
+                save_rate = "0%" if is_skip else f"{rate_val}%"
+                
+                # 10개 컬럼: 주차, 학생재적, 학생출석, 교사재적, 교사출석, 새친구, 총합계, 학생출석률, 비고, 일시
+                stat_data = [
+                    sel_w, 
+                    student_count, save_s_p, 
+                    len(t_df), save_t_p, 
+                    guest_in, 
+                    save_s_p + save_t_p + guest_in, 
+                    save_rate, 
+                    note_text, 
+                    str(datetime.datetime.now())
+                ]
                 
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
                 if not match_stat.empty: 
-                    ws_stat.update(f"A{match_stat.index[0]+2}:I{match_stat.index[0]+2}", [stat_data])
+                    # A열부터 J열(10번째 열)까지 업데이트
+                    ws_stat.update(f"A{match_stat.index[0]+2}:J{match_stat.index[0]+2}", [stat_data])
                 else: 
                     ws_stat.append_row(stat_data)
                 
-                fetch_sheet_data.clear(); st.success(f"[{sel_w}] 데이터가 성공적으로 저장되었습니다!"); st.rerun()
+                fetch_sheet_data.clear(); st.success(f"[{sel_w}] 데이터가 성공적으로 분리 저장되었습니다!"); st.rerun()
 
     with st.expander("📊 연간 출석 현황 에디터 (일괄 수정)"):
         week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
-        # 에디터에서도 비활성 인원 표시 옵션 연동
         if show_inactive:
             annual_df = df[[class_col, '이름', '학교상태', 'sheet_row'] + week_cols].copy()
         else:
@@ -477,12 +500,11 @@ with tabs[5]:
                 fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
 
 # ==========================================
-# [탭 6] 통합 통계 & 다운로드 (핵심 보완 3)
+# [탭 6] 통합 통계 & 다운로드
 # ==========================================
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
     
-    # [핵심 보완 3] 통합 통계망에서 이사/졸업 인원 데이터 보존 옵션
     show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업) 인원 기록 포함하기", value=True)
     
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
