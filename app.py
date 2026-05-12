@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v39.1", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v39.2", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
@@ -350,7 +350,7 @@ with tabs[1]:
         
         with cols[i % 3]:
             with st.container(border=True):
-                st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{c_name} (학생 {active_count}명)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{c_name} ({active_count}명)</h4>", unsafe_allow_html=True)
                 btn_cols = st.columns(2)
                 for j, (_, r) in enumerate(group.iterrows()):
                     s = r[status_col]
@@ -442,13 +442,11 @@ with tabs[4]:
     with c2: 
         sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
     
-    # [논리 오류 완벽 수정] 과거 날짜의 명단을 제대로 불러오기 위한 로직 분리
     show_inactive = st.checkbox("👀 강제 전체명단 표시 (등록전/이사후 등 모든 명단 수정용)")
     
     if show_inactive:
-        att_df = df.copy() # 체크하면 무조건 전체 표시
+        att_df = df.copy()
     else:
-        # 체크 안하면 '선택한 타겟 날짜' 기준으로 그 당시에 재적 중이었던 사람만 깔끔하게 표시
         att_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
         
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
@@ -559,11 +557,12 @@ with tabs[4]:
                 fetch_sheet_data.clear(); st.success("업데이트 완료!"); st.rerun()
 
 # ==========================================
-# [탭 5] 행사기록
+# [탭 5] 행사기록 전용 (사진 첨부 및 수정 폼 복구)
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 기록 관리")
     e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
+    
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
             with st.container():
@@ -572,27 +571,58 @@ with tabs[5]:
                 for i in range(1, 5):
                     url = row.get(f'사진{i}', "")
                     if url and str(url).startswith('http'): p_cols[i-1].image(url, use_container_width=True)
+                    
     elif e_mode == "📝 수정" and not df_act.empty:
-        act_sh_headers = ws_act.row_values(1)
-        v_act_cols = [c for c in ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"] if c in df_act.columns]
-        edited_events = st.data_editor(df_act, use_container_width=True, hide_index=True, column_config={f"사진{i}": st.column_config.ImageColumn() for i in range(1, 5)})
-        if st.button("📝 행사 저장"):
-            with st.spinner("수정 중..."):
-                cells_to_update = []
-                for r in range(len(edited_events)):
-                    for c in v_act_cols:
-                        if str(df_act.iloc[r][c]) != str(edited_events.iloc[r][c]):
-                            cells_to_update.append(gspread.Cell(int(df_act.iloc[r]['sheet_row']), act_sh_headers.index(c)+1, str(edited_events.iloc[r][c])))
-                if cells_to_update: chunked_update(ws_act, cells_to_update); fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
+        event_options = ["행사 선택"] + df_act.apply(lambda r: f"{r.get('날짜','')} | {r.get('활동명','')} (ID:{r['sheet_row']})", axis=1).tolist()
+        sel_edit = st.selectbox("수정할 행사 선택", event_options)
+        
+        if sel_edit != "행사 선택":
+            target_row_id = int(sel_edit.split("(ID:")[1].replace(")", ""))
+            target_event = df_act[df_act['sheet_row'] == target_row_id].iloc[0]
+            
+            with st.form("edit_event_form"):
+                e_d_val = parse_date_safe(target_event.get('날짜', ''))
+                e_d = st.date_input("날짜", value=e_d_val)
+                e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
+                e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
+                e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
+                
+                st.write("기존 사진 (새 사진을 첨부하면 덮어씁니다)")
+                p_cols = st.columns(4)
+                old_urls = []
+                for i in range(1, 5):
+                    url = target_event.get(f'사진{i}', "")
+                    old_urls.append(url)
+                    if url and str(url).startswith('http'): p_cols[i-1].image(url, use_container_width=True)
+                    
+                e_f = st.file_uploader("새 사진 첨부 (최대 4장)", accept_multiple_files=True)
+                
+                if st.form_submit_button("📝 행사 수정 저장"):
+                    with st.spinner("수정 중..."):
+                        new_urls = old_urls.copy()
+                        if e_f: 
+                            for i, f in enumerate(e_f[:4]): new_urls[i] = upload_photo(f, e_t)
+                                
+                        act_sh_headers = ws_act.row_values(1)
+                        update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n, "사진1": new_urls[0], "사진2": new_urls[1], "사진3": new_urls[2], "사진4": new_urls[3]}
+                        cells_to_update = []
+                        for k, v in update_map.items():
+                            if k in act_sh_headers: cells_to_update.append(gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)))
+                                
+                        if cells_to_update: chunked_update(ws_act, cells_to_update)
+                        fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
+
     elif e_mode == "🚨 삭제" and not df_act.empty:
         sel_del = st.selectbox("삭제할 행사", df_act.apply(lambda r: f"{r['활동명']} | 날짜:{r.get('날짜','')} (ID:{r['sheet_row']})", axis=1).tolist())
         if st.button("🚨 삭제 실행"): ws_act.delete_rows(int(sel_del.split("(ID:")[1].replace(")", ""))); fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
+        
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
-            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_f = st.file_uploader("사진", accept_multiple_files=True)
+            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항"); a_f = st.file_uploader("사진", accept_multiple_files=True)
             if st.form_submit_button("저장"):
                 urls = ["", "", "", ""]; [urls.__setitem__(i, upload_photo(f, a_t)) for i, f in enumerate(a_f[:4])]
-                ws_act.append_row([str(a_d), a_t, a_c, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())]); fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
+                ws_act.append_row([str(a_d.strftime("%Y-%m-%d")), a_t, a_c, a_n, urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())])
+                fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
 
 # ==========================================
 # [탭 6] 통합통계 
