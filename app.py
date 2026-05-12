@@ -9,12 +9,12 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v38.5", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v38.6", page_icon="🌱", layout="wide")
 
-INACTIVE_STATUS = ['이사', '비활성', '졸업']
-ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
+# [핵심 보완] 타교회 추가 및 상태 세분화
+INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
+ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# [핵심 보완 4] 모바일 탭 줄바꿈 및 반응형 CSS 적용
 st.markdown("""
     <style>
     .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
@@ -79,7 +79,6 @@ def parse_date_safe(date_str):
         return datetime.datetime.strptime(clean_str, "%Y-%m-%d").date()
     except: return datetime.date(2015, 1, 1)
 
-# [핵심 보완 2] 공백 무시 자연 정렬 강화 (1-1, 1-2 순서 완벽 정렬)
 def natural_sort_key(s):
     clean_s = str(s).replace(" ", "")
     return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', clean_s)]
@@ -190,10 +189,10 @@ start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') })" for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 ---
+# --- 모달 팝업용 수정 함수 (비활성화 버튼 삭제, 저장 버튼 단일화) ---
 @st.dialog("📝 인원 정보 수정 팝업")
 def edit_student_dialog(target_dict):
-    st.info(f"💡 **{target_dict.get('이름', '')}** 님의 정보를 수정합니다.")
+    st.info(f"💡 **{target_dict.get('이름', '')}** 님의 정보를 수정합니다. '구분'에서 알맞은 상태를 선택 후 저장하세요.")
     with st.form("modal_edit_form"):
         col_i, col_f = st.columns([1, 2])
         if target_dict.get('사진') and str(target_dict['사진']).startswith('http'): 
@@ -203,9 +202,10 @@ def edit_student_dialog(target_dict):
         e_class = c2.text_input("학년(담임)", value=target_dict.get(class_col,''))
         e_birth = c1.date_input("생년월일", value=parse_date_safe(target_dict.get('생년월일', '')), min_value=datetime.date(1900,1,1)).strftime("%Y-%m-%d")
         e_reg = c1.text_input("등록일 (YYYY-MM-DD)", value=target_dict.get('등록일',''), placeholder="예: 2026-05-10")
-        e_change = c2.text_input("변동일 (이사/졸업)", value=target_dict.get('변동일',''), placeholder="이사/졸업 날짜")
+        e_change = c2.text_input("변동일 (이사/졸업/타교회)", value=target_dict.get('변동일',''), placeholder="변동 발생 날짜")
         e_school = c1.text_input("학교", value=target_dict.get('학교',''))
         e_phone = c2.text_input("연락처", value=target_dict.get('연락처',''))
+        
         curr_s = target_dict.get('학교상태', '일반')
         e_status = col_f.selectbox("구분 (상태)", ALL_STATUS_OPTS, index=ALL_STATUS_OPTS.index(curr_s) if curr_s in ALL_STATUS_OPTS else 0)
         e_parents = col_f.text_input("부모", value=target_dict.get('부모(아빠/엄마)',''))
@@ -213,28 +213,22 @@ def edit_student_dialog(target_dict):
         e_memo = col_f.text_input("비고", value=target_dict.get('비고',''))
         e_photo = col_f.file_uploader("사진변경")
         
-        c_btn1, c_btn2 = st.columns(2)
-        if c_btn1.form_submit_button("💾 정보 저장"):
+        # [수정] 헷갈리는 비활성화 버튼을 없애고 저장 버튼 하나만 넓게 배치
+        if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
                 p_url = upload_photo(e_photo, e_name) if e_photo else target_dict.get('사진','')
                 actual_headers = ws.row_values(1)
                 r_idx = int(target_dict['sheet_row'])
                 update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
+                
                 cells_to_update = []
                 for k, v in update_map.items():
                     if k in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index(k)+1, str(v)))
                 if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
                 elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
+                
                 if cells_to_update: chunked_update(ws, cells_to_update)
                 fetch_sheet_data.clear(); st.rerun()
-                
-        if c_btn2.form_submit_button("🚨 비활성화 (오늘 날짜로 이사 처리)"):
-            actual_headers = ws.row_values(1)
-            status_col_idx = actual_headers.index('학교상태') + 1 if '학교상태' in actual_headers else actual_headers.index('상태') + 1
-            change_col_idx = actual_headers.index('변동일') + 1 if '변동일' in actual_headers else None
-            cells = [gspread.Cell(int(target_dict['sheet_row']), status_col_idx, "이사")]
-            if change_col_idx: cells.append(gspread.Cell(int(target_dict['sheet_row']), change_col_idx, datetime.date.today().strftime("%Y-%m-%d")))
-            ws.update_cells(cells); fetch_sheet_data.clear(); st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "✅ 출석/행사", "⚙️ 행사기록", "📊 통합통계"])
@@ -255,20 +249,21 @@ with tabs[0]:
     tc_count = len(active_staff[active_staff['role'] == 'teacher'])
     ps_count = len(active_staff[active_staff['role'] == 'pastor'])
     
+    # 비활성 상태 세분화 (타교회, 비활성 추가 반영)
     mv_count = len(df[df[status_col] == '이사'])
     gr_count = len(df[df[status_col] == '졸업'])
+    etc_count = len(df[df[status_col].isin(['비활성', '타교회'])])
+    total_inact = mv_count + gr_count + etc_count
     
-    # [핵심 보완 5] 모바일 최적화를 위한 2열 그리드 배치 및 데이터 총합 로직 정확한 반영
     st.markdown("##### 👥 전체 인원 현황 (Live)")
     dash_r1_1, dash_r1_2 = st.columns(2)
     dash_r1_1.metric("총 재적 (유년부)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
     dash_r1_2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 전도사,목사 {ps_count}명")
     
     dash_r2_1, dash_r2_2 = st.columns(2)
-    dash_r2_1.metric("비활성 (이사/졸업)", f"{mv_count + gr_count}명", f"이사 {mv_count}명 / 졸업 {gr_count}명")
+    dash_r2_1.metric("비활성 (이사/졸업/기타)", f"{total_inact}명", f"이사 {mv_count} / 졸업 {gr_count} / 타교회등 {etc_count}")
     
-    # 전체 DB 인원에서 비활성 인원을 뺀 진짜 활성(데이터 총합) 표시
-    active_sum_calc = len(df) - (mv_count + gr_count)
+    active_sum_calc = len(df) - total_inact
     dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
     st.divider()
     
@@ -487,6 +482,7 @@ with tabs[4]:
                 
                 valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
                 valid_enrollment_df['role'] = valid_enrollment_df.apply(get_role, axis=1)
+                
                 strict_teacher_df = valid_enrollment_df[valid_enrollment_df['role'] == 'teacher']
                 strict_student_df = valid_enrollment_df[valid_enrollment_df['role'] == 'student']
                 
@@ -506,7 +502,6 @@ with tabs[4]:
                 else: ws_stat.append_row(stat_data)
                 fetch_sheet_data.clear(); st.success(f"[{sel_w}] 동적 재적 기반 데이터 저장 완료!"); st.rerun()
 
-    # 복구된 연간 출석 현황 에디터
     with st.expander("📊 연간 출석 현황 에디터 (일괄 수정)"):
         week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
         if show_inactive: annual_df = df[[class_col, '이름', '학교상태', 'sheet_row'] + week_cols].copy()
@@ -560,11 +555,11 @@ with tabs[5]:
                 ws_act.append_row([str(a_d), a_t, a_c, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())]); fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
 
 # ==========================================
-# [탭 6] 통합통계 (비율 배치 & 다운로드 버튼 일체화)
+# [탭 6] 통합통계
 # ==========================================
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
-    show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업) 인원 기록 포함하기", value=True)
+    show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성(이사/졸업/타교회) 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     if show_all_stats: report_df = df[[class_col, '이름', '학교상태'] + week_cols].copy()
     else: report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
@@ -598,12 +593,9 @@ with tabs[6]:
         else:
             st.dataframe(df_stat, use_container_width=True, hide_index=True)
         
-        # [핵심 보완 3] 다운로드 버튼 테이블에 맞춰 배치
         st.download_button("📅 주차별 흐름 통계 다운로드 (CSV)", data=df_stat.to_csv(index=False).encode('utf-8-sig'), file_name=f"주차별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
             
     with col_cumul: 
         st.write("👤 **개인별 누적 출석**")
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
-        
-        # [핵심 보완 3] 다운로드 버튼 테이블에 맞춰 배치
         st.download_button("📊 개인별 누적 통계 다운로드 (CSV)", data=report_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
