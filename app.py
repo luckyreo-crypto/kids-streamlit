@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v39.3", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="슈팅스타 통합 관리 v39.3", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
@@ -43,7 +43,7 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state["authenticated"]:
     st.markdown("## 🔒 슈팅스타 시스템 접근 제어")
-    pwd = st.text_input("비밀번호를 입력하세요", type="password")
+    pwd = st.text_input("비밀번호8자리(특수문자포함)를 입력하세요", type="password")
     if st.button("로그인"):
         if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
             st.session_state["authenticated"] = True
@@ -654,7 +654,7 @@ def highlight_zero_attendance(row):
     return ['' for _ in row.index]
 
 with tabs[6]:
-    st.subheader("📊 사역 통합 통계 및 다운로드")
+    st.subheader("📊 통합 통계 및 다운로드")
     show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     if show_all_stats: report_df = df[[class_col, '이름', '학교상태'] + week_cols].copy()
