@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v38.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v38.1", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
@@ -80,23 +80,21 @@ def get_teacher_rank(name, memo):
     if '회계' in text: return 50
     return 60 
 
-# [핵심 로직] 시계열 등록/변동일 정밀 판별
 def is_enrolled_at_date(row, target_date):
     reg_str = str(row.get('등록일', '')).strip()
     if reg_str:
         reg_date = parse_date_safe(reg_str)
-        if reg_date > target_date: return False # 등록일이 타겟날짜 이후면 재적 아님
+        if reg_date > target_date: return False
         
     s = str(row.get('학교상태', '일반')).strip()
     if s in INACTIVE_STATUS:
         change_str = str(row.get('변동일', '')).strip()
         if change_str:
             change_date = parse_date_safe(change_str)
-            if change_date <= target_date: return False # 이사/졸업일이 타겟날짜와 같거나 과거면 재적 아님
+            if change_date <= target_date: return False
         else: return False
     return True
 
-# [핵심 로직] 직분 엄격 분리 (전도사 배제)
 def get_role(row):
     s = str(row.get('학교상태', '')).strip()
     c = str(row.get('학년(담임)', row.get('반', ''))).strip()
@@ -128,8 +126,8 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except: 
         ws_s = sh.add_worksheet("주차별통계", 200, 15)
-        # [구조 변경] 비고 위치 및 컬럼명 재배치
-        ws_s.append_row(["주차", "비고", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "출석률", "업데이트일시"])
+        # 10개 항목으로 변경 (출석률 제외, 내용(비고) 이동)
+        ws_s.append_row(["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"])
     return ws_m, ws_a, ws_s
 
 @st.cache_data(ttl=600)
@@ -399,13 +397,9 @@ with tabs[4]:
     
     show_inactive = st.checkbox("👀 비활성 명단 포함 (과거 출석 데이터 수정용)")
     
-    # 1. 원본 데이터 복사
     att_df = df.copy()
-    
-    # 2. [시계열 재적 필터링] 해당 날짜 시점에 교적부에 존재하지 않는 사람은 명단에서 아예 삭제
     att_df = att_df[att_df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)]
     
-    # 3. 비활성 필터 연동
     if not show_inactive:
         att_df = att_df[~att_df[status_col].isin(INACTIVE_STATUS)]
         
@@ -414,7 +408,6 @@ with tabs[4]:
     
     att_df['role'] = att_df.apply(get_role, axis=1)
     
-    # UI 집계용 (전도사 배제 적용)
     ui_s_df = att_df[att_df['role'] == 'student']
     ui_t_df = att_df[att_df['role'] == 'teacher']
     
@@ -427,7 +420,8 @@ with tabs[4]:
         if not match.empty: 
             try: saved_guest = int(match.iloc[0].get('추가', match.iloc[0].get('새친구/추가예배', 0)))
             except: pass
-            saved_note = match.iloc[0].get('비고', '')
+            # [구조 변경 반영] 기존 비고에서 '내용(비고)'로 조회
+            saved_note = match.iloc[0].get('내용(비고)', match.iloc[0].get('비고', ''))
 
     st.markdown("#### 📊 현재 체크 현황 (수정/저장 전)")
     cs1, cs2, cs3, cs4 = st.columns(4)
@@ -439,7 +433,7 @@ with tabs[4]:
     st.markdown("---")
     col_ex1, col_ex2 = st.columns([1, 3])
     is_skip = col_ex1.toggle("⚠️ 출석체크 쉼 (행사/예외)", value=bool(saved_note))
-    note_text = col_ex2.text_input("행사명/비고 (예: 유년부 쿠킹행사)", value=saved_note)
+    note_text = col_ex2.text_input("행사명/내용(비고)", value=saved_note)
 
     calc_total = guest_in if is_skip else (s_p + t_p + guest_in)
     st.markdown(f"<div class='total-summary'>✅ 저장 시 총합계 (선생님 포함): {calc_total}명</div>", unsafe_allow_html=True)
@@ -469,7 +463,6 @@ with tabs[4]:
                         row_data = att_df[att_df['sheet_row'] == r]
                         is_teacher_person = False
                         is_pastor_person = False
-                        
                         if not row_data.empty:
                             if row_data.iloc[0]['role'] == 'teacher': is_teacher_person = True
                             elif row_data.iloc[0]['role'] == 'pastor': is_pastor_person = True
@@ -477,14 +470,13 @@ with tabs[4]:
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
                         if v:
                             if is_teacher_person: final_t_p += 1
-                            elif not is_pastor_person: final_s_p += 1 # 전도사님은 합산 배제
+                            elif not is_pastor_person: final_s_p += 1 
                                 
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
                 save_s_p = 0 if is_skip else final_s_p
                 save_t_p = 0 if is_skip else final_t_p
                 
-                # 저장 시점의 시계열 재적 다시 확인
                 valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
                 valid_enrollment_df['role'] = valid_enrollment_df.apply(get_role, axis=1)
                 
@@ -496,18 +488,16 @@ with tabs[4]:
                 
                 kids_total = save_s_p + guest_in
                 grand_total = kids_total + save_t_p
-                rate_val = 0 if student_count == 0 else int((save_s_p / student_count) * 100)
-                save_rate = "0%" if is_skip else f"{rate_val}%"
                 
-                # 비고란 위치 변경 매핑
+                # [구조 반영] 출석률 제거 및 10열 (A~J) 재배치
                 stat_data = [
                     sel_w, note_text, student_count, save_s_p, guest_in, 
                     kids_total, teacher_count, save_t_p, grand_total, 
-                    save_rate, str(datetime.datetime.now())
+                    str(datetime.datetime.now())
                 ]
                 
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
-                if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:K{match_stat.index[0]+2}", [stat_data])
+                if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:J{match_stat.index[0]+2}", [stat_data])
                 else: ws_stat.append_row(stat_data)
                 fetch_sheet_data.clear(); st.success(f"[{sel_w}] 동적 재적 기반 데이터 저장 완료!"); st.rerun()
 
@@ -556,19 +546,18 @@ with tabs[6]:
     report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
     report_df['출석률'] = report_df['출석수'].apply(lambda x: f"{int(x/len(week_cols)*100)}%" if len(week_cols)>0 else "0%")
     
-    # [핵심 보완] 화면 2/3 (주차별), 1/3 (누적) 비율 및 순서 재배치
     col_stat, col_cumul = st.columns([2, 1])
     
     with col_stat: 
         st.write("📅 **주차별 통계 (시계열 역산 적용)**")
         if not df_stat.empty:
-            preferred_order = ["주차", "비고", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "출석률", "업데이트일시"]
+            preferred_order = ["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"]
             actual_order = [c for c in preferred_order if c in df_stat.columns]
             for c in df_stat.columns:
                 if c not in actual_order: actual_order.append(c)
             df_stat_display = df_stat[actual_order]
             
-            # [핵심 보완] 유년부 합계 및 총합 진하게 강조
+            # [시각적 개선] 유년부 합계 및 총합 진하게 강조
             style_cols = [c for c in ['유년부 합계', '총합'] if c in df_stat_display.columns]
             if style_cols:
                 styled_df = df_stat_display.style.set_properties(subset=style_cols, **{'font-weight': 'bold', 'color': '#0366d6', 'background-color': '#f1f8ff'})
