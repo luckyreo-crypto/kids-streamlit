@@ -91,7 +91,7 @@ def natural_sort_key(s):
 def class_sort_key(c):
     c_str = str(c).replace(" ", "")
     priority = 1
-    if any(k in c_str for k in ['교역자', '전도사', '목사']): priority = 3
+    if any(k in c_str for k in ['교역자', '전도사님', '목사님']): priority = 3
     elif any(k in c_str for k in ['선생님', '교사']): priority = 2
     return (priority, [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', c_str)])
 
