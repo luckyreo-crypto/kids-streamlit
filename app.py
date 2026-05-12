@@ -134,6 +134,7 @@ if df is None or df.empty:
     st.stop()
 
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
+status_col = '학교상태' if '학교상태' in df.columns else '상태'  # 🔥 이 줄을 여기에 추가하세요!
 start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') })" for i in range(1, 53)}
