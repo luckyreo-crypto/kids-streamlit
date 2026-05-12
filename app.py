@@ -84,14 +84,11 @@ def natural_sort_key(s):
     clean_s = str(s).replace(" ", "")
     return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', clean_s)]
 
-# [에러 해결!] 반편성 고도화 정렬 알고리즘 (튜플 이중 정렬로 타입 충돌 방지)
 def class_sort_key(c):
     c_str = str(c).replace(" ", "")
-    priority = 1 # 일반반 기본 순위
+    priority = 1
     if any(k in c_str for k in ['교역자', '전도사', '목사']): priority = 3
     elif any(k in c_str for k in ['선생님', '교사']): priority = 2
-    
-    # 1차로 우선순위 비교, 2차로 자연 정렬 수행
     return (priority, [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', c_str)])
 
 def get_teacher_rank(name, memo):
@@ -333,7 +330,6 @@ with tabs[0]:
 # ==========================================
 with tabs[1]:
     st.subheader("🏫 반별 명단")
-    # [수정 확인] 클래스 이름 정렬 (이중 정렬 적용 완료)
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     cols = st.columns(3)
     
@@ -350,11 +346,11 @@ with tabs[1]:
             
         group['sort_key'] = group.apply(get_sort_key, axis=1)
         group = group.sort_values(by=['sort_key', '이름'])
-        active_count = len(group[~group[status_col].isin(INACTIVE_STATUS)])
+        active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')])
         
         with cols[i % 3]:
             with st.container(border=True):
-                st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{c_name} ({active_count}명)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{c_name} (학생 {active_count}명)</h4>", unsafe_allow_html=True)
                 btn_cols = st.columns(2)
                 for j, (_, r) in enumerate(group.iterrows()):
                     s = r[status_col]
@@ -446,10 +442,15 @@ with tabs[4]:
     with c2: 
         sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
     
-    show_inactive = st.checkbox("👀 비활성 명단 포함 (과거 출석 데이터 수정용)")
+    # [논리 오류 완벽 수정] 과거 날짜의 명단을 제대로 불러오기 위한 로직 분리
+    show_inactive = st.checkbox("👀 강제 전체명단 표시 (등록전/이사후 등 모든 명단 수정용)")
     
-    att_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
-    if not show_inactive: att_df = att_df[~att_df[status_col].isin(INACTIVE_STATUS)]
+    if show_inactive:
+        att_df = df.copy() # 체크하면 무조건 전체 표시
+    else:
+        # 체크 안하면 '선택한 타겟 날짜' 기준으로 그 당시에 재적 중이었던 사람만 깔끔하게 표시
+        att_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
+        
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
     
