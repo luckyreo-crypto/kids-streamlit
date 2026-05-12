@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="슈팅스타 통합 관리 v0.9", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v39.4", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
@@ -43,7 +43,7 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state["authenticated"]:
     st.markdown("## 🔒 슈팅스타 시스템 접근 제어")
-    pwd = st.text_input("비밀번호8자리(특수문자포함)를 입력하세요", type="password")
+    pwd = st.text_input("비밀번호를 입력하세요", type="password")
     if st.button("로그인"):
         if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
             st.session_state["authenticated"] = True
@@ -91,7 +91,7 @@ def natural_sort_key(s):
 def class_sort_key(c):
     c_str = str(c).replace(" ", "")
     priority = 1
-    if any(k in c_str for k in ['교역자', '전도사님', '목사님']): priority = 3
+    if any(k in c_str for k in ['교역자', '전도사', '목사']): priority = 3
     elif any(k in c_str for k in ['선생님', '교사']): priority = 2
     return (priority, [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', c_str)])
 
@@ -366,11 +366,24 @@ with tabs[1]:
             
         group['sort_key'] = group.apply(get_sort_key, axis=1)
         group = group.sort_values(by=['sort_key', '이름'])
-        active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')])
         
+        # [핵심 보완] 그룹 성격에 따른 다이나믹 타이틀 카운트 적용
+        is_teacher_grp = any(k in str(c_name) for k in ['선생님', '교사'])
+        is_pastor_grp = any(k in str(c_name) for k in ['교역자', '전도사', '목사'])
+        
+        if is_teacher_grp:
+            active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'teacher')])
+            header_title = f"{c_name} ({active_count}명)"
+        elif is_pastor_grp:
+            active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'pastor')])
+            header_title = f"{c_name} ({active_count}명)"
+        else:
+            active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')])
+            header_title = f"{c_name} (학생 {active_count}명)"
+            
         with cols[i % 3]:
             with st.container(border=True):
-                st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{c_name} (학생 {active_count}명)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{header_title}</h4>", unsafe_allow_html=True)
                 btn_cols = st.columns(2)
                 for j, (_, r) in enumerate(group.iterrows()):
                     s = r[status_col]
@@ -654,7 +667,7 @@ def highlight_zero_attendance(row):
     return ['' for _ in row.index]
 
 with tabs[6]:
-    st.subheader("📊 통합 통계 및 다운로드")
+    st.subheader("📊 사역 통합 통계 및 다운로드")
     show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     if show_all_stats: report_df = df[[class_col, '이름', '학교상태'] + week_cols].copy()
@@ -674,7 +687,6 @@ with tabs[6]:
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
             preferred_order = ["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"]
             
-            # [에러 해결] 타입 에러 방지를 위해 계산값을 string으로 강제 형변환(Casting)하여 저장
             for idx, row_st in df_stat_renamed.iterrows():
                 t_date = get_date_from_week_str(row_st['주차'])
                 v_df = df[df.apply(lambda r: is_enrolled_at_date(r, t_date), axis=1)].copy()
