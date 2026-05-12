@@ -9,11 +9,12 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v38.4", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v38.5", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
 
+# [핵심 보완 4] 모바일 탭 줄바꿈 및 반응형 CSS 적용
 st.markdown("""
     <style>
     .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
@@ -22,6 +23,18 @@ st.markdown("""
     .total-summary { background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
+    
+    /* 모바일 환경 탭 메뉴 자동 줄바꿈 적용 */
+    div[data-baseweb="tab-list"] {
+        flex-wrap: wrap !important;
+        gap: 5px;
+    }
+    div[data-baseweb="tab"] {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,8 +79,10 @@ def parse_date_safe(date_str):
         return datetime.datetime.strptime(clean_str, "%Y-%m-%d").date()
     except: return datetime.date(2015, 1, 1)
 
+# [핵심 보완 2] 공백 무시 자연 정렬 강화 (1-1, 1-2 순서 완벽 정렬)
 def natural_sort_key(s):
-    return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(s))]
+    clean_s = str(s).replace(" ", "")
+    return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', clean_s)]
 
 def get_teacher_rank(name, memo):
     text = str(name) + " " + str(memo)
@@ -243,11 +258,18 @@ with tabs[0]:
     mv_count = len(df[df[status_col] == '이사'])
     gr_count = len(df[df[status_col] == '졸업'])
     
-    dash1, dash2, dash3, dash4 = st.columns(4)
-    dash1.metric("총 재적 (유년부)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
-    dash2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 전도사,목사 {ps_count}명")
-    dash3.metric("비활성 (이사/졸업)", f"{mv_count + gr_count}명", f"이사 {mv_count}명 / 졸업 {gr_count}명")
-    dash4.metric("데이터 총합", f"{len(df)}명")
+    # [핵심 보완 5] 모바일 최적화를 위한 2열 그리드 배치 및 데이터 총합 로직 정확한 반영
+    st.markdown("##### 👥 전체 인원 현황 (Live)")
+    dash_r1_1, dash_r1_2 = st.columns(2)
+    dash_r1_1.metric("총 재적 (유년부)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
+    dash_r1_2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 전도사,목사 {ps_count}명")
+    
+    dash_r2_1, dash_r2_2 = st.columns(2)
+    dash_r2_1.metric("비활성 (이사/졸업)", f"{mv_count + gr_count}명", f"이사 {mv_count}명 / 졸업 {gr_count}명")
+    
+    # 전체 DB 인원에서 비활성 인원을 뺀 진짜 활성(데이터 총합) 표시
+    active_sum_calc = len(df) - (mv_count + gr_count)
+    dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
     st.divider()
     
     manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"], horizontal=True)
@@ -484,7 +506,7 @@ with tabs[4]:
                 else: ws_stat.append_row(stat_data)
                 fetch_sheet_data.clear(); st.success(f"[{sel_w}] 동적 재적 기반 데이터 저장 완료!"); st.rerun()
 
-    # [복구] 연간 출석 현황 에디터 (일괄 수정) 100% 복구 완료
+    # 복구된 연간 출석 현황 에디터
     with st.expander("📊 연간 출석 현황 에디터 (일괄 수정)"):
         week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
         if show_inactive: annual_df = df[[class_col, '이름', '학교상태', 'sheet_row'] + week_cols].copy()
@@ -538,7 +560,7 @@ with tabs[5]:
                 ws_act.append_row([str(a_d), a_t, a_c, "", urls[0], urls[1], urls[2], urls[3], str(datetime.datetime.now())]); fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
 
 # ==========================================
-# [탭 6] 통합통계 (2/3 & 1/3 비율 배치 및 하이라이트)
+# [탭 6] 통합통계 (비율 배치 & 다운로드 버튼 일체화)
 # ==========================================
 with tabs[6]:
     st.subheader("📊 사역 통합 통계 및 다운로드")
@@ -575,12 +597,13 @@ with tabs[6]:
                 st.dataframe(df_stat_display, use_container_width=True, hide_index=True)
         else:
             st.dataframe(df_stat, use_container_width=True, hide_index=True)
+        
+        # [핵심 보완 3] 다운로드 버튼 테이블에 맞춰 배치
+        st.download_button("📅 주차별 흐름 통계 다운로드 (CSV)", data=df_stat.to_csv(index=False).encode('utf-8-sig'), file_name=f"주차별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
             
     with col_cumul: 
         st.write("👤 **개인별 누적 출석**")
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
         
-    st.divider()
-    c_csv1, c_csv2 = st.columns(2)
-    with c_csv1: st.download_button("📊 개인별 누적 통계 다운로드 (CSV)", data=report_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
-    with c_csv2: st.download_button("📅 주차별 흐름 통계 다운로드 (CSV)", data=df_stat.to_csv(index=False).encode('utf-8-sig'), file_name=f"주차별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
+        # [핵심 보완 3] 다운로드 버튼 테이블에 맞춰 배치
+        st.download_button("📊 개인별 누적 통계 다운로드 (CSV)", data=report_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
