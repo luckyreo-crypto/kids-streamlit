@@ -75,11 +75,12 @@ def get_teacher_rank(name, memo):
     match = re.search(r'\[(\d+)\]', text)
     if match: return int(match.group(1))
     # 키워드 우선순위
-    if '부장' in text: return 10
-    if '부감' in text: return 20
-    if '총무' in text: return 30
-    if '회계' in text: return 40
-    return 50 # 일반 교사
+    if '전도사' in text: return 10
+    if '부장' in text: return 20
+    if '부감' in text: return 30
+    if '총무' in text: return 40
+    if '회계' in text: return 50
+    return 60 # 일반 교사
 
 # --- 4. 구글 시트 데이터 연동 ---
 @st.cache_resource
