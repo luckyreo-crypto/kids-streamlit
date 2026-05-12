@@ -9,10 +9,10 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v37.1", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v37.2", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
-# 직분 세분화 (교역자 추가)
+# 직분 세분화
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "이사", "비활성", "졸업"]
 
 st.markdown("""
@@ -109,7 +109,7 @@ def get_worksheets():
     try: ws_a = sh.worksheet("활동간식")
     except: ws_a = sh.add_worksheet("활동간식", 500, 10); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4", "등록일"])
     try: ws_s = sh.worksheet("주차별통계")
-    except: ws_s = sh.add_worksheet("주차별통계", 200, 10); ws_s.append_row(["주차", "학생재적", "학생출석", "교사재적", "교사출석", "새친구(기타)", "총합계", "학생출석률", "비고", "업데이트일시"])
+    except: ws_s = sh.add_worksheet("주차별통계", 200, 10); ws_s.append_row(["주차", "학생재적", "학생출석", "교사재적", "교사출석", "새친구/추가예배", "총합계", "학생출석률", "비고", "업데이트일시"])
     return ws_m, ws_a, ws_s
 
 @st.cache_data(ttl=600)
@@ -155,10 +155,8 @@ def edit_student_dialog(target_dict):
         e_name = c1.text_input("이름", value=target_dict.get('이름',''))
         e_class = c2.text_input("학년(담임)", value=target_dict.get(class_col,''))
         e_birth = c1.date_input("생년월일", value=parse_date_safe(target_dict.get('생년월일', '')), min_value=datetime.date(1900,1,1)).strftime("%Y-%m-%d")
-        
         e_reg = c1.text_input("등록일 (YYYY-MM-DD)", value=target_dict.get('등록일',''), placeholder="예: 2026-05-10")
         e_change = c2.text_input("변동일 (이사/졸업)", value=target_dict.get('변동일',''), placeholder="이사/졸업 날짜")
-        
         e_school = c1.text_input("학교", value=target_dict.get('학교',''))
         e_phone = c2.text_input("연락처", value=target_dict.get('연락처',''))
         
@@ -205,7 +203,8 @@ with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
     
     st.markdown("##### 👥 전체 인원 현황 (Live)")
-    st_count = len(df[df[status_col].isin(['일반'])])
+    # [핵심 보완] 데이터 누수를 막는 네거티브 필터링 적용
+    st_count = len(df[~df[status_col].isin(['새친구', '교사', '교역자', '전도사', '이사', '비활성', '졸업'])])
     new_count = len(df[df[status_col] == '새친구'])
     tc_count = len(df[df[status_col] == '교사'])
     ps_count = len(df[df[status_col].isin(['교역자', '전도사'])])
@@ -214,7 +213,7 @@ with tabs[0]:
     
     dash1, dash2, dash3, dash4 = st.columns(4)
     dash1.metric("총 재적 (학생)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
-    dash2.metric("사역자 (교사/교역자)", f"{tc_count + ps_count}명", f"교사 {tc_count}명 / 교역자 {ps_count}명")
+    dash2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"교사 {tc_count}명 / 교역자 {ps_count}명")
     dash3.metric("비활성 (이사/졸업)", f"{mv_count + gr_count}명", f"이사 {mv_count}명 / 졸업 {gr_count}명")
     dash4.metric("데이터 총합", f"{len(df)}명")
     st.divider()
@@ -257,7 +256,7 @@ with tabs[0]:
                     ws.append_row(new_row); fetch_sheet_data.clear(); st.success("등록 완료!"); st.rerun()
 
 # ==========================================
-# [탭 1] 반편성 (복구: 새친구 추가 폼)
+# [탭 1] 반편성
 # ==========================================
 with tabs[1]:
     st.subheader("🏫 반별 명단")
@@ -293,7 +292,6 @@ with tabs[1]:
                         if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 즉시 정보 수정", use_container_width=True):
                             edit_student_dialog(r.to_dict())
                 
-                # [복구] 다이렉트 새친구 추가
                 with st.expander(f"➕ 새친구 추가"):
                     with st.form(f"qa_{i}"):
                         new_n = st.text_input("새친구 이름", placeholder="이름 입력")
@@ -310,7 +308,7 @@ with tabs[1]:
                                 ws.append_row(new_row); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 2, 3] 생일표 (복구 완료), 새친구
+# [탭 2, 3] 생일표, 새친구
 # ==========================================
 with tabs[2]:
     st.subheader("🎂 월별 생일 명단")
@@ -365,8 +363,9 @@ with tabs[4]:
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
     
-    ui_s_df = att_df[att_df[status_col].isin(['일반', '새친구'])]
+    # [핵심 보완] 네거티브 필터링 적용 (교사/교역자가 아니면 무조건 학생으로 간주)
     ui_t_df = att_df[att_df[status_col].isin(['교사', '교역자', '전도사'])]
+    ui_s_df = att_df[~att_df[status_col].isin(['교사', '교역자', '전도사'])]
     
     s_p = len(ui_s_df[ui_s_df[sel_w].astype(str).str.strip() == "1"])
     t_p = len(ui_t_df[ui_t_df[sel_w].astype(str).str.strip() == "1"])
@@ -375,16 +374,19 @@ with tabs[4]:
     if not df_stat.empty and '주차' in df_stat.columns:
         match = df_stat[df_stat['주차'] == sel_w]
         if not match.empty: 
-            try: saved_guest = int(match.iloc[0].get('새친구(기타)', match.iloc[0].get('기타인원', 0)))
+            # [핵심 보완] 새로운 헤더 우선 적용 및 하위 호환성 유지
+            try: saved_guest = int(match.iloc[0].get('새친구/추가예배', match.iloc[0].get('새친구(기타)', match.iloc[0].get('기타인원', 0))))
             except: pass
             saved_note = match.iloc[0].get('비고', '')
 
     st.markdown("#### 📊 현재 체크 현황 (수정/저장 전)")
     cs1, cs2, cs3, cs4 = st.columns(4)
     cs1.metric("학생 출석 체크", f"{s_p}명")
-    cs2.metric("사역자 출석 체크", f"{t_p}명")
+    # [핵심 보완] 선생님 명칭 변경
+    cs2.metric("선생님 출석 체크", f"{t_p}명") 
     cs3.metric("기존 출석 합계", f"{s_p + t_p}명")
-    guest_in = cs4.number_input("🎉 새친구(기타 방문)", min_value=0, value=saved_guest)
+    # [핵심 보완] 새친구/추가예배 명칭 적용
+    guest_in = cs4.number_input("🎉 새친구/추가예배 참석", min_value=0, value=saved_guest)
     
     st.markdown("---")
     col_ex1, col_ex2 = st.columns([1, 3])
@@ -401,7 +403,7 @@ with tabs[4]:
                 cols = st.columns(3)
                 for i, (idx, row) in enumerate(group.iterrows()):
                     is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                    prefix = f"🚫 " if row[status_col] in INACTIVE_STATUS else ("🌱 " if row[status_col] == '새친구' else "🧑‍🏫 " if row[status_col] in ['교사','교역자'] else "👤 ")
+                    prefix = f"🚫 " if row[status_col] in INACTIVE_STATUS else ("🌱 " if row[status_col] == '새친구' else "🧑‍🏫 " if row[status_col] in ['교사','교역자','전도사'] else "👤 ")
                     label = f"{prefix}{row['이름']}"
                     new_att[row['sheet_row']] = cols[i%3].toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
@@ -414,6 +416,7 @@ with tabs[4]:
                 if not is_skip:
                     for r, v in new_att.items():
                         row_data = att_df[att_df['sheet_row'] == r]
+                        # 네거티브 방식으로 직원 판별
                         is_staff = False
                         if not row_data.empty and row_data.iloc[0][status_col] in ['교사', '교역자', '전도사']: is_staff = True
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
@@ -426,8 +429,9 @@ with tabs[4]:
                 save_t_p = 0 if is_skip else final_t_p
                 
                 valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)]
-                strict_student_df = valid_enrollment_df[valid_enrollment_df[status_col].isin(['일반', '새친구'])]
                 strict_staff_df = valid_enrollment_df[valid_enrollment_df[status_col].isin(['교사', '교역자', '전도사'])]
+                # 네거티브 필터링으로 학생 누수 방지
+                strict_student_df = valid_enrollment_df[~valid_enrollment_df[status_col].isin(['교사', '교역자', '전도사'])]
                 
                 student_count = len(strict_student_df)
                 staff_count = len(strict_staff_df)
@@ -443,13 +447,11 @@ with tabs[4]:
                 fetch_sheet_data.clear(); st.success(f"[{sel_w}] 동적 재적 기반 데이터 저장 완료!"); st.rerun()
 
 # ==========================================
-# [탭 5, 6] 행사기록 (복구 완료), 통합통계
+# [탭 5, 6] 행사기록, 통합통계
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 기록 관리")
     e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
-    
-    # [복구] 이미지 출력 및 수정/삭제 기능 복구
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
             with st.container():
@@ -458,7 +460,6 @@ with tabs[5]:
                 for i in range(1, 5):
                     url = row.get(f'사진{i}', "")
                     if url and str(url).startswith('http'): p_cols[i-1].image(url, use_container_width=True)
-                    
     elif e_mode == "📝 수정" and not df_act.empty:
         act_sh_headers = ws_act.row_values(1)
         v_act_cols = [c for c in ["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4"] if c in df_act.columns]
@@ -471,11 +472,9 @@ with tabs[5]:
                         if str(df_act.iloc[r][c]) != str(edited_events.iloc[r][c]):
                             cells_to_update.append(gspread.Cell(int(df_act.iloc[r]['sheet_row']), act_sh_headers.index(c)+1, str(edited_events.iloc[r][c])))
                 if cells_to_update: chunked_update(ws_act, cells_to_update); fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
-                
     elif e_mode == "🚨 삭제" and not df_act.empty:
         sel_del = st.selectbox("삭제할 행사", df_act.apply(lambda r: f"{r['활동명']} | 날짜:{r.get('날짜','')} (ID:{r['sheet_row']})", axis=1).tolist())
         if st.button("🚨 삭제 실행"): ws_act.delete_rows(int(sel_del.split("(ID:")[1].replace(")", ""))); fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
-        
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_f = st.file_uploader("사진", accept_multiple_files=True)
