@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v37.4", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v37.5", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
@@ -93,7 +93,7 @@ def is_enrolled_at_date(row, target_date):
         else: return False
     return True
 
-# [신규 핵심 로직] 스마트 사역자 판별기
+# 스마트 사역자 판별기
 def check_is_staff(row):
     s = str(row.get('학교상태', '')).strip()
     c = str(row.get('학년(담임)', row.get('반', ''))).strip()
@@ -149,12 +149,16 @@ if df is None or df.empty:
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
 
-# [신규 핵심 방어막] 동명이인 / 중복 등록 자동 탐지기
+# [핵심 방어막 진화] 비활성(이사) 명단까지 전수조사하는 더블카운트 탐지기
 if '이름' in df.columns:
-    active_df = df[~df[status_col].isin(INACTIVE_STATUS)]
-    dup_names = active_df[active_df.duplicated('이름', keep=False)]['이름'].unique()
+    valid_names_df = df[df['이름'].astype(str).str.strip() != '']
+    dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
     if len(dup_names) > 0:
-        st.error(f"🚨 **더블카운트 주의 (데이터 중복 경고):** 현재 명단에 이름이 두 번 이상 등록된 사람(동명이인 또는 중복등록)이 있습니다! 출석 더블카운트의 원인이 될 수 있으니 교적부에서 확인 후 하나를 비활성(이사) 처리하거나, 진짜 동명이인이라면 이름 뒤에 (A), (B)를 붙여주세요. **(의심 이름: {', '.join(dup_names)})**")
+        dup_details = []
+        for n in dup_names:
+            rows = valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()
+            dup_details.append(f"[{n}: 구글시트 {rows}행]")
+        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다! (이사/졸업 명단 포함) 이 때문에 1명이 2명으로 카운트됩니다. 구글 시트를 열어 중복된 행을 찾아 하나를 삭제해주세요.\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
@@ -402,8 +406,6 @@ with tabs[4]:
     cs1.metric("학생 출석 체크", f"{s_p}명")
     cs2.metric("선생님 출석 체크", f"{t_p}명") 
     cs3.metric("기존 출석 합계", f"{s_p + t_p}명")
-    
-    # [핵심 보완] 명단에 없는 새친구만 카운트하도록 UX 가이드 텍스트 강화
     guest_in = cs4.number_input("🎉 미등록 새친구/추가예배 (명단 체크 외)", min_value=0, value=saved_guest)
     
     st.markdown("---")
