@@ -9,11 +9,10 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v37.2", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v37.4", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
-# 직분 세분화
-ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "이사", "비활성", "졸업"]
+ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
 
 st.markdown("""
     <style>
@@ -94,6 +93,17 @@ def is_enrolled_at_date(row, target_date):
         else: return False
     return True
 
+# [신규 핵심 로직] 스마트 사역자 판별기
+def check_is_staff(row):
+    s = str(row.get('학교상태', '')).strip()
+    c = str(row.get('학년(담임)', row.get('반', ''))).strip()
+    m = str(row.get('비고', '')).strip()
+    if s in ['교사', '교역자', '전도사', '목사']: return True
+    if s in INACTIVE_STATUS:
+        if any(k in c for k in ['교사', '교역자', '전도사', '목사', '임원']): return True
+        if any(k in m for k in ['교사', '교역자', '전도사', '목사', '부장', '부감', '총무']): return True
+    return False
+
 # --- 4. 구글 시트 데이터 연동 ---
 @st.cache_resource
 def init_connection():
@@ -138,6 +148,14 @@ if df is None or df.empty:
 
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
+
+# [신규 핵심 방어막] 동명이인 / 중복 등록 자동 탐지기
+if '이름' in df.columns:
+    active_df = df[~df[status_col].isin(INACTIVE_STATUS)]
+    dup_names = active_df[active_df.duplicated('이름', keep=False)]['이름'].unique()
+    if len(dup_names) > 0:
+        st.error(f"🚨 **더블카운트 주의 (데이터 중복 경고):** 현재 명단에 이름이 두 번 이상 등록된 사람(동명이인 또는 중복등록)이 있습니다! 출석 더블카운트의 원인이 될 수 있으니 교적부에서 확인 후 하나를 비활성(이사) 처리하거나, 진짜 동명이인이라면 이름 뒤에 (A), (B)를 붙여주세요. **(의심 이름: {', '.join(dup_names)})**")
+
 start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": f"{i}주 ({ (start_date + datetime.timedelta(days=(i-1)*7)).strftime('%m/%d') })" for i in range(1, 53)}
@@ -203,17 +221,18 @@ with tabs[0]:
     st.subheader("📋 교적부 통합 관리")
     
     st.markdown("##### 👥 전체 인원 현황 (Live)")
-    # [핵심 보완] 데이터 누수를 막는 네거티브 필터링 적용
-    st_count = len(df[~df[status_col].isin(['새친구', '교사', '교역자', '전도사', '이사', '비활성', '졸업'])])
+    df['is_staff_flag'] = df.apply(check_is_staff, axis=1)
+    
+    st_count = len(df[(df['is_staff_flag'] == False) & (~df[status_col].isin(INACTIVE_STATUS + ['새친구']))])
     new_count = len(df[df[status_col] == '새친구'])
     tc_count = len(df[df[status_col] == '교사'])
-    ps_count = len(df[df[status_col].isin(['교역자', '전도사'])])
+    ps_count = len(df[df[status_col].isin(['교역자', '전도사', '목사'])])
     mv_count = len(df[df[status_col] == '이사'])
     gr_count = len(df[df[status_col] == '졸업'])
     
     dash1, dash2, dash3, dash4 = st.columns(4)
     dash1.metric("총 재적 (학생)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
-    dash2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"교사 {tc_count}명 / 교역자 {ps_count}명")
+    dash2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 교역자 {ps_count}명")
     dash3.metric("비활성 (이사/졸업)", f"{mv_count + gr_count}명", f"이사 {mv_count}명 / 졸업 {gr_count}명")
     dash4.metric("데이터 총합", f"{len(df)}명")
     st.divider()
@@ -268,7 +287,7 @@ with tabs[1]:
         def get_sort_key(row):
             s = row[status_col]
             if s in INACTIVE_STATUS: return 100
-            if s in ['교사', '교역자', '전도사']: return get_teacher_rank(row['이름'], row.get('비고', ''))
+            if check_is_staff(row): return get_teacher_rank(row['이름'], row.get('비고', ''))
             if s == '새친구': return 60
             return 80
             
@@ -283,7 +302,7 @@ with tabs[1]:
                 for j, (_, r) in enumerate(group.iterrows()):
                     s = r[status_col]
                     n = r['이름']
-                    if s in ['교사', '교역자', '전도사']: label = f"🧑‍🏫 {n}"
+                    if check_is_staff(r): label = f"🧑‍🏫 {n}"
                     elif s == '새친구': label = f"🔴 {n}"
                     elif s in INACTIVE_STATUS: label = f"🚫 {n} ({s})"
                     else: label = f"👤 {n}"
@@ -363,9 +382,9 @@ with tabs[4]:
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
     
-    # [핵심 보완] 네거티브 필터링 적용 (교사/교역자가 아니면 무조건 학생으로 간주)
-    ui_t_df = att_df[att_df[status_col].isin(['교사', '교역자', '전도사'])]
-    ui_s_df = att_df[~att_df[status_col].isin(['교사', '교역자', '전도사'])]
+    att_df['is_staff_flag'] = att_df.apply(check_is_staff, axis=1)
+    ui_t_df = att_df[att_df['is_staff_flag'] == True]
+    ui_s_df = att_df[att_df['is_staff_flag'] == False]
     
     s_p = len(ui_s_df[ui_s_df[sel_w].astype(str).str.strip() == "1"])
     t_p = len(ui_t_df[ui_t_df[sel_w].astype(str).str.strip() == "1"])
@@ -374,7 +393,6 @@ with tabs[4]:
     if not df_stat.empty and '주차' in df_stat.columns:
         match = df_stat[df_stat['주차'] == sel_w]
         if not match.empty: 
-            # [핵심 보완] 새로운 헤더 우선 적용 및 하위 호환성 유지
             try: saved_guest = int(match.iloc[0].get('새친구/추가예배', match.iloc[0].get('새친구(기타)', match.iloc[0].get('기타인원', 0))))
             except: pass
             saved_note = match.iloc[0].get('비고', '')
@@ -382,11 +400,11 @@ with tabs[4]:
     st.markdown("#### 📊 현재 체크 현황 (수정/저장 전)")
     cs1, cs2, cs3, cs4 = st.columns(4)
     cs1.metric("학생 출석 체크", f"{s_p}명")
-    # [핵심 보완] 선생님 명칭 변경
     cs2.metric("선생님 출석 체크", f"{t_p}명") 
     cs3.metric("기존 출석 합계", f"{s_p + t_p}명")
-    # [핵심 보완] 새친구/추가예배 명칭 적용
-    guest_in = cs4.number_input("🎉 새친구/추가예배 참석", min_value=0, value=saved_guest)
+    
+    # [핵심 보완] 명단에 없는 새친구만 카운트하도록 UX 가이드 텍스트 강화
+    guest_in = cs4.number_input("🎉 미등록 새친구/추가예배 (명단 체크 외)", min_value=0, value=saved_guest)
     
     st.markdown("---")
     col_ex1, col_ex2 = st.columns([1, 3])
@@ -403,7 +421,7 @@ with tabs[4]:
                 cols = st.columns(3)
                 for i, (idx, row) in enumerate(group.iterrows()):
                     is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                    prefix = f"🚫 " if row[status_col] in INACTIVE_STATUS else ("🌱 " if row[status_col] == '새친구' else "🧑‍🏫 " if row[status_col] in ['교사','교역자','전도사'] else "👤 ")
+                    prefix = f"🚫 " if row[status_col] in INACTIVE_STATUS else ("🌱 " if row[status_col] == '새친구' else "🧑‍🏫 " if row['is_staff_flag'] else "👤 ")
                     label = f"{prefix}{row['이름']}"
                     new_att[row['sheet_row']] = cols[i%3].toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
@@ -416,22 +434,22 @@ with tabs[4]:
                 if not is_skip:
                     for r, v in new_att.items():
                         row_data = att_df[att_df['sheet_row'] == r]
-                        # 네거티브 방식으로 직원 판별
-                        is_staff = False
-                        if not row_data.empty and row_data.iloc[0][status_col] in ['교사', '교역자', '전도사']: is_staff = True
+                        is_staff_person = False
+                        if not row_data.empty and row_data.iloc[0]['is_staff_flag']: is_staff_person = True
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
                         if v:
-                            if is_staff: final_t_p += 1
+                            if is_staff_person: final_t_p += 1
                             else: final_s_p += 1
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
                 save_s_p = 0 if is_skip else final_s_p
                 save_t_p = 0 if is_skip else final_t_p
                 
-                valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)]
-                strict_staff_df = valid_enrollment_df[valid_enrollment_df[status_col].isin(['교사', '교역자', '전도사'])]
-                # 네거티브 필터링으로 학생 누수 방지
-                strict_student_df = valid_enrollment_df[~valid_enrollment_df[status_col].isin(['교사', '교역자', '전도사'])]
+                valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
+                valid_enrollment_df['is_staff_flag'] = valid_enrollment_df.apply(check_is_staff, axis=1)
+                
+                strict_staff_df = valid_enrollment_df[valid_enrollment_df['is_staff_flag'] == True]
+                strict_student_df = valid_enrollment_df[valid_enrollment_df['is_staff_flag'] == False]
                 
                 student_count = len(strict_student_df)
                 staff_count = len(strict_staff_df)
