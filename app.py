@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v37.6", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v38.0", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
@@ -118,7 +118,9 @@ def get_worksheets():
     try: ws_a = sh.worksheet("활동간식")
     except: ws_a = sh.add_worksheet("활동간식", 500, 10); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항", "사진1", "사진2", "사진3", "사진4", "등록일"])
     try: ws_s = sh.worksheet("주차별통계")
-    except: ws_s = sh.add_worksheet("주차별통계", 200, 10); ws_s.append_row(["주차", "학생재적", "학생출석", "교사재적", "교사출석", "새친구/추가예배", "총합계", "학생출석률", "비고", "업데이트일시"])
+    except: 
+        ws_s = sh.add_worksheet("주차별통계", 200, 15)
+        ws_s.append_row(["주차", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "출석률", "비고", "업데이트일시"])
     return ws_m, ws_a, ws_s
 
 @st.cache_data(ttl=600)
@@ -131,16 +133,10 @@ def get_all_data():
         ws_m, ws_a, ws_s = get_worksheets()
         vals_m, vals_a, vals_s = fetch_sheet_data()
         df_m = pd.DataFrame(vals_m[1:], columns=vals_m[0]) if len(vals_m) > 1 else pd.DataFrame()
-        
-        # 줄 번호를 먼저 부여해야 업데이트 시 위치가 꼬이지 않음
         df_m['sheet_row'] = range(2, len(df_m) + 2)
-        
-        # [유령 행 제거 로직] 이름 칸이 비어있는 쓰레기 데이터는 메모리에서 원천 삭제!
         if not df_m.empty and '이름' in df_m.columns:
             df_m = df_m[df_m['이름'].astype(str).str.strip() != '']
-            
         if '상태' in df_m.columns and '학교상태' not in df_m.columns: df_m.rename(columns={'상태': '학교상태'}, inplace=True)
-        
         df_a = pd.DataFrame(vals_a[1:], columns=vals_a[0]) if len(vals_a) > 1 else pd.DataFrame()
         df_a['sheet_row'] = range(2, len(df_a) + 2)
         df_s = pd.DataFrame(vals_s[1:], columns=vals_s[0]) if len(vals_s) > 1 else pd.DataFrame()
@@ -156,7 +152,6 @@ if df is None or df.empty:
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
 
-# 동명이인 / 중복 등록 자동 탐지기
 if '이름' in df.columns:
     valid_names_df = df[df['이름'].astype(str).str.strip() != '']
     dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
@@ -165,7 +160,7 @@ if '이름' in df.columns:
         for n in dup_names:
             rows = valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()
             dup_details.append(f"[{n}: 구글시트 {rows}행]")
-        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다! 이 때문에 1명이 2명으로 카운트됩니다. 구글 시트를 열어 중복된 행을 찾아 하나를 삭제해주세요.\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
+        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다! 구글 시트를 열어 중복된 행을 찾아 하나를 삭제해주세요.\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
@@ -242,7 +237,7 @@ with tabs[0]:
     gr_count = len(df[df[status_col] == '졸업'])
     
     dash1, dash2, dash3, dash4 = st.columns(4)
-    dash1.metric("총 재적 (학생)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
+    dash1.metric("총 재적 (유년부)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
     dash2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 교역자 {ps_count}명")
     dash3.metric("비활성 (이사/졸업)", f"{mv_count + gr_count}명", f"이사 {mv_count}명 / 졸업 {gr_count}명")
     dash4.metric("데이터 총합", f"{len(df)}명")
@@ -404,21 +399,24 @@ with tabs[4]:
     if not df_stat.empty and '주차' in df_stat.columns:
         match = df_stat[df_stat['주차'] == sel_w]
         if not match.empty: 
-            try: saved_guest = int(match.iloc[0].get('새친구/추가예배', match.iloc[0].get('새친구(기타)', match.iloc[0].get('기타인원', 0))))
+            try: saved_guest = int(match.iloc[0].get('추가', match.iloc[0].get('새친구/추가예배', match.iloc[0].get('새친구(기타)', 0))))
             except: pass
             saved_note = match.iloc[0].get('비고', '')
 
     st.markdown("#### 📊 현재 체크 현황 (수정/저장 전)")
     cs1, cs2, cs3, cs4 = st.columns(4)
-    cs1.metric("학생 출석 체크", f"{s_p}명")
-    cs2.metric("선생님 출석 체크", f"{t_p}명") 
-    cs3.metric("기존 출석 합계", f"{s_p + t_p}명")
-    guest_in = cs4.number_input("🎉 미등록 새친구/추가예배 (명단 체크 외)", min_value=0, value=saved_guest)
+    cs1.metric("유년부 출석", f"{s_p}명")
+    cs2.metric("선생님 출석", f"{t_p}명") 
+    cs3.metric("유년부 합계 (출석+추가)", f"{s_p + saved_guest}명")
+    guest_in = cs4.number_input("🎉 미등록 새친구/추가예배", min_value=0, value=saved_guest)
     
     st.markdown("---")
     col_ex1, col_ex2 = st.columns([1, 3])
     is_skip = col_ex1.toggle("⚠️ 출석체크 쉼 (행사/예외)", value=bool(saved_note))
     note_text = col_ex2.text_input("행사명/비고 (예: 유년부 쿠킹행사)", value=saved_note)
+
+    calc_total = guest_in if is_skip else (s_p + t_p + guest_in)
+    st.markdown(f"<div class='total-summary'>✅ 저장 시 총합계: {calc_total}명</div>", unsafe_allow_html=True)
 
     with st.form("att_toggle_form"):
         new_att = {}
@@ -463,13 +461,29 @@ with tabs[4]:
                 student_count = len(strict_student_df)
                 staff_count = len(strict_staff_df)
                 
+                # [구조 반영] 데이터 계산
+                kids_total = save_s_p + guest_in
+                grand_total = kids_total + save_t_p
                 rate_val = 0 if student_count == 0 else int((save_s_p / student_count) * 100)
                 save_rate = "0%" if is_skip else f"{rate_val}%"
                 
-                stat_data = [sel_w, student_count, save_s_p, staff_count, save_t_p, guest_in, save_s_p + save_t_p + guest_in, save_rate, note_text, str(datetime.datetime.now())]
+                # 11개 컬럼 A~K 포맷 맞춤
+                stat_data = [
+                    sel_w, 
+                    student_count, 
+                    save_s_p, 
+                    guest_in, 
+                    kids_total, 
+                    staff_count, 
+                    save_t_p, 
+                    grand_total, 
+                    save_rate, 
+                    note_text, 
+                    str(datetime.datetime.now())
+                ]
                 
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
-                if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:J{match_stat.index[0]+2}", [stat_data])
+                if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:K{match_stat.index[0]+2}", [stat_data])
                 else: ws_stat.append_row(stat_data)
                 fetch_sheet_data.clear(); st.success(f"[{sel_w}] 동적 재적 기반 데이터 저장 완료!"); st.rerun()
 
@@ -519,7 +533,20 @@ with tabs[6]:
     report_df['출석률'] = report_df['출석수'].apply(lambda x: f"{int(x/len(week_cols)*100)}%" if len(week_cols)>0 else "0%")
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1: st.write("👤 **개인별 누적 출석 현황**"); st.dataframe(report_df[[class_col, '이름', '학교상태', '출석수', '출석률']], use_container_width=True, hide_index=True)
-    with col_dl2: st.write("📅 **주차별 통계 (시계열 역산 적용)**"); st.dataframe(df_stat, use_container_width=True, hide_index=True)
+    
+    with col_dl2: 
+        st.write("📅 **주차별 통계 (시계열 역산 적용)**")
+        # [신규 UI] 판다스 스타일링을 이용해 합계 열을 진하고 파란색으로 하이라이팅
+        if not df_stat.empty:
+            style_cols = [c for c in ['유년부 합계', '총합', '총합계'] if c in df_stat.columns]
+            if style_cols:
+                styled_df_stat = df_stat.style.set_properties(subset=style_cols, **{'font-weight': 'bold', 'color': '#0366d6', 'background-color': '#f1f8ff'})
+                st.dataframe(styled_df_stat, use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_stat, use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(df_stat, use_container_width=True, hide_index=True)
+            
     st.divider()
     c_csv1, c_csv2 = st.columns(2)
     with c_csv1: st.download_button("📊 개인별 누적 통계 다운로드 (CSV)", data=report_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
