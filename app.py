@@ -9,7 +9,7 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="유년부 통합 관리 v37.5", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="유년부 통합 관리 v37.6", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "비활성", "졸업"]
@@ -93,7 +93,6 @@ def is_enrolled_at_date(row, target_date):
         else: return False
     return True
 
-# 스마트 사역자 판별기
 def check_is_staff(row):
     s = str(row.get('학교상태', '')).strip()
     c = str(row.get('학년(담임)', row.get('반', ''))).strip()
@@ -132,8 +131,16 @@ def get_all_data():
         ws_m, ws_a, ws_s = get_worksheets()
         vals_m, vals_a, vals_s = fetch_sheet_data()
         df_m = pd.DataFrame(vals_m[1:], columns=vals_m[0]) if len(vals_m) > 1 else pd.DataFrame()
+        
+        # 줄 번호를 먼저 부여해야 업데이트 시 위치가 꼬이지 않음
         df_m['sheet_row'] = range(2, len(df_m) + 2)
+        
+        # [유령 행 제거 로직] 이름 칸이 비어있는 쓰레기 데이터는 메모리에서 원천 삭제!
+        if not df_m.empty and '이름' in df_m.columns:
+            df_m = df_m[df_m['이름'].astype(str).str.strip() != '']
+            
         if '상태' in df_m.columns and '학교상태' not in df_m.columns: df_m.rename(columns={'상태': '학교상태'}, inplace=True)
+        
         df_a = pd.DataFrame(vals_a[1:], columns=vals_a[0]) if len(vals_a) > 1 else pd.DataFrame()
         df_a['sheet_row'] = range(2, len(df_a) + 2)
         df_s = pd.DataFrame(vals_s[1:], columns=vals_s[0]) if len(vals_s) > 1 else pd.DataFrame()
@@ -149,7 +156,7 @@ if df is None or df.empty:
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
 
-# [핵심 방어막 진화] 비활성(이사) 명단까지 전수조사하는 더블카운트 탐지기
+# 동명이인 / 중복 등록 자동 탐지기
 if '이름' in df.columns:
     valid_names_df = df[df['이름'].astype(str).str.strip() != '']
     dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
@@ -158,7 +165,7 @@ if '이름' in df.columns:
         for n in dup_names:
             rows = valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()
             dup_details.append(f"[{n}: 구글시트 {rows}행]")
-        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다! (이사/졸업 명단 포함) 이 때문에 1명이 2명으로 카운트됩니다. 구글 시트를 열어 중복된 행을 찾아 하나를 삭제해주세요.\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
+        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다! 이 때문에 1명이 2명으로 카운트됩니다. 구글 시트를 열어 중복된 행을 찾아 하나를 삭제해주세요.\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 start_date = datetime.date(2026, 1, 4)
 weeks_list = [f"{i}주" for i in range(1, 53)]
