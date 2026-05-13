@@ -9,7 +9,6 @@ import uuid
 import re
 
 # --- 1. 전역 설정 및 상수 ---
-# 내부 업데이트 버전은 v39.5, 표출은 V0.9
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
@@ -351,7 +350,6 @@ with tabs[0]:
 # ==========================================
 with tabs[1]:
     st.subheader("🏫 반별 명단")
-    # [핵심 보완] 모바일 정렬 이슈 해결을 위해 3단 그룹핑 후 Row 단위 렌더링
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     
     for i in range(0, len(all_classes), 3):
@@ -602,15 +600,21 @@ with tabs[5]:
     
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
-            with st.container():
-                st.markdown(f"<div class='event-card'><h3 style='margin-top:0;'>📅 {row.get('날짜', '')} | {row.get('활동명', '')}</h3><p><b>내용:</b> {row.get('세부내용', '')}</p><p style='color: #d32f2f;'><b>공지:</b> {row.get('공지사항', '')}</p></div>", unsafe_allow_html=True)
-                # [핵심 보완 3] 사진 10장 표출 및 1/4 사이즈(4열 배치) 지원
-                p_cols = st.columns(4)
-                for i in range(1, 11):
-                    url = row.get(f'사진{i}', "")
-                    if url and str(url).startswith('http'): 
-                        p_cols[(i-1) % 4].image(url, use_container_width=True)
-                        
+            with st.container(border=True):
+                st.markdown(f"<h3 style='margin-top:0; color:#0366d6;'>📅 {row.get('날짜', '')} | {row.get('활동명', '')}</h3>", unsafe_allow_html=True)
+                st.write(f"**내용:** {row.get('세부내용', '')}")
+                if str(row.get('공지사항', '')).strip():
+                    st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
+                
+                # [핵심 보완 3] 사진 10개 추출 및 줄바꿈(4열 Grid) 박스 형태 렌더링
+                valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
+                if valid_urls:
+                    st.markdown("---")
+                    for i in range(0, len(valid_urls), 4):
+                        p_cols = st.columns(4)
+                        for j, img_url in enumerate(valid_urls[i:i+4]):
+                            p_cols[j].image(img_url, use_container_width=True)
+                    
     elif e_mode == "📝 수정" and not df_act.empty:
         event_options = ["행사 선택"] + df_act.apply(lambda r: f"{r.get('날짜','')} | {r.get('활동명','')} (ID:{r['sheet_row']})", axis=1).tolist()
         sel_edit = st.selectbox("수정할 행사 선택", event_options)
@@ -644,8 +648,6 @@ with tabs[5]:
                             for i, f in enumerate(e_f[:10]): new_urls[i] = upload_photo(f, e_t)
                                 
                         act_sh_headers = ws_act.row_values(1)
-                        
-                        # [DB 힐링] 사진 열 누락 시 자동 생성 방어막
                         missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                         if missing_act:
                             for mh in missing_act:
@@ -707,7 +709,6 @@ def highlight_zero_attendance(row):
     return ['' for _ in row.index]
 
 with tabs[6]:
-    # [핵심 보완 4] 타이틀 변경
     st.subheader("📊 통합 통계")
     show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
