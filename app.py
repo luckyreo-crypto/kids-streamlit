@@ -67,10 +67,12 @@ def upload_photo(file, name):
     try:
         b64 = base64.b64encode(file.getvalue()).decode()
         headers = {"Authorization": f"Bearer {st.secrets.get('PROXY_AUTH_KEY', '')}"} if "PROXY_AUTH_KEY" in st.secrets else {}
-        res = requests.post(GOOGLE_PROXY_URL, json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64}, headers=headers, timeout=10)
+        # [다중 업로드 버그 해결] 대용량 파일 10장 전송을 위해 타임아웃을 120초로 대폭 상향
+        res = requests.post(GOOGLE_PROXY_URL, json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64}, headers=headers, timeout=120)
         res.raise_for_status()
         return res.json().get("fileUrl", "")
-    except Exception as e: return ""
+    except Exception as e: 
+        return ""
 
 def chunked_update(worksheet, cells, chunk_size=100):
     for i in range(0, len(cells), chunk_size):
@@ -253,11 +255,15 @@ def edit_student_dialog(target_dict):
                 p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                 actual_headers = ws.row_values(1)
                 
+                # [DB 힐링] 컬럼 일괄 생성 (속도 제한 방지)
                 missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
                 if missing_headers:
-                    for mh in missing_headers:
+                    start_col = len(actual_headers) + 1
+                    h_cells = []
+                    for i, mh in enumerate(missing_headers):
                         actual_headers.append(mh)
-                        ws.update_cell(1, len(actual_headers), mh)
+                        h_cells.append(gspread.Cell(1, start_col + i, mh))
+                    chunked_update(ws, h_cells)
                 
                 r_idx = int(target_dict['sheet_row'])
                 update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
@@ -598,6 +604,14 @@ with tabs[5]:
     st.subheader("⚙️ 행사 기록 관리")
     e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
     
+    # [핵심 보완] 행사 선택 박스에서 ID 숨김 포맷 함수
+    def format_event(row_id):
+        if row_id == "행사 선택": return "행사 선택"
+        match = df_act[df_act['sheet_row'] == row_id]
+        if not match.empty:
+            return f"{match.iloc[0].get('날짜','')} | {match.iloc[0].get('활동명','')}"
+        return "알 수 없음"
+
     if e_mode == "📂 보기" and not df_act.empty:
         for _, row in df_act[::-1].iterrows():
             with st.container(border=True):
@@ -606,7 +620,6 @@ with tabs[5]:
                 if str(row.get('공지사항', '')).strip():
                     st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
                 
-                # [핵심 보완 3] 사진 10개 추출 및 줄바꿈(4열 Grid) 박스 형태 렌더링
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
@@ -616,11 +629,11 @@ with tabs[5]:
                             p_cols[j].image(img_url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
-        event_options = ["행사 선택"] + df_act.apply(lambda r: f"{r.get('날짜','')} | {r.get('활동명','')} (ID:{r['sheet_row']})", axis=1).tolist()
-        sel_edit = st.selectbox("수정할 행사 선택", event_options)
+        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
+        sel_edit = st.selectbox("수정할 행사 선택", event_options, format_func=format_event)
         
         if sel_edit != "행사 선택":
-            target_row_id = int(sel_edit.split("(ID:")[1].replace(")", ""))
+            target_row_id = int(sel_edit)
             target_event = df_act[df_act['sheet_row'] == target_row_id].iloc[0]
             
             with st.form("edit_event_form"):
@@ -631,13 +644,18 @@ with tabs[5]:
                 e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
                 
                 st.write("기존 사진 (새 사진을 첨부하면 덮어씁니다)")
-                p_cols = st.columns(4)
                 old_urls = [""] * 10
+                valid_old_urls = []
                 for i in range(1, 11):
                     url = target_event.get(f'사진{i}', "")
                     old_urls[i-1] = url
-                    if url and str(url).startswith('http'): 
-                        p_cols[(i-1) % 4].image(url, use_container_width=True)
+                    if url and str(url).startswith('http'): valid_old_urls.append(url)
+                
+                if valid_old_urls:
+                    for i in range(0, len(valid_old_urls), 4):
+                        p_cols = st.columns(4)
+                        for j, img_url in enumerate(valid_old_urls[i:i+4]):
+                            p_cols[j].image(img_url, use_container_width=True)
                     
                 e_f = st.file_uploader("새 사진 첨부 (최대 10장)", accept_multiple_files=True)
                 
@@ -648,11 +666,16 @@ with tabs[5]:
                             for i, f in enumerate(e_f[:10]): new_urls[i] = upload_photo(f, e_t)
                                 
                         act_sh_headers = ws_act.row_values(1)
+                        
+                        # [DB 힐링] 사진 열 누락 시 일괄 생성 안전장치
                         missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                         if missing_act:
-                            for mh in missing_act:
+                            start_col = len(act_sh_headers) + 1
+                            h_cells = []
+                            for i, mh in enumerate(missing_act):
                                 act_sh_headers.append(mh)
-                                ws_act.update_cell(1, len(act_sh_headers), mh)
+                                h_cells.append(gspread.Cell(1, start_col + i, mh))
+                            chunked_update(ws_act, h_cells)
                                 
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
                         for k in range(1, 11): update_map[f"사진{k}"] = new_urls[k-1]
@@ -665,8 +688,12 @@ with tabs[5]:
                         fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
 
     elif e_mode == "🚨 삭제" and not df_act.empty:
-        sel_del = st.selectbox("삭제할 행사", df_act.apply(lambda r: f"{r['활동명']} | 날짜:{r.get('날짜','')} (ID:{r['sheet_row']})", axis=1).tolist())
-        if st.button("🚨 삭제 실행"): ws_act.delete_rows(int(sel_del.split("(ID:")[1].replace(")", ""))); fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
+        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
+        sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event)
+        if st.button("🚨 삭제 실행"): 
+            if sel_del != "행사 선택":
+                ws_act.delete_rows(int(sel_del))
+                fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
         
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
@@ -679,11 +706,13 @@ with tabs[5]:
                 act_sh_headers = ws_act.row_values(1)
                 missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                 if missing_act:
-                    for mh in missing_act:
+                    start_col = len(act_sh_headers) + 1
+                    h_cells = []
+                    for i, mh in enumerate(missing_act):
                         act_sh_headers.append(mh)
-                        ws_act.update_cell(1, len(act_sh_headers), mh)
+                        h_cells.append(gspread.Cell(1, start_col + i, mh))
+                    chunked_update(ws_act, h_cells)
                 
-                act_sh_headers = ws_act.row_values(1)
                 h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
                 new_row = [""] * len(act_sh_headers)
                 
