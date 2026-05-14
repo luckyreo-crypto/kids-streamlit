@@ -35,7 +35,7 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 행사기록 사진 1/2 축소 및 가로/세로 혼합 비율 깔끔하게 썸네일 고정 */
+    /* 행사기록 사진/동영상 1/2 축소 및 가로/세로 혼합 비율 깔끔하게 썸네일 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 120px !important;
         object-fit: cover !important;
@@ -81,7 +81,14 @@ def upload_photo(file, name):
         headers = {"Authorization": f"Bearer {st.secrets.get('PROXY_AUTH_KEY', '')}"} if "PROXY_AUTH_KEY" in st.secrets else {}
         res = requests.post(GOOGLE_PROXY_URL, json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64}, headers=headers, timeout=120)
         res.raise_for_status()
-        return res.json().get("fileUrl", "")
+        
+        url = res.json().get("fileUrl", "")
+        
+        # [핵심 보완] 동영상 파일일 경우 시각적 깨짐을 방지하기 위해 스마트 식별자 부착
+        if file.type and file.type.startswith('video/'):
+            url += "&vid=1" if "?" in url else "?vid=1"
+            
+        return url
     except Exception as e: 
         return ""
 
@@ -505,13 +512,13 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [핵심 보완] 1/2 축소를 위해 5열 구조로 변경
                     for i in range(0, len(valid_urls), 5):
                         p_cols = st.columns(5)
                         for j, media_url in enumerate(valid_urls[i:i+5]):
                             with p_cols[j]:
-                                # [핵심 보완] 동영상과 사진 분기 처리 (네이티브 확대 적용 위해 링크 삭제)
-                                if any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
+                                # [핵심 보완] 확장자 및 식별자(vid=1) 판별하여 스마트 미디어 라우팅
+                                is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
+                                if is_vid:
                                     st.video(media_url)
                                 else:
                                     st.image(media_url, use_container_width=True)
@@ -540,7 +547,6 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                # [핵심 보완] 5열로 변경하여 사진 10장이 2줄로 꽉 차게 나열됨
                 for i in range(0, 10, 5):
                     p_cols = st.columns(5)
                     for j in range(5):
@@ -548,7 +554,8 @@ with tabs[4]:
                         with p_cols[j]:
                             media_url = old_urls[idx]
                             if media_url and str(media_url).startswith('http'):
-                                if any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
+                                is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
+                                if is_vid:
                                     st.video(media_url)
                                 else:
                                     st.image(media_url, use_container_width=True)
