@@ -36,14 +36,26 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* [핵심 개선] 사진 1:1 정사각형 비율 강제 고정 (가로 너비에 맞춰 높이 자동 조절) */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        height: 180px !important; 
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1 !important; 
         object-fit: cover !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    /* 동영상(stVideo)에 걸었던 강제 CSS는 플레이어 먹통의 원인이므로 완전히 삭제하여 순정 상태로 롤백함 */
+    
+    /* [핵심 개선] 동영상 1:1 비율 박스 내에서 잘림 없이(contain) 맞춤 */
+    div[data-testid="column"] div[data-testid="stVideo"] video {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1 !important; 
+        object-fit: contain !important;
+        border-radius: 8px;
+        background-color: #000;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -517,14 +529,15 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 4):
-                        p_cols = st.columns(4)
-                        for j, media_url in enumerate(valid_urls[i:i+4]):
+                    # [핵심 보완] 1/5 사이즈(5열 구조) 적용
+                    for i in range(0, len(valid_urls), 5):
+                        p_cols = st.columns(5)
+                        for j, media_url in enumerate(valid_urls[i:i+5]):
                             with p_cols[j]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] CSS 삭제 후 순정 st.video() 롤백 (이전처럼 에러 없이 바로 플레이되도록 원상복구)
+                                # [핵심 보완] 플레이가 완벽히 되던 구버전 순정 스트리밍(st.video)으로 복원
                                 if is_vid:
                                     st.video(clean_url)
                                 else:
@@ -558,9 +571,10 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                for i in range(0, 10, 4):
-                    p_cols = st.columns(4)
-                    for j in range(4):
+                # 5열 배치 수정 UI
+                for i in range(0, 10, 5):
+                    p_cols = st.columns(5)
+                    for j in range(5):
                         idx = i + j
                         if idx >= 10: break
                         with p_cols[j]:
@@ -594,9 +608,9 @@ with tabs[4]:
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
                             h_cells = []
-                            for i, mh in enumerate(missing_act):
+                            for idx_h, mh in enumerate(missing_act):
                                 act_sh_headers.append(mh)
-                                h_cells.append(gspread.Cell(1, start_col + i, mh))
+                                h_cells.append(gspread.Cell(1, start_col + idx_h, mh))
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
