@@ -36,8 +36,9 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진 20% 축소(140px) 및 1:1 정사각형 비율 강제 고정 */
+    /* [핵심 개선] 사진과 동영상 CSS 완벽 분리 (사진은 정사각형 140px 썸네일 고정) */
     div[data-testid="column"] div[data-testid="stImage"] img {
+        width: 100% !important;
         height: 140px !important; 
         aspect-ratio: 1 / 1 !important; 
         object-fit: cover !important;
@@ -45,16 +46,15 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    /* [핵심 개선] 동영상도 20% 축소(140px) 및 잘림 방지(contain) 적용 */
+    /* [핵심 개선] 동영상 플레이어를 먹통으로 만들던 강제 높이/비율 완전 제거 (안전한 100% 폭만 지정) */
+    div[data-testid="column"] div[data-testid="stVideo"] {
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
     div[data-testid="column"] div[data-testid="stVideo"] video {
         width: 100% !important;
-        height: auto !important;
-        max-height: 140px !important;
-        aspect-ratio: 1 / 1 !important;
-        object-fit: contain !important;
-        border-radius: 8px;
-        background-color: #000;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        /* 플레이어 내부 UI 보호를 위해 height나 aspect-ratio 간섭 속성은 넣지 않습니다 */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -93,7 +93,6 @@ def upload_photo(file, name):
         res.raise_for_status()
         
         url = res.json().get("fileUrl", "")
-        # 백그라운드 식별용 vid 플래그 부착
         if file.type and file.type.startswith('video/'):
             url += "&vid=1" if "?" in url else "?vid=1"
         return url
@@ -197,7 +196,6 @@ def get_worksheets():
     sh = client.open_by_key("1UfoeHFWPoJ3bnkjLJyIwEIURyeKa82i7SrMXK35tq3Q")
     ws_m = sh.worksheet("교적부")
     try: ws_a = sh.worksheet("활동간식")
-    # [핵심 보완] 활동간식 시트 생성 시 15장까지 컬럼 확보
     except: ws_a = sh.add_worksheet("활동간식", 500, 20); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항"] + [f"사진{i}" for i in range(1, 16)] + ["등록일"])
     try: ws_s = sh.worksheet("주차별통계")
     except: 
@@ -293,7 +291,7 @@ def edit_student_dialog(target_dict):
                     try:
                         chunked_update(ws, h_cells)
                     except Exception:
-                        ws.add_cols(10)
+                        ws.add_cols(15)
                         chunked_update(ws, h_cells)
                 
                 r_idx = int(target_dict['sheet_row'])
@@ -527,11 +525,9 @@ with tabs[4]:
                 if str(row.get('공지사항', '')).strip():
                     st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
                 
-                # [핵심 보완] 사진 10장 -> 15장으로 확대 연동
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [핵심 보완] 1/5 사이즈 최적화 (5열 적용)
                     for i in range(0, len(valid_urls), 5):
                         p_cols = st.columns(5)
                         for j, media_url in enumerate(valid_urls[i:i+5]):
@@ -563,13 +559,11 @@ with tabs[4]:
                 e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
                 e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
                 
-                # [핵심 보완] 대량 덮어쓰기 기능 (모두 지우고 새로 올리기)
                 bulk_files = st.file_uploader("🔄 일괄 덮어쓰기 (기존 미디어를 모두 지우고 최대 15개까지 새로 올립니다)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
                 
                 st.markdown("---")
                 st.write("📸 개별 사진/동영상 수정 (위 일괄 덮어쓰기를 사용하면 아래 개별 수정은 무시됩니다)")
                 
-                # [핵심 보완] 관리 리스트 15개로 상향
                 old_urls = [""] * 15
                 for i in range(1, 16):
                     url = target_event.get(f'사진{i}', "")
@@ -578,7 +572,6 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
-                # 5칸 배열(1/5 사이즈)로 15개 나열
                 for i in range(0, 15, 5):
                     p_cols = st.columns(5)
                     for j in range(5):
@@ -605,7 +598,6 @@ with tabs[4]:
                     with st.spinner("미디어 반영 중... (개수가 많으면 오래 걸릴 수 있습니다)"):
                         final_urls = old_urls.copy()
                         
-                        # [핵심 보완] 일괄 덮어쓰기 로직
                         if bulk_files:
                             final_urls = [""] * 15
                             for k, f in enumerate(bulk_files[:15]):
@@ -660,7 +652,6 @@ with tabs[4]:
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
-            # [핵심 보완] 최대 15개로 업로드 제한 확대
             a_f = st.file_uploader("사진 및 동영상 (최대 15개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
                 with st.spinner("저장 중... (미디어가 많으면 오래 걸릴 수 있습니다)"):
