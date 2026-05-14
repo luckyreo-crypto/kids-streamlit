@@ -523,8 +523,19 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
+                                # [핵심 보완] 다운로드 글자 완전 삭제, Iframe 사이즈를 사진(180px)과 완벽하게 일치시킴
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
@@ -568,7 +579,16 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
@@ -838,12 +858,10 @@ with tabs[6]:
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
-            df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
+            df_stat_calc = df_stat_calc.sort_values(by='sort_date').drop(columns=['sort_date'])
             
-            rename_dict = {'비고': '내용(비고)', '학생재적': '유년부 재적', '학생출석': '출석', '새친구(기타)': '추가', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계'}
+            rename_dict = {'비고': '내용(비고)', '학생재적': '유년부 재적', '학생출석': '출석', '새친구(기타)': '추가', '새친구/추가예배': '추가', '총합계': '총합'}
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
-            df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
-            
             preferred_order = ["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"]
             
             for idx, row_st in df_stat_renamed.iterrows():
@@ -864,8 +882,7 @@ with tabs[6]:
                 
             actual_order = [c for c in preferred_order if c in df_stat_renamed.columns]
             for c in df_stat_renamed.columns:
-                if c not in actual_order and c != '출석률' and '유년부' not in c:
-                    actual_order.append(c)
+                if c not in actual_order and c != '출석률': actual_order.append(c)
                 
             df_stat_display = df_stat_renamed[actual_order]
             df_stat_display['주차'] = df_stat_display['주차'].apply(format_week_display)
