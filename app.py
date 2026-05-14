@@ -36,23 +36,11 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진 1:1 정사각형 비율 강제 고정 (가로 너비에 맞춰 높이 자동 조절) */
+    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        width: 100% !important;
-        height: auto !important;
-        aspect-ratio: 1 / 1 !important; 
+        height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    /* [핵심 개선] 동영상은 원본 비율 그대로 유지하여 잘림 현상 완벽 해결 */
-    div[data-testid="column"] div[data-testid="stVideo"] video {
-        width: 100% !important;
-        height: auto !important;
-        object-fit: contain !important;
-        border-radius: 8px;
-        background-color: #000;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     </style>
@@ -528,25 +516,36 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 5):
-                        p_cols = st.columns(5)
-                        for j, media_url in enumerate(valid_urls[i:i+5]):
+                    for i in range(0, len(valid_urls), 4):
+                        p_cols = st.columns(4)
+                        for j, media_url in enumerate(valid_urls[i:i+4]):
                             with p_cols[j]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] 원본 복구: 에러 없이 재생 잘되던 순정 st.video()로 롤백.
+                                # [핵심 보완] 구글 드라이브 네이티브 Iframe 적용 (인라인 스틸컷 및 즉시재생)
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                            <div style="text-align:center; margin-top:2px;">
+                                                <a href="https://drive.google.com/uc?export=download&id={f_id}" target="_blank" style="font-size:0.75rem; color:#0366d6; text-decoration:none; font-weight:bold;">📥 영상 다운로드</a>
+                                            </div>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
-        sort_act = df_act.copy()
-        sort_act['sort_date'] = pd.to_datetime(sort_act['날짜'], errors='coerce')
-        sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
-        event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
-        
+        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
         sel_edit = st.selectbox("수정할 행사 선택", event_options, format_func=format_event)
         
         if sel_edit != "행사 선택":
@@ -569,9 +568,9 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                for i in range(0, 10, 5):
-                    p_cols = st.columns(5)
-                    for j in range(5):
+                for i in range(0, 10, 4):
+                    p_cols = st.columns(4)
+                    for j in range(4):
                         idx = i + j
                         if idx >= 10: break
                         with p_cols[j]:
@@ -581,7 +580,18 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
@@ -605,9 +615,9 @@ with tabs[4]:
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
                             h_cells = []
-                            for idx_h, mh in enumerate(missing_act):
+                            for i, mh in enumerate(missing_act):
                                 act_sh_headers.append(mh)
-                                h_cells.append(gspread.Cell(1, start_col + idx_h, mh))
+                                h_cells.append(gspread.Cell(1, start_col + i, mh))
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
@@ -627,11 +637,7 @@ with tabs[4]:
                         fetch_sheet_data.clear(); st.rerun()
 
     elif e_mode == "🚨 삭제" and not df_act.empty:
-        sort_act = df_act.copy()
-        sort_act['sort_date'] = pd.to_datetime(sort_act['날짜'], errors='coerce')
-        sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
-        event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
-        
+        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
         sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event)
         if st.button("🚨 삭제 실행"): 
             if sel_del != "행사 선택":
