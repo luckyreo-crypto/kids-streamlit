@@ -46,11 +46,10 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    /* [핵심 개선] 동영상 1:1 비율 박스 내에서 잘림 없이(contain) 맞춤 */
+    /* [핵심 개선] 동영상은 원본 비율 그대로 유지하여 잘림 현상 완벽 해결 */
     div[data-testid="column"] div[data-testid="stVideo"] video {
         width: 100% !important;
         height: auto !important;
-        aspect-ratio: 1 / 1 !important; 
         object-fit: contain !important;
         border-radius: 8px;
         background-color: #000;
@@ -529,7 +528,6 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [핵심 보완] 1/5 사이즈(5열 구조) 적용
                     for i in range(0, len(valid_urls), 5):
                         p_cols = st.columns(5)
                         for j, media_url in enumerate(valid_urls[i:i+5]):
@@ -537,7 +535,7 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] 플레이가 완벽히 되던 구버전 순정 스트리밍(st.video)으로 복원
+                                # [핵심 보완] 원본 복구: 에러 없이 재생 잘되던 순정 st.video()로 롤백.
                                 if is_vid:
                                     st.video(clean_url)
                                 else:
@@ -571,7 +569,6 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                # 5열 배치 수정 UI
                 for i in range(0, 10, 5):
                     p_cols = st.columns(5)
                     for j in range(5):
