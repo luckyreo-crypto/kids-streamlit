@@ -36,16 +36,21 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* 사진 가로/세로 혼합을 1/5 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* [핵심 개선] 사진: 높이를 120px로 줄이고, 원본 비율을 유지(contain)하여 세로는 좁게, 가로는 넓게 보이도록 최적화 */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        height: 200px !important; 
-        object-fit: cover !important;
+        height: 120px !important; 
+        width: 100% !important;
+        object-fit: contain !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        background-color: #f8f9fa;
     }
-    /* 동영상도 너무 커지지 않게 안전 높이 200px 지정 (비율 간섭은 배제) */
+    
+    /* [핵심 개선] 동영상: 간섭 없이 기존 크기(최대 높이 200px) 유지 */
     div[data-testid="column"] div[data-testid="stVideo"] video {
         max-height: 200px !important;
+        width: 100% !important;
+        border-radius: 8px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -139,7 +144,6 @@ def is_enrolled_at_date(row, target_date):
         else: return False
     return True
 
-# [핵심 보완] 상태가 이사(비활성)일 때 '선생님' 키워드를 인식하여 교사로 정확히 분류되도록 수정
 def check_is_staff(row):
     s = safe_str(row.get('학교상태', ''))
     c = safe_str(row.get('학년(담임)', row.get('반', '')))
@@ -150,7 +154,6 @@ def check_is_staff(row):
         if any(k in m for k in ['교사', '교역자', '전도사', '목사', '부장', '부감', '총무', '선생님']): return True
     return False
 
-# [핵심 보완] 상태가 이사(비활성)일 때 '선생님' 키워드를 인식하여 교사로 정확히 분류되도록 수정
 def get_role(row):
     s = safe_str(row.get('학교상태', ''))
     c = safe_str(row.get('학년(담임)', row.get('반', '')))
@@ -360,11 +363,14 @@ with tabs[0]:
                                     bd_disp = f" 🎂{m_b:02d}/{d_b:02d}"
                                 except: pass
                             
-                            if r['role'] == 'pastor': label = f"✝️ {n}{bd_disp}"
-                            elif r['role'] == 'teacher': label = f"🧑‍🏫 {n}{bd_disp}"
-                            elif s == '새친구': label = f"🔴 {n}{bd_disp}"
-                            elif s in INACTIVE_STATUS: label = f"🚫 {n} ({s}){bd_disp}"
-                            else: label = f"👤 {n}{bd_disp}"
+                            # [핵심 보완] 비활성(이사) 교사도 (이사) 표기와 함께 🚫 아이콘이 정상 적용되도록 로직 분리 개선
+                            prefix = "🚫 " if s in INACTIVE_STATUS else ""
+                            suffix = f" ({s})" if s in INACTIVE_STATUS else ""
+                            
+                            if r['role'] == 'pastor': label = f"{prefix}✝️ {n}{suffix}{bd_disp}"
+                            elif r['role'] == 'teacher': label = f"{prefix}🧑‍🏫 {n}{suffix}{bd_disp}"
+                            elif s == '새친구': label = f"{prefix}🔴 {n}{suffix}{bd_disp}"
+                            else: label = f"{prefix}👤 {n}{suffix}{bd_disp}"
                             
                             with btn_cols[idx_j % 2]:
                                 if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 즉시 정보 수정", use_container_width=True):
@@ -540,17 +546,7 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
-                                    if not file_id_match:
-                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
-                                    
-                                    if file_id_match:
-                                        f_id = file_id_match.group(1)
-                                        st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
-                                        """, unsafe_allow_html=True)
-                                    else:
-                                        st.video(clean_url)
+                                    st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
@@ -598,16 +594,7 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
-                                    if not file_id_match:
-                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
-                                    if file_id_match:
-                                        f_id = file_id_match.group(1)
-                                        st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
-                                        """, unsafe_allow_html=True)
-                                    else:
-                                        st.video(clean_url)
+                                    st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
@@ -944,6 +931,7 @@ with tabs[6]:
                 medals = ["🥇", "🥈", "🥉"]
                 for i, score in enumerate(unique_scores):
                     group = student_report[student_report['출석수'] == score]
+                    # [핵심 보완] 선생님 이름 등 괄호 안의 내용은 짤라서 제거하고 순수 반 이름만 표시
                     names = ", ".join([f"{row['이름']}({str(row[class_col]).split('(')[0].strip()})" for _, row in group.iterrows()])
                     st.markdown(f"**{medals[i]} {score}회** : {names}")
                 st.markdown("</div>", unsafe_allow_html=True)
