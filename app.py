@@ -36,12 +36,19 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* [핵심 개선 1,2] 사진 비율 절반 축소 및 정사각형 비율 고정 (더 많이 보이게) */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 180px !important; 
-        object-fit: cover !important;
+        aspect-ratio: 1/1 !important; /* 정사각형 비율 강제 */
+        object-fit: cover !important; /* 이미지 비율 유지하며 꽉 채움 */
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* [핵심 개선 3] 웹 동영상 잘림 방지용 CSS 추가 */
+    .stVideo {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -516,14 +523,15 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 4):
-                        p_cols = st.columns(4)
-                        for j, media_url in enumerate(valid_urls[i:i+4]):
+                    # [핵심 개선 1] 한 줄에 8개씩 보이도록 columns 수 조정 (절반 크기)
+                    for i in range(0, len(valid_urls), 8):
+                        p_cols = st.columns(8)
+                        for j, media_url in enumerate(valid_urls[i:i+8]):
                             with p_cols[j]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] 다운로드 글자 완전 삭제, Iframe 사이즈를 사진(180px)과 완벽하게 일치시킴
+                                # [핵심 보완 & 기능 유지] 구글 드라이브 네이티브 Iframe 적용 (기존 소스 활용)
                                 if is_vid:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
@@ -531,8 +539,16 @@ with tabs[4]:
                                     
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
+                                        # [핵심 개선 3] 웹에서 잘리지 않도록 비율 조정된 Iframe 태그 사용
+                                        # width/height 속성을 제거하고 CSS 클래스로 비율 관리하는 것이 웹/모바일 반응형에 더 좋지만,
+                                        # 인라인 스타일로 height를 지정하는 기존 방식을 유지하되 잘림을 방지하기 위해 
+                                        # 플레이어 비율에 맞게 height 값을 최적화했습니다. (보통 16:9 비율 플레이어 사용)
+                                        # 데스크톱 웹 환경에서 GDrive 플레이어의 컨트롤 UI가 잘리는 현상을 수정하기 위해 
+                                        # height 값을 와이드 비율에 맞게 조정했습니다.
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="90" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); aspect-ratio: 16 / 9;" allow="autoplay; fullscreen"></iframe>
+                                        </div>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -567,9 +583,10 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                for i in range(0, 10, 4):
-                    p_cols = st.columns(4)
-                    for j in range(4):
+                # 수정 화면에서도 8열 배치 적용
+                for i in range(0, 10, 8):
+                    p_cols = st.columns(8)
+                    for j in range(8):
                         idx = i + j
                         if idx >= 10: break
                         with p_cols[j]:
@@ -585,7 +602,9 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="90" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); aspect-ratio: 16 / 9;" allow="autoplay; fullscreen"></iframe>
+                                        </div>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -612,9 +631,9 @@ with tabs[4]:
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
                             h_cells = []
-                            for i, mh in enumerate(missing_act):
+                            for idx_h, mh in enumerate(missing_act):
                                 act_sh_headers.append(mh)
-                                h_cells.append(gspread.Cell(1, start_col + i, mh))
+                                h_cells.append(gspread.Cell(1, start_col + idx_h, mh))
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
