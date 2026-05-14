@@ -36,16 +36,12 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 (높이 200px 적용) */
+    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        height: 200px !important; 
+        height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    /* 동영상도 너무 커지지 않게 안전 높이 200px 지정 (비율 간섭은 배제) */
-    div[data-testid="column"] div[data-testid="stVideo"] video {
-        max-height: 200px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -348,11 +344,22 @@ with tabs[0]:
                         for idx_j, (_, r) in enumerate(group.iterrows()):
                             s = r[status_col]
                             n = r['이름']
-                            if r['role'] == 'pastor': label = f"✝️ {n}"
-                            elif r['role'] == 'teacher': label = f"🧑‍🏫 {n}"
-                            elif s == '새친구': label = f"🔴 {n}"
-                            elif s in INACTIVE_STATUS: label = f"🚫 {n} ({s})"
-                            else: label = f"👤 {n}"
+                            
+                            # [핵심 추가] 버튼 텍스트 우측 생일 표시 로직
+                            b_str = str(r.get('생년월일', ''))
+                            bd_disp = ""
+                            if '-' in b_str and len(b_str.split('-')) == 3:
+                                try:
+                                    m_b = int(b_str.split('-')[1])
+                                    d_b = int(b_str.split('-')[2])
+                                    bd_disp = f" 🎂{m_b:02d}/{d_b:02d}"
+                                except: pass
+                            
+                            if r['role'] == 'pastor': label = f"✝️ {n}{bd_disp}"
+                            elif r['role'] == 'teacher': label = f"🧑‍🏫 {n}{bd_disp}"
+                            elif s == '새친구': label = f"🔴 {n}{bd_disp}"
+                            elif s in INACTIVE_STATUS: label = f"🚫 {n} ({s}){bd_disp}"
+                            else: label = f"👤 {n}{bd_disp}"
                             
                             with btn_cols[idx_j % 2]:
                                 if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 즉시 정보 수정", use_container_width=True):
@@ -535,12 +542,7 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
-                                            <div style="text-align:center; margin-top:2px;">
-                                                <a href="https://drive.google.com/uc?export=download&id={f_id}" target="_blank" style="font-size:0.75rem; color:#0366d6; text-decoration:none; font-weight:bold;">📥 영상 다운로드</a>
-                                            </div>
-                                        </div>
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -593,9 +595,7 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
-                                        </div>
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -861,6 +861,9 @@ with tabs[6]:
     else: report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
     report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
     
+    # [핵심 보완] 학생 TOP3 통계를 위한 role 컬럼 안전하게 매핑
+    report_df['role'] = df.loc[report_df.index].apply(get_role, axis=1)
+    
     col_stat, col_cumul = st.columns([2, 1])
     
     with col_stat: 
@@ -916,5 +919,21 @@ with tabs[6]:
             
     with col_cumul: 
         st.write("👤 **개인별 누적 출석**")
+        
+        # [핵심 보완] 학생 누적 출석 TOP 3 대시보드 추가 (동점자 모두 표시)
+        student_report = report_df[report_df['role'] == 'student'].copy()
+        student_report = student_report[student_report['출석수'] > 0]
+        if not student_report.empty:
+            unique_scores = sorted(student_report['출석수'].unique(), reverse=True)[:3]
+            if unique_scores:
+                st.markdown("<div style='background-color:#f1f8ff; padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid #cce5ff;'>", unsafe_allow_html=True)
+                st.markdown("<h5 style='color:#0366d6; margin-top:0;'>🏆 유년부 누적 출석 TOP 3</h5>", unsafe_allow_html=True)
+                medals = ["🥇", "🥈", "🥉"]
+                for i, score in enumerate(unique_scores):
+                    group = student_report[student_report['출석수'] == score]
+                    names = ", ".join([f"{row['이름']}({row[class_col]})" for _, row in group.iterrows()])
+                    st.markdown(f"**{medals[i]} {score}회** : {names}")
+                st.markdown("</div>", unsafe_allow_html=True)
+        
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
         st.download_button("📊 개인별 누적 통계 다운로드 (CSV)", data=report_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"개인별통계_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
