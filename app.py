@@ -15,46 +15,27 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon=
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# [핵심 보완] 이미지 슬라이더 기본값 세팅
-img_h = st.session_state.get('img_slider', 140)
-
-st.markdown(f"""
+# 정적인 공통 UI 스타일만 남겨둠 (이미지는 슬라이더 탭에서 동적 적용)
+st.markdown("""
     <style>
-    .class-header {{ background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }}
-    div[data-testid="stToggle"] {{ border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }}
-    div[data-testid="stToggle"]:hover {{ border-color: #0366d6; background-color: #f8fbff; }}
-    .total-summary {{ background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }}
-    .event-card {{ border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }}
-    div[data-testid="stButton"] button {{ width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }}
+    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
+    div[data-testid="stToggle"] { border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }
+    div[data-testid="stToggle"]:hover { border-color: #0366d6; background-color: #f8fbff; }
+    .total-summary { background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }
+    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
+    div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
     /* 모바일 환경 탭 메뉴 자동 줄바꿈 적용 */
-    div[data-baseweb="tab-list"] {{
+    div[data-baseweb="tab-list"] {
         flex-wrap: wrap !important;
         gap: 5px;
-    }}
-    div[data-baseweb="tab"] {{
+    }
+    div[data-baseweb="tab"] {
         flex: 1 1 auto;
         justify-content: center;
         padding-top: 10px;
         padding-bottom: 10px;
-    }}
-    
-    /* [핵심 보완] 이미지 크기를 슬라이더 값(img_h)에 따라 동적 조절 & contain으로 원본비율 유지 */
-    div[data-testid="column"] div[data-testid="stImage"] img {{
-        height: {img_h}px !important; 
-        width: 100% !important;
-        object-fit: contain !important;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        background-color: #f8f9fa;
-    }}
-    
-    /* 동영상 안전 높이 200px (간섭 배제) */
-    div[data-testid="column"] div[data-testid="stVideo"] video {{
-        max-height: 200px !important;
-        width: 100% !important;
-        border-radius: 8px;
-    }}
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -224,7 +205,7 @@ def get_all_data():
         return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s
     except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame()
 
-# [핵심 보완] 데이터 로드 전/후 상단에 새로고침 버튼 배치
+# [✅ 새로고침 버튼 유지] 데이터 로드 전/후 상단 우측에 깔끔하게 배치
 cols_top = st.columns([9, 1.5])
 with cols_top[1]:
     if st.button("🔄 데이터 새로고침", use_container_width=True):
@@ -373,7 +354,6 @@ with tabs[0]:
                                     bd_disp = f" 🎂{m_b:02d}/{d_b:02d}"
                                 except: pass
                             
-                            # [핵심 보완] 비활성(이사) 교사도 (이사) 표기와 함께 🚫 아이콘이 정상 적용되도록 분리
                             prefix = "🚫 " if s in INACTIVE_STATUS else ""
                             suffix = f" ({s})" if s in INACTIVE_STATUS else ""
                             
@@ -525,8 +505,22 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [핵심 보완] 이미지 크기 조절 슬라이더 추가 (세션스테이트 연동으로 즉시 CSS 반영)
-    st.session_state['img_slider'] = st.slider("🖼️ 이미지 크기 조절 (기본 140px, 좌우로 움직여보세요)", min_value=80, max_value=300, value=st.session_state.get('img_slider', 140), step=10, key='img_size_slider')
+    # [✅ 완벽 복원 & 핵심 기능] 사진과 영상을 완전히 분리하여 슬라이더로 조절 (영상은 원본 보장)
+    img_slider_val = st.slider("🖼️ 이미지 크기 조절 (좌우로 움직여보세요)", min_value=80, max_value=400, value=140, step=10)
+    
+    st.markdown(f"""
+        <style>
+        /* 사진: 슬라이더 값 동적 적용, 원본 비율(contain) 유지 */
+        div[data-testid="column"] div[data-testid="stImage"] img {{
+            height: {img_slider_val}px !important; 
+            width: 100% !important;
+            object-fit: contain !important;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: #f8f9fa;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
     st.divider()
     
     e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
@@ -553,15 +547,27 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 5):
-                        p_cols = st.columns(5)
-                        for j, media_url in enumerate(valid_urls[i:i+5]):
+                    # [✅ 세로사진 반응형 웹] 2열(2개씩) 배치로 시원하게 보여주기
+                    for i in range(0, len(valid_urls), 2):
+                        p_cols = st.columns(2)
+                        for j, media_url in enumerate(valid_urls[i:i+2]):
                             with p_cols[j]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
+                                # [✅ 영상 100% 원본 유지] 마스터 버전의 완벽한 iframe 소스로 재생 보장 (height 200)
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
@@ -597,9 +603,10 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
-                for i in range(0, 15, 5):
-                    p_cols = st.columns(5)
-                    for j in range(5):
+                # [✅ 세로사진 반응형 웹] 수정 탭에서도 2열(2개씩) 배치
+                for i in range(0, 15, 2):
+                    p_cols = st.columns(2)
+                    for j in range(2):
                         idx = i + j
                         if idx >= 15: break
                         with p_cols[j]:
@@ -608,8 +615,18 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
+                                # [✅ 영상 100% 원본 유지] 마스터 버전의 완벽한 iframe 소스로 재생 보장 (height 200)
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
