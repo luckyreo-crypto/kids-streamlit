@@ -7,7 +7,7 @@ import base64
 import datetime
 import uuid
 import re
-import time  # 저장 딜레이를 위한 라이브러리 추가
+import time
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
@@ -36,17 +36,12 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    /* 동영상은 플레이어 UI 보호를 위해 높이제한 해제하고 가로폭에 맞춤 */
-    div[data-testid="column"] div[data-testid="stVideo"] video {
-        border-radius: 8px;
-        width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -295,7 +290,6 @@ def edit_student_dialog(target_dict):
                 elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
                 
                 if cells_to_update: chunked_update(ws, cells_to_update)
-                # [개선] 명확한 저장 완료 피드백 및 1.5초 딜레이
                 st.success("✅ 저장이 완료되었습니다!")
                 time.sleep(1.5)
                 fetch_sheet_data.clear(); st.rerun()
@@ -373,7 +367,7 @@ with tabs[0]:
                                         elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
                                         ws.append_row(new_row)
                                         st.success("✅ 등록 완료!")
-                                        time.sleep(1)
+                                        time.sleep(1.5)
                                         fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
@@ -520,15 +514,22 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [핵심 보완] 1/4 사이즈(4열 구조)를 유지하며 썸네일 고정 크기 적용
+                    # [핵심 보완] 1/4 사이즈(4열 구조) 적용
                     for i in range(0, len(valid_urls), 4):
                         p_cols = st.columns(4)
                         for j, media_url in enumerate(valid_urls[i:i+4]):
                             with p_cols[j]:
-                                # 링크 제거, 네이티브 클릭 확대 기능 활용
+                                # [핵심 보완] 동영상은 가벼운 클릭형 썸네일 박스로 교체하여 프록시 충돌 차단
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 if is_vid:
-                                    st.video(media_url)
+                                    st.markdown(f"""
+                                    <a href="{media_url}" target="_blank" style="text-decoration:none;">
+                                        <div style="height:180px; background-color:#2c3e50; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:transform 0.2s;">
+                                            <div style="font-size:3rem;">▶️</div>
+                                            <div style="color:#ffffff; font-size:0.9rem; font-weight:bold; margin-top:10px;">동영상 재생 (새 창)</div>
+                                        </div>
+                                    </a>
+                                    """, unsafe_allow_html=True)
                                 else:
                                     st.image(media_url, use_container_width=True)
                     
@@ -567,7 +568,14 @@ with tabs[4]:
                             if media_url and str(media_url).startswith('http'):
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 if is_vid:
-                                    st.video(media_url)
+                                    st.markdown(f"""
+                                    <a href="{media_url}" target="_blank" style="text-decoration:none;">
+                                        <div style="height:180px; background-color:#2c3e50; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:transform 0.2s;">
+                                            <div style="font-size:3rem;">▶️</div>
+                                            <div style="color:#ffffff; font-size:0.9rem; font-weight:bold; margin-top:10px;">동영상 재생 (새 창)</div>
+                                        </div>
+                                    </a>
+                                    """, unsafe_allow_html=True)
                                 else:
                                     st.image(media_url, use_container_width=True)
                                 
