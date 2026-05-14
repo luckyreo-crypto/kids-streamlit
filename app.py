@@ -254,6 +254,7 @@ def edit_student_dialog(target_dict):
                 p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                 actual_headers = ws.row_values(1)
                 
+                # [에러 해결 방어막] 누락된 헤더 칸 자동 치유 로직 (API 한도 방어 적용)
                 missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
                 if missing_headers:
                     start_col = len(actual_headers) + 1
@@ -261,7 +262,11 @@ def edit_student_dialog(target_dict):
                     for i, mh in enumerate(missing_headers):
                         actual_headers.append(mh)
                         h_cells.append(gspread.Cell(1, start_col + i, mh))
-                    chunked_update(ws, h_cells)
+                    try:
+                        chunked_update(ws, h_cells)
+                    except Exception:
+                        ws.add_cols(10)  # 칸이 모자라면 10칸 무한 확장
+                        chunked_update(ws, h_cells)
                 
                 r_idx = int(target_dict['sheet_row'])
                 update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
@@ -276,8 +281,7 @@ def edit_student_dialog(target_dict):
                 fetch_sheet_data.clear(); st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
-# [요청 반영] 탭 순서 및 명칭 변경
-tabs = st.tabs(["📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
+tabs = st.tabs(["📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사기록", "✅ 출석", "📊 통계"])
 
 # ==========================================
 # [탭 0] 교적부 통합 관리
@@ -462,7 +466,7 @@ with tabs[3]:
     else: st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 4] 행사 (수정/순서 이동 완료)
+# [탭 4] 행사기록 
 # ==========================================
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
@@ -476,7 +480,6 @@ with tabs[4]:
         return "알 수 없음"
 
     if e_mode == "📂 보기" and not df_act.empty:
-        # [요청 반영] 날짜 기준 최신순 자동 정렬 표시
         view_act_df = df_act.copy()
         view_act_df['sort_date'] = pd.to_datetime(view_act_df['날짜'], errors='coerce')
         view_act_df = view_act_df.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
@@ -511,7 +514,6 @@ with tabs[4]:
                 e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
                 e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
                 
-                # [요청 반영] 10장 사진 개별 변경 및 삭제 지원 스마트 그리드
                 st.write("📸 개별 사진 수정 (기존 사진을 삭제하거나 새 사진으로 덮어쓸 수 있습니다)")
                 old_urls = [""] * 10
                 for i in range(1, 11):
@@ -544,6 +546,8 @@ with tabs[4]:
                                 final_urls[k] = ""
                                 
                         act_sh_headers = ws_act.row_values(1)
+                        
+                        # [에러 방지 힐링] 사진 열 자동 추가 방어막
                         missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
@@ -551,7 +555,11 @@ with tabs[4]:
                             for i, mh in enumerate(missing_act):
                                 act_sh_headers.append(mh)
                                 h_cells.append(gspread.Cell(1, start_col + i, mh))
-                            chunked_update(ws_act, h_cells)
+                            try:
+                                chunked_update(ws_act, h_cells)
+                            except Exception:
+                                ws_act.add_cols(10)
+                                chunked_update(ws_act, h_cells)
                                 
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
                         for k in range(1, 11): update_map[f"사진{k}"] = final_urls[k-1]
@@ -587,7 +595,11 @@ with tabs[4]:
                     for i, mh in enumerate(missing_act):
                         act_sh_headers.append(mh)
                         h_cells.append(gspread.Cell(1, start_col + i, mh))
-                    chunked_update(ws_act, h_cells)
+                    try:
+                        chunked_update(ws_act, h_cells)
+                    except Exception:
+                        ws_act.add_cols(10)
+                        chunked_update(ws_act, h_cells)
                 
                 act_sh_headers = ws_act.row_values(1)
                 h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
@@ -683,7 +695,12 @@ with tabs[5]:
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("안전하게 일괄 저장 중..."):
                 target_c = headers.index(sel_w) + 1 if sel_w in headers else len(headers) + 1
-                if sel_w not in headers: ws.update_cell(1, target_c, sel_w)
+                if sel_w not in headers: 
+                    try:
+                        ws.update_cell(1, target_c, sel_w)
+                    except Exception:
+                        ws.add_cols(10)
+                        ws.update_cell(1, target_c, sel_w)
                 
                 final_s_p = 0; final_t_p = 0; cells_to_update = []
                 if not is_skip:
