@@ -523,7 +523,7 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] 구글 드라이브 네이티브 Iframe 적용 (인라인 스틸컷 및 즉시재생)
+                                # [핵심 보완] HTML5 네이티브 비디오 플레이어 적용 (스틸컷 자동 로드 및 즉시 재생)
                                 if is_vid:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
@@ -531,21 +531,24 @@ with tabs[4]:
                                     
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f"""
-                                        <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
-                                            <div style="text-align:center; margin-top:2px;">
-                                                <a href="https://drive.google.com/uc?export=download&id={f_id}" target="_blank" style="font-size:0.75rem; color:#0366d6; text-decoration:none; font-weight:bold;">📥 영상 다운로드</a>
-                                            </div>
-                                        </div>
-                                        """, unsafe_allow_html=True)
+                                        video_url = f"https://drive.google.com/uc?export=download&id={f_id}"
+                                        st.markdown(f'''
+                                        <video width="100%" height="180" controls preload="metadata" style="object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
+                                            <source src="{video_url}" type="video/mp4">
+                                        </video>
+                                        ''', unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
-        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
+        # [핵심 보완] 수정/삭제 콤보박스 목록도 무조건 최신 날짜가 위로 오게 자동 정렬
+        sort_act = df_act.copy()
+        sort_act['sort_date'] = pd.to_datetime(sort_act['날짜'], errors='coerce')
+        sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
+        event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
+        
         sel_edit = st.selectbox("수정할 행사 선택", event_options, format_func=format_event)
         
         if sel_edit != "행사 선택":
@@ -585,11 +588,14 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f"""
+                                        video_url = f"https://drive.google.com/uc?export=download&id={f_id}"
+                                        st.markdown(f'''
                                         <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                            <video width="100%" height="180" controls preload="metadata" style="object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
+                                                <source src="{video_url}" type="video/mp4">
+                                            </video>
                                         </div>
-                                        """, unsafe_allow_html=True)
+                                        ''', unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
                                 else:
@@ -637,7 +643,11 @@ with tabs[4]:
                         fetch_sheet_data.clear(); st.rerun()
 
     elif e_mode == "🚨 삭제" and not df_act.empty:
-        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
+        sort_act = df_act.copy()
+        sort_act['sort_date'] = pd.to_datetime(sort_act['날짜'], errors='coerce')
+        sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
+        event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
+        
         sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event)
         if st.button("🚨 삭제 실행"): 
             if sel_del != "행사 선택":
