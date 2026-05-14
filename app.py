@@ -36,21 +36,14 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진: 높이를 120px로 줄이고, 원본 비율을 유지(contain)하여 세로는 좁게, 가로는 넓게 보이도록 최적화 */
+    /* [핵심 개선] 미디어에 간섭하던 강제 크기/비율 CSS를 모두 제거하여 100% 순정 복원 완료 */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        height: 120px !important; 
-        width: 100% !important;
-        object-fit: contain !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        background-color: #f8f9fa;
     }
-    
-    /* [핵심 개선] 동영상: 간섭 없이 기존 크기(최대 높이 200px) 유지 */
     div[data-testid="column"] div[data-testid="stVideo"] video {
-        max-height: 200px !important;
-        width: 100% !important;
         border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -363,7 +356,6 @@ with tabs[0]:
                                     bd_disp = f" 🎂{m_b:02d}/{d_b:02d}"
                                 except: pass
                             
-                            # [핵심 보완] 비활성(이사) 교사도 (이사) 표기와 함께 🚫 아이콘이 정상 적용되도록 로직 분리 개선
                             prefix = "🚫 " if s in INACTIVE_STATUS else ""
                             suffix = f" ({s})" if s in INACTIVE_STATUS else ""
                             
@@ -538,9 +530,10 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 5):
-                        p_cols = st.columns(5)
-                        for j, media_url in enumerate(valid_urls[i:i+5]):
+                    # [핵심 개선] 사진 2개씩 배열 (2열 레이아웃) 적용
+                    for i in range(0, len(valid_urls), 2):
+                        p_cols = st.columns(2)
+                        for j, media_url in enumerate(valid_urls[i:i+2]):
                             with p_cols[j]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -582,9 +575,10 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
-                for i in range(0, 15, 5):
-                    p_cols = st.columns(5)
-                    for j in range(5):
+                # [핵심 개선] 수정 화면에서도 2개씩 배열 (2열 레이아웃) 적용
+                for i in range(0, 15, 2):
+                    p_cols = st.columns(2)
+                    for j in range(2):
                         idx = i + j
                         if idx >= 15: break
                         with p_cols[j]:
@@ -931,7 +925,6 @@ with tabs[6]:
                 medals = ["🥇", "🥈", "🥉"]
                 for i, score in enumerate(unique_scores):
                     group = student_report[student_report['출석수'] == score]
-                    # [핵심 보완] 선생님 이름 등 괄호 안의 내용은 짤라서 제거하고 순수 반 이름만 표시
                     names = ", ".join([f"{row['이름']}({str(row[class_col]).split('(')[0].strip()})" for _, row in group.iterrows()])
                     st.markdown(f"**{medals[i]} {score}회** : {names}")
                 st.markdown("</div>", unsafe_allow_html=True)
