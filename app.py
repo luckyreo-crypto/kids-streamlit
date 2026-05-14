@@ -36,11 +36,22 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* [핵심 개선] 사진은 1/4 박스로 꽉 차게 크롭 */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* [핵심 개선] 동영상은 UI 및 썸네일 잘림을 방지하기 위해 비율 유지(contain) 및 자동 높이 적용 */
+    div[data-testid="column"] div[data-testid="stVideo"] video {
+        width: 100% !important;
+        height: auto !important;
+        max-height: 180px !important;
+        object-fit: contain !important;
+        border-radius: 8px;
+        background-color: #000;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     </style>
@@ -523,27 +534,13 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] HTML5 네이티브 비디오 플레이어 적용 (스틸컷 자동 로드 및 즉시 재생)
+                                # [핵심 보완] 원본 복구: 에러 없던 순정 st.video()로 롤백. 단, CSS(height: auto)를 통해 썸네일 잘림 해결
                                 if is_vid:
-                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
-                                    if not file_id_match:
-                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
-                                    
-                                    if file_id_match:
-                                        f_id = file_id_match.group(1)
-                                        video_url = f"https://drive.google.com/uc?export=download&id={f_id}"
-                                        st.markdown(f'''
-                                        <video width="100%" height="180" controls preload="metadata" style="object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
-                                            <source src="{video_url}" type="video/mp4">
-                                        </video>
-                                        ''', unsafe_allow_html=True)
-                                    else:
-                                        st.video(clean_url)
+                                    st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
-        # [핵심 보완] 수정/삭제 콤보박스 목록도 무조건 최신 날짜가 위로 오게 자동 정렬
         sort_act = df_act.copy()
         sort_act['sort_date'] = pd.to_datetime(sort_act['날짜'], errors='coerce')
         sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
@@ -583,21 +580,7 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
-                                    if not file_id_match:
-                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
-                                    if file_id_match:
-                                        f_id = file_id_match.group(1)
-                                        video_url = f"https://drive.google.com/uc?export=download&id={f_id}"
-                                        st.markdown(f'''
-                                        <div style="margin-bottom:10px;">
-                                            <video width="100%" height="180" controls preload="metadata" style="object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
-                                                <source src="{video_url}" type="video/mp4">
-                                            </video>
-                                        </div>
-                                        ''', unsafe_allow_html=True)
-                                    else:
-                                        st.video(clean_url)
+                                    st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
