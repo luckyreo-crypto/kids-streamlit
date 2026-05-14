@@ -67,7 +67,6 @@ def upload_photo(file, name):
     try:
         b64 = base64.b64encode(file.getvalue()).decode()
         headers = {"Authorization": f"Bearer {st.secrets.get('PROXY_AUTH_KEY', '')}"} if "PROXY_AUTH_KEY" in st.secrets else {}
-        # [다중 업로드 버그 해결] 대용량 파일 10장 전송을 위해 타임아웃을 120초로 대폭 상향
         res = requests.post(GOOGLE_PROXY_URL, json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64}, headers=headers, timeout=120)
         res.raise_for_status()
         return res.json().get("fileUrl", "")
@@ -255,7 +254,6 @@ def edit_student_dialog(target_dict):
                 p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                 actual_headers = ws.row_values(1)
                 
-                # [DB 힐링] 컬럼 일괄 생성 (속도 제한 방지)
                 missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
                 if missing_headers:
                     start_col = len(actual_headers) + 1
@@ -278,7 +276,8 @@ def edit_student_dialog(target_dict):
                 fetch_sheet_data.clear(); st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
-tabs = st.tabs(["📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "✅ 출석/행사", "⚙️ 행사기록", "📊 통합 통계"])
+# [요청 반영] 탭 순서 및 명칭 변경
+tabs = st.tabs(["📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
 
 # ==========================================
 # [탭 0] 교적부 통합 관리
@@ -463,10 +462,154 @@ with tabs[3]:
     else: st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 4] 출석/행사
+# [탭 4] 행사 (수정/순서 이동 완료)
 # ==========================================
 with tabs[4]:
-    st.subheader("📅 주간 출석 & 행사 현황")
+    st.subheader("⚙️ 행사 기록 관리")
+    e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
+    
+    def format_event(row_id):
+        if row_id == "행사 선택": return "행사 선택"
+        match = df_act[df_act['sheet_row'] == row_id]
+        if not match.empty:
+            return f"{match.iloc[0].get('날짜','')} | {match.iloc[0].get('활동명','')}"
+        return "알 수 없음"
+
+    if e_mode == "📂 보기" and not df_act.empty:
+        # [요청 반영] 날짜 기준 최신순 자동 정렬 표시
+        view_act_df = df_act.copy()
+        view_act_df['sort_date'] = pd.to_datetime(view_act_df['날짜'], errors='coerce')
+        view_act_df = view_act_df.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
+        
+        for _, row in view_act_df.iterrows():
+            with st.container(border=True):
+                st.markdown(f"<h3 style='margin-top:0; color:#0366d6;'>📅 {row.get('날짜', '')} | {row.get('활동명', '')}</h3>", unsafe_allow_html=True)
+                st.write(f"**내용:** {row.get('세부내용', '')}")
+                if str(row.get('공지사항', '')).strip():
+                    st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
+                
+                valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
+                if valid_urls:
+                    st.markdown("---")
+                    for i in range(0, len(valid_urls), 4):
+                        p_cols = st.columns(4)
+                        for j, img_url in enumerate(valid_urls[i:i+4]):
+                            p_cols[j].image(img_url, use_container_width=True)
+                    
+    elif e_mode == "📝 수정" and not df_act.empty:
+        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
+        sel_edit = st.selectbox("수정할 행사 선택", event_options, format_func=format_event)
+        
+        if sel_edit != "행사 선택":
+            target_row_id = int(sel_edit)
+            target_event = df_act[df_act['sheet_row'] == target_row_id].iloc[0]
+            
+            with st.form("edit_event_form"):
+                e_d_val = parse_date_safe(target_event.get('날짜', ''))
+                e_d = st.date_input("날짜", value=e_d_val)
+                e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
+                e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
+                e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
+                
+                # [요청 반영] 10장 사진 개별 변경 및 삭제 지원 스마트 그리드
+                st.write("📸 개별 사진 수정 (기존 사진을 삭제하거나 새 사진으로 덮어쓸 수 있습니다)")
+                old_urls = [""] * 10
+                for i in range(1, 11):
+                    url = target_event.get(f'사진{i}', "")
+                    old_urls[i-1] = url
+                
+                new_files = [None] * 10
+                delete_flags = [False] * 10
+                
+                for i in range(0, 10, 5):
+                    p_cols = st.columns(5)
+                    for j in range(5):
+                        idx = i + j
+                        with p_cols[j]:
+                            if old_urls[idx] and str(old_urls[idx]).startswith('http'):
+                                st.image(old_urls[idx], use_container_width=True)
+                                delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
+                                new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed")
+                            else:
+                                st.markdown(f"**[{idx+1}] 빈 칸**")
+                                new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed")
+                
+                if st.form_submit_button("📝 행사 수정 저장", type="primary"):
+                    with st.spinner("개별 사진 및 내용 수정 중..."):
+                        final_urls = old_urls.copy()
+                        for k in range(10):
+                            if new_files[k] is not None:
+                                final_urls[k] = upload_photo(new_files[k], e_t)
+                            elif delete_flags[k]:
+                                final_urls[k] = ""
+                                
+                        act_sh_headers = ws_act.row_values(1)
+                        missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
+                        if missing_act:
+                            start_col = len(act_sh_headers) + 1
+                            h_cells = []
+                            for i, mh in enumerate(missing_act):
+                                act_sh_headers.append(mh)
+                                h_cells.append(gspread.Cell(1, start_col + i, mh))
+                            chunked_update(ws_act, h_cells)
+                                
+                        update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
+                        for k in range(1, 11): update_map[f"사진{k}"] = final_urls[k-1]
+                            
+                        cells_to_update = []
+                        for k, v in update_map.items():
+                            if k in act_sh_headers: cells_to_update.append(gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)))
+                                
+                        if cells_to_update: chunked_update(ws_act, cells_to_update)
+                        fetch_sheet_data.clear(); st.success("개별 수정이 완료되었습니다!"); st.rerun()
+
+    elif e_mode == "🚨 삭제" and not df_act.empty:
+        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
+        sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event)
+        if st.button("🚨 삭제 실행"): 
+            if sel_del != "행사 선택":
+                ws_act.delete_rows(int(sel_del))
+                fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
+        
+    elif e_mode == "➕ 등록":
+        with st.form("new_e"):
+            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항"); a_f = st.file_uploader("사진 (최대 10장)", accept_multiple_files=True)
+            if st.form_submit_button("저장"):
+                urls = [""] * 10
+                if a_f: 
+                    for i, f in enumerate(a_f[:10]): urls[i] = upload_photo(f, a_t)
+                
+                act_sh_headers = ws_act.row_values(1)
+                missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
+                if missing_act:
+                    start_col = len(act_sh_headers) + 1
+                    h_cells = []
+                    for i, mh in enumerate(missing_act):
+                        act_sh_headers.append(mh)
+                        h_cells.append(gspread.Cell(1, start_col + i, mh))
+                    chunked_update(ws_act, h_cells)
+                
+                act_sh_headers = ws_act.row_values(1)
+                h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
+                new_row = [""] * len(act_sh_headers)
+                
+                if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
+                if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
+                if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
+                if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
+                if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
+                
+                for k in range(1, 11):
+                    if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
+                
+                ws_act.append_row(new_row)
+                fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
+
+# ==========================================
+# [탭 5] 출석
+# ==========================================
+with tabs[5]:
+    st.subheader("📅 주간 출석 현황")
     extended_weeks_list = weeks_list + ["✏️ 직접 입력 (새 날짜)"]
     
     c1, c2 = st.columns(2)
@@ -598,138 +741,7 @@ with tabs[4]:
                 fetch_sheet_data.clear(); st.success("업데이트 완료!"); st.rerun()
 
 # ==========================================
-# [탭 5] 행사기록 
-# ==========================================
-with tabs[5]:
-    st.subheader("⚙️ 행사 기록 관리")
-    e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
-    
-    # [핵심 보완] 행사 선택 박스에서 ID 숨김 포맷 함수
-    def format_event(row_id):
-        if row_id == "행사 선택": return "행사 선택"
-        match = df_act[df_act['sheet_row'] == row_id]
-        if not match.empty:
-            return f"{match.iloc[0].get('날짜','')} | {match.iloc[0].get('활동명','')}"
-        return "알 수 없음"
-
-    if e_mode == "📂 보기" and not df_act.empty:
-        for _, row in df_act[::-1].iterrows():
-            with st.container(border=True):
-                st.markdown(f"<h3 style='margin-top:0; color:#0366d6;'>📅 {row.get('날짜', '')} | {row.get('활동명', '')}</h3>", unsafe_allow_html=True)
-                st.write(f"**내용:** {row.get('세부내용', '')}")
-                if str(row.get('공지사항', '')).strip():
-                    st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
-                
-                valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
-                if valid_urls:
-                    st.markdown("---")
-                    for i in range(0, len(valid_urls), 4):
-                        p_cols = st.columns(4)
-                        for j, img_url in enumerate(valid_urls[i:i+4]):
-                            p_cols[j].image(img_url, use_container_width=True)
-                    
-    elif e_mode == "📝 수정" and not df_act.empty:
-        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
-        sel_edit = st.selectbox("수정할 행사 선택", event_options, format_func=format_event)
-        
-        if sel_edit != "행사 선택":
-            target_row_id = int(sel_edit)
-            target_event = df_act[df_act['sheet_row'] == target_row_id].iloc[0]
-            
-            with st.form("edit_event_form"):
-                e_d_val = parse_date_safe(target_event.get('날짜', ''))
-                e_d = st.date_input("날짜", value=e_d_val)
-                e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
-                e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
-                e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
-                
-                st.write("기존 사진 (새 사진을 첨부하면 덮어씁니다)")
-                old_urls = [""] * 10
-                valid_old_urls = []
-                for i in range(1, 11):
-                    url = target_event.get(f'사진{i}', "")
-                    old_urls[i-1] = url
-                    if url and str(url).startswith('http'): valid_old_urls.append(url)
-                
-                if valid_old_urls:
-                    for i in range(0, len(valid_old_urls), 4):
-                        p_cols = st.columns(4)
-                        for j, img_url in enumerate(valid_old_urls[i:i+4]):
-                            p_cols[j].image(img_url, use_container_width=True)
-                    
-                e_f = st.file_uploader("새 사진 첨부 (최대 10장)", accept_multiple_files=True)
-                
-                if st.form_submit_button("📝 행사 수정 저장"):
-                    with st.spinner("수정 중..."):
-                        new_urls = old_urls.copy()
-                        if e_f: 
-                            for i, f in enumerate(e_f[:10]): new_urls[i] = upload_photo(f, e_t)
-                                
-                        act_sh_headers = ws_act.row_values(1)
-                        
-                        # [DB 힐링] 사진 열 누락 시 일괄 생성 안전장치
-                        missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
-                        if missing_act:
-                            start_col = len(act_sh_headers) + 1
-                            h_cells = []
-                            for i, mh in enumerate(missing_act):
-                                act_sh_headers.append(mh)
-                                h_cells.append(gspread.Cell(1, start_col + i, mh))
-                            chunked_update(ws_act, h_cells)
-                                
-                        update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
-                        for k in range(1, 11): update_map[f"사진{k}"] = new_urls[k-1]
-                            
-                        cells_to_update = []
-                        for k, v in update_map.items():
-                            if k in act_sh_headers: cells_to_update.append(gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)))
-                                
-                        if cells_to_update: chunked_update(ws_act, cells_to_update)
-                        fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
-
-    elif e_mode == "🚨 삭제" and not df_act.empty:
-        event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
-        sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event)
-        if st.button("🚨 삭제 실행"): 
-            if sel_del != "행사 선택":
-                ws_act.delete_rows(int(sel_del))
-                fetch_sheet_data.clear(); st.success("삭제되었습니다!"); st.rerun()
-        
-    elif e_mode == "➕ 등록":
-        with st.form("new_e"):
-            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항"); a_f = st.file_uploader("사진 (최대 10장)", accept_multiple_files=True)
-            if st.form_submit_button("저장"):
-                urls = [""] * 10
-                if a_f: 
-                    for i, f in enumerate(a_f[:10]): urls[i] = upload_photo(f, a_t)
-                
-                act_sh_headers = ws_act.row_values(1)
-                missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
-                if missing_act:
-                    start_col = len(act_sh_headers) + 1
-                    h_cells = []
-                    for i, mh in enumerate(missing_act):
-                        act_sh_headers.append(mh)
-                        h_cells.append(gspread.Cell(1, start_col + i, mh))
-                    chunked_update(ws_act, h_cells)
-                
-                h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
-                new_row = [""] * len(act_sh_headers)
-                
-                if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
-                if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
-                if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
-                if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
-                if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
-                
-                for k in range(1, 11):
-                    if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
-                
-                ws_act.append_row(new_row)
-                fetch_sheet_data.clear(); st.success("저장 완료!"); st.rerun()
-
-# ==========================================
-# [탭 6] 통합통계 
+# [탭 6] 통계
 # ==========================================
 def highlight_zero_attendance(row):
     try: att = int(row['출석'])
@@ -738,7 +750,7 @@ def highlight_zero_attendance(row):
     return ['' for _ in row.index]
 
 with tabs[6]:
-    st.subheader("📊 통합 통계")
+    st.subheader("📊 통계")
     show_all_stats = st.checkbox("📥 엑셀/통계 추출 시 비활성 인원 기록 포함하기", value=True)
     week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
     if show_all_stats: report_df = df[[class_col, '이름', '학교상태'] + week_cols].copy()
