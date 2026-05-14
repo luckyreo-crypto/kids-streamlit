@@ -7,7 +7,7 @@ import base64
 import datetime
 import uuid
 import re
-import time
+import time  # 저장 딜레이를 위한 라이브러리 추가
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
@@ -36,16 +36,17 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 1/4 사이즈 세로사진 비율 썸네일 최적화 및 동영상 깨짐 방지 */
+    /* [핵심 개선] 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        height: 200px !important;
+        height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    /* 동영상은 플레이어 UI 보호를 위해 높이제한 해제하고 가로폭에 맞춤 */
     div[data-testid="column"] div[data-testid="stVideo"] video {
-        width: 100% !important;
-        max-height: 250px !important;
         border-radius: 8px;
+        width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -267,7 +268,7 @@ def edit_student_dialog(target_dict):
         e_photo = col_f.file_uploader("사진변경")
         
         if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
-            with st.spinner("데이터를 안전하게 저장하고 있습니다. 잠시만 기다려주세요..."):
+            with st.spinner("저장 중..."):
                 p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                 actual_headers = ws.row_values(1)
                 
@@ -294,10 +295,10 @@ def edit_student_dialog(target_dict):
                 elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
                 
                 if cells_to_update: chunked_update(ws, cells_to_update)
-                fetch_sheet_data.clear()
-                st.success("✅ 정보 수정이 완료되었습니다!")
+                # [개선] 명확한 저장 완료 피드백 및 1.5초 딜레이
+                st.success("✅ 저장이 완료되었습니다!")
                 time.sleep(1.5)
-                st.rerun()
+                fetch_sheet_data.clear(); st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반편성", "📋 교적부", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
@@ -371,10 +372,9 @@ with tabs[0]:
                                         if '학교상태' in h_map: new_row[h_map['학교상태']] = "새친구"
                                         elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
                                         ws.append_row(new_row)
-                                        fetch_sheet_data.clear()
-                                        st.success("✅ 새친구 등록이 완료되었습니다!")
-                                        time.sleep(1.5)
-                                        st.rerun()
+                                        st.success("✅ 등록 완료!")
+                                        time.sleep(1)
+                                        fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 1] 교적부 통합 관리
@@ -434,23 +434,21 @@ with tabs[1]:
             n_photo = st.file_uploader("사진 첨부")
             if st.form_submit_button("✨ 등록하기"):
                 if n_name and n_class:
-                    with st.spinner("데이터를 안전하게 저장하고 있습니다. 잠시만 기다려주세요..."):
-                        p_url = upload_photo(n_photo, n_name)
-                        new_row = [""] * len(headers)
-                        h_map = {str(h): i for i, h in enumerate(headers)}
-                        if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
-                        if '이름' in h_map: new_row[h_map['이름']] = n_name
-                        if class_col in h_map: new_row[h_map[class_col]] = n_class
-                        if '생년월일' in h_map: new_row[h_map['생년월일']] = "2015-01-01"
-                        if '등록일' in h_map: new_row[h_map['등록일']] = n_reg
-                        if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
-                        elif '상태' in h_map: new_row[h_map['상태']] = n_status
-                        if '사진' in h_map: new_row[h_map['사진']] = p_url
-                        ws.append_row(new_row)
-                        fetch_sheet_data.clear()
-                        st.success("✅ 학생 등록이 완료되었습니다!")
-                        time.sleep(1.5)
-                        st.rerun()
+                    p_url = upload_photo(n_photo, n_name)
+                    new_row = [""] * len(headers)
+                    h_map = {str(h): i for i, h in enumerate(headers)}
+                    if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
+                    if '이름' in h_map: new_row[h_map['이름']] = n_name
+                    if class_col in h_map: new_row[h_map[class_col]] = n_class
+                    if '생년월일' in h_map: new_row[h_map['생년월일']] = "2015-01-01"
+                    if '등록일' in h_map: new_row[h_map['등록일']] = n_reg
+                    if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
+                    elif '상태' in h_map: new_row[h_map['상태']] = n_status
+                    if '사진' in h_map: new_row[h_map['사진']] = p_url
+                    ws.append_row(new_row)
+                    st.success("✅ 등록 완료!")
+                    time.sleep(1.5)
+                    fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 2, 3] 생일표, 새친구
@@ -522,11 +520,12 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [핵심 보완] 사진 사이즈 1/4 (4열) 축소 배치 적용
+                    # [핵심 보완] 1/4 사이즈(4열 구조)를 유지하며 썸네일 고정 크기 적용
                     for i in range(0, len(valid_urls), 4):
                         p_cols = st.columns(4)
                         for j, media_url in enumerate(valid_urls[i:i+4]):
                             with p_cols[j]:
+                                # 링크 제거, 네이티브 클릭 확대 기능 활용
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 if is_vid:
                                     st.video(media_url)
@@ -557,29 +556,29 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                # [핵심 보완] 수정 화면도 1/4 (4열) 사이즈 통일
+                # 4열 배치 수정 UI
                 for i in range(0, 10, 4):
                     p_cols = st.columns(4)
                     for j in range(4):
                         idx = i + j
-                        if idx < 10:
-                            with p_cols[j]:
-                                media_url = old_urls[idx]
-                                if media_url and str(media_url).startswith('http'):
-                                    is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
-                                    if is_vid:
-                                        st.video(media_url)
-                                    else:
-                                        st.image(media_url, use_container_width=True)
-                                    
-                                    delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
-                                    new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
+                        if idx >= 10: break
+                        with p_cols[j]:
+                            media_url = old_urls[idx]
+                            if media_url and str(media_url).startswith('http'):
+                                is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
+                                if is_vid:
+                                    st.video(media_url)
                                 else:
-                                    st.markdown(f"**[{idx+1}] 빈 칸**")
-                                    new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
+                                    st.image(media_url, use_container_width=True)
+                                
+                                delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
+                                new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
+                            else:
+                                st.markdown(f"**[{idx+1}] 빈 칸**")
+                                new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                 
                 if st.form_submit_button("📝 행사 수정 저장", type="primary"):
-                    with st.spinner("데이터를 안전하게 저장하고 있습니다. 잠시만 기다려주세요..."):
+                    with st.spinner("개별 사진 및 내용 수정 중... (미디어가 많으면 오래 걸릴 수 있습니다)"):
                         final_urls = old_urls.copy()
                         for k in range(10):
                             if new_files[k] is not None:
@@ -592,9 +591,9 @@ with tabs[4]:
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
                             h_cells = []
-                            for i, mh in enumerate(missing_act):
+                            for idx_h, mh in enumerate(missing_act):
                                 act_sh_headers.append(mh)
-                                h_cells.append(gspread.Cell(1, start_col + i, mh))
+                                h_cells.append(gspread.Cell(1, start_col + idx_h, mh))
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
@@ -609,29 +608,26 @@ with tabs[4]:
                             if k in act_sh_headers: cells_to_update.append(gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)))
                                 
                         if cells_to_update: chunked_update(ws_act, cells_to_update)
-                        fetch_sheet_data.clear()
-                        st.success("✅ 행사 수정이 완료되었습니다!")
+                        st.success("✅ 개별 수정이 완료되었습니다!")
                         time.sleep(1.5)
-                        st.rerun()
+                        fetch_sheet_data.clear(); st.rerun()
 
     elif e_mode == "🚨 삭제" and not df_act.empty:
         event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
         sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event)
         if st.button("🚨 삭제 실행"): 
             if sel_del != "행사 선택":
-                with st.spinner("데이터를 안전하게 삭제 중입니다..."):
-                    ws_act.delete_rows(int(sel_del))
-                    fetch_sheet_data.clear()
-                    st.success("🚨 삭제가 완료되었습니다!")
-                    time.sleep(1.5)
-                    st.rerun()
+                ws_act.delete_rows(int(sel_del))
+                st.success("✅ 삭제되었습니다!")
+                time.sleep(1.5)
+                fetch_sheet_data.clear(); st.rerun()
         
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
             a_f = st.file_uploader("사진 및 동영상 (최대 10개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
-                with st.spinner("데이터를 안전하게 저장하고 있습니다. 잠시만 기다려주세요..."):
+                with st.spinner("저장 중... (미디어가 많으면 오래 걸릴 수 있습니다)"):
                     urls = [""] * 10
                     if a_f: 
                         for i, f in enumerate(a_f[:10]): urls[i] = upload_photo(f, a_t)
@@ -641,9 +637,9 @@ with tabs[4]:
                     if missing_act:
                         start_col = len(act_sh_headers) + 1
                         h_cells = []
-                        for i, mh in enumerate(missing_act):
+                        for idx_h, mh in enumerate(missing_act):
                             act_sh_headers.append(mh)
-                            h_cells.append(gspread.Cell(1, start_col + i, mh))
+                            h_cells.append(gspread.Cell(1, start_col + idx_h, mh))
                         try:
                             chunked_update(ws_act, h_cells)
                         except Exception:
@@ -664,10 +660,9 @@ with tabs[4]:
                         if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
                     
                     ws_act.append_row(new_row)
-                    fetch_sheet_data.clear()
-                    st.success("✅ 행사 등록이 완료되었습니다!")
+                    st.success("✅ 저장 완료!")
                     time.sleep(1.5)
-                    st.rerun()
+                    fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 5] 출석
@@ -745,7 +740,7 @@ with tabs[5]:
                     new_att[row['sheet_row']] = cols[i%3].toggle(label, value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
-            with st.spinner("데이터를 안전하게 저장하고 있습니다. 잠시만 기다려주세요..."):
+            with st.spinner("안전하게 일괄 저장 중..."):
                 target_c = headers.index(sel_w) + 1 if sel_w in headers else len(headers) + 1
                 if sel_w not in headers: 
                     try:
@@ -791,10 +786,10 @@ with tabs[5]:
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
                 if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:J{match_stat.index[0]+2}", [stat_data])
                 else: ws_stat.append_row(stat_data)
-                fetch_sheet_data.clear()
-                st.success(f"✅ [{sel_w}] 출석 데이터 저장이 완료되었습니다!")
+                
+                st.success(f"✅ [{sel_w}] 동적 재적 기반 데이터 저장 완료!")
                 time.sleep(1.5)
-                st.rerun()
+                fetch_sheet_data.clear(); st.rerun()
 
     with st.expander("📊 연간 출석 현황 에디터 (일괄 수정)"):
         week_cols = [c for c in df.columns if c.endswith('주') or (c.count('-')==2 and len(c)>=8)]
@@ -803,17 +798,16 @@ with tabs[5]:
         for w in week_cols: annual_df[w] = annual_df[w].apply(lambda x: True if str(x).strip() == "1" else False)
         edited_annual = st.data_editor(annual_df, hide_index=True, use_container_width=True, column_config={w: st.column_config.CheckboxColumn(w) for w in week_cols})
         if st.button("📝 연간 데이터 수정사항 서버에 반영"):
-            with st.spinner("데이터를 안전하게 저장하고 있습니다. 잠시만 기다려주세요..."):
+            with st.spinner("동기화 중..."):
                 cells_to_update = []
                 for r in range(len(annual_df)):
                     for w in week_cols:
                         if annual_df.iloc[r][w] != edited_annual.iloc[r][w]:
                             cells_to_update.append(gspread.Cell(int(annual_df.iloc[r]['sheet_row']), headers.index(w) + 1, "1" if edited_annual.iloc[r][w] else ""))
                 if cells_to_update: chunked_update(ws, cells_to_update, chunk_size=200)
-                fetch_sheet_data.clear()
-                st.success("✅ 연간 데이터 수정이 완료되었습니다!")
+                st.success("✅ 업데이트 완료!")
                 time.sleep(1.5)
-                st.rerun()
+                fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 6] 통계
