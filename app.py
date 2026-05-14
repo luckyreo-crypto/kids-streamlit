@@ -36,12 +36,21 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* [핵심 개선] 사진 스마트 크롭 (가로/세로 관계없이 1/4 박스로 깔끔하게 맞춤) */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* 동영상은 조작버튼 보호를 위해 180px 내에서 비율 유지 */
+    div[data-testid="column"] div[data-testid="stVideo"] video {
+        height: 180px !important;
+        width: 100% !important;
+        object-fit: contain !important;
+        border-radius: 8px;
+        background-color: #000;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -80,6 +89,7 @@ def upload_photo(file, name):
         res.raise_for_status()
         
         url = res.json().get("fileUrl", "")
+        # 백그라운드 식별용 vid 플래그 부착
         if file.type and file.type.startswith('video/'):
             url += "&vid=1" if "?" in url else "?vid=1"
         return url
@@ -239,8 +249,9 @@ def edit_student_dialog(target_dict):
     st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 정보를 수정합니다.")
     with st.form("modal_edit_form"):
         col_i, col_f = st.columns([1, 2])
-        if safe_str(target_dict.get('사진')) and str(target_dict['사진']).startswith('http'): 
-            col_i.image(target_dict['사진'], use_container_width=True)
+        clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+        if clean_p_url and str(clean_p_url).startswith('http'): 
+            col_i.image(clean_p_url, use_container_width=True)
         
         c1, c2 = col_f.columns(2)
         e_name = c1.text_input("이름", value=safe_str(target_dict.get('이름','')))
@@ -514,24 +525,27 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [핵심 보완] 1/4 사이즈(4열 구조) 적용
                     for i in range(0, len(valid_urls), 4):
                         p_cols = st.columns(4)
                         for j, media_url in enumerate(valid_urls[i:i+4]):
                             with p_cols[j]:
-                                # [핵심 보완] 동영상은 가벼운 클릭형 썸네일 박스로 교체하여 프록시 충돌 차단
+                                # [핵심 보완] 스트림 404 에러 방지 및 직접 재생 구현
+                                clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
+                                
                                 if is_vid:
-                                    st.markdown(f"""
-                                    <a href="{media_url}" target="_blank" style="text-decoration:none;">
-                                        <div style="height:180px; background-color:#2c3e50; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:transform 0.2s;">
-                                            <div style="font-size:3rem;">▶️</div>
-                                            <div style="color:#ffffff; font-size:0.9rem; font-weight:bold; margin-top:10px;">동영상 재생 (새 창)</div>
-                                        </div>
-                                    </a>
-                                    """, unsafe_allow_html=True)
+                                    # 구글 드라이브 URL에서 File ID를 추출하여 원본 스트림 주소로 변경
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    if file_id_match:
+                                        video_url = f"https://drive.google.com/uc?export=download&id={file_id_match.group(1)}"
+                                        st.video(video_url)
+                                    else:
+                                        st.video(clean_url)
                                 else:
-                                    st.image(media_url, use_container_width=True)
+                                    st.image(clean_url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
         event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
@@ -557,7 +571,6 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
-                # 4열 배치 수정 UI
                 for i in range(0, 10, 4):
                     p_cols = st.columns(4)
                     for j in range(4):
@@ -566,18 +579,20 @@ with tabs[4]:
                         with p_cols[j]:
                             media_url = old_urls[idx]
                             if media_url and str(media_url).startswith('http'):
+                                clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
+                                
                                 if is_vid:
-                                    st.markdown(f"""
-                                    <a href="{media_url}" target="_blank" style="text-decoration:none;">
-                                        <div style="height:180px; background-color:#2c3e50; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:transform 0.2s;">
-                                            <div style="font-size:3rem;">▶️</div>
-                                            <div style="color:#ffffff; font-size:0.9rem; font-weight:bold; margin-top:10px;">동영상 재생 (새 창)</div>
-                                        </div>
-                                    </a>
-                                    """, unsafe_allow_html=True)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    if file_id_match:
+                                        video_url = f"https://drive.google.com/uc?export=download&id={file_id_match.group(1)}"
+                                        st.video(video_url)
+                                    else:
+                                        st.video(clean_url)
                                 else:
-                                    st.image(media_url, use_container_width=True)
+                                    st.image(clean_url, use_container_width=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
