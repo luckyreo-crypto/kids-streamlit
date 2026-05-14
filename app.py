@@ -36,25 +36,12 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진과 동영상 CSS 완벽 분리 (사진은 정사각형 140px 썸네일 고정) */
+    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
-        width: 100% !important;
-        height: 140px !important; 
-        aspect-ratio: 1 / 1 !important; 
+        height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    /* [핵심 개선] 동영상 플레이어를 먹통으로 만들던 강제 높이/비율 완전 제거 (안전한 100% 폭만 지정) */
-    div[data-testid="column"] div[data-testid="stVideo"] {
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        overflow: hidden;
-    }
-    div[data-testid="column"] div[data-testid="stVideo"] video {
-        width: 100% !important;
-        /* 플레이어 내부 UI 보호를 위해 height나 aspect-ratio 간섭 속성은 넣지 않습니다 */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -93,6 +80,7 @@ def upload_photo(file, name):
         res.raise_for_status()
         
         url = res.json().get("fileUrl", "")
+        # 백그라운드 식별용 vid 플래그 부착
         if file.type and file.type.startswith('video/'):
             url += "&vid=1" if "?" in url else "?vid=1"
         return url
@@ -196,7 +184,7 @@ def get_worksheets():
     sh = client.open_by_key("1UfoeHFWPoJ3bnkjLJyIwEIURyeKa82i7SrMXK35tq3Q")
     ws_m = sh.worksheet("교적부")
     try: ws_a = sh.worksheet("활동간식")
-    except: ws_a = sh.add_worksheet("활동간식", 500, 20); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항"] + [f"사진{i}" for i in range(1, 16)] + ["등록일"])
+    except: ws_a = sh.add_worksheet("활동간식", 500, 15); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항"] + [f"사진{i}" for i in range(1, 11)] + ["등록일"])
     try: ws_s = sh.worksheet("주차별통계")
     except: 
         ws_s = sh.add_worksheet("주차별통계", 200, 11)
@@ -291,7 +279,7 @@ def edit_student_dialog(target_dict):
                     try:
                         chunked_update(ws, h_cells)
                     except Exception:
-                        ws.add_cols(15)
+                        ws.add_cols(10)
                         chunked_update(ws, h_cells)
                 
                 r_idx = int(target_dict['sheet_row'])
@@ -525,12 +513,12 @@ with tabs[4]:
                 if str(row.get('공지사항', '')).strip():
                     st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
                 
-                valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
+                valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 5):
-                        p_cols = st.columns(5)
-                        for j, media_url in enumerate(valid_urls[i:i+5]):
+                    for i in range(0, len(valid_urls), 4):
+                        p_cols = st.columns(4)
+                        for j, media_url in enumerate(valid_urls[i:i+4]):
                             with p_cols[j]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -559,24 +547,20 @@ with tabs[4]:
                 e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
                 e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
                 
-                bulk_files = st.file_uploader("🔄 일괄 덮어쓰기 (기존 미디어를 모두 지우고 최대 15개까지 새로 올립니다)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
-                
-                st.markdown("---")
-                st.write("📸 개별 사진/동영상 수정 (위 일괄 덮어쓰기를 사용하면 아래 개별 수정은 무시됩니다)")
-                
-                old_urls = [""] * 15
-                for i in range(1, 16):
+                st.write("📸 개별 사진/동영상 수정 (기존 미디어를 삭제하거나 새 미디어로 덮어쓸 수 있습니다)")
+                old_urls = [""] * 10
+                for i in range(1, 11):
                     url = target_event.get(f'사진{i}', "")
                     old_urls[i-1] = url
                 
-                new_files = [None] * 15
-                delete_flags = [False] * 15
+                new_files = [None] * 10
+                delete_flags = [False] * 10
                 
-                for i in range(0, 15, 5):
-                    p_cols = st.columns(5)
-                    for j in range(5):
+                for i in range(0, 10, 4):
+                    p_cols = st.columns(4)
+                    for j in range(4):
                         idx = i + j
-                        if idx >= 15: break
+                        if idx >= 10: break
                         with p_cols[j]:
                             media_url = old_urls[idx]
                             if media_url and str(media_url).startswith('http'):
@@ -595,22 +579,16 @@ with tabs[4]:
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                 
                 if st.form_submit_button("📝 행사 수정 저장", type="primary"):
-                    with st.spinner("미디어 반영 중... (개수가 많으면 오래 걸릴 수 있습니다)"):
+                    with st.spinner("개별 사진 및 내용 수정 중... (미디어가 많으면 오래 걸릴 수 있습니다)"):
                         final_urls = old_urls.copy()
-                        
-                        if bulk_files:
-                            final_urls = [""] * 15
-                            for k, f in enumerate(bulk_files[:15]):
-                                final_urls[k] = upload_photo(f, e_t)
-                        else:
-                            for k in range(15):
-                                if new_files[k] is not None:
-                                    final_urls[k] = upload_photo(new_files[k], e_t)
-                                elif delete_flags[k]:
-                                    final_urls[k] = ""
+                        for k in range(10):
+                            if new_files[k] is not None:
+                                final_urls[k] = upload_photo(new_files[k], e_t)
+                            elif delete_flags[k]:
+                                final_urls[k] = ""
                                 
                         act_sh_headers = ws_act.row_values(1)
-                        missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
+                        missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
                             h_cells = []
@@ -620,18 +598,18 @@ with tabs[4]:
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
-                                ws_act.add_cols(15)
+                                ws_act.add_cols(10)
                                 chunked_update(ws_act, h_cells)
                                 
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
-                        for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
+                        for k in range(1, 11): update_map[f"사진{k}"] = final_urls[k-1]
                             
                         cells_to_update = []
                         for k, v in update_map.items():
                             if k in act_sh_headers: cells_to_update.append(gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)))
                                 
                         if cells_to_update: chunked_update(ws_act, cells_to_update)
-                        st.success("✅ 행사 수정이 완료되었습니다!")
+                        st.success("✅ 개별 수정이 완료되었습니다!")
                         time.sleep(1.5)
                         fetch_sheet_data.clear(); st.rerun()
 
@@ -652,15 +630,15 @@ with tabs[4]:
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
-            a_f = st.file_uploader("사진 및 동영상 (최대 15개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
+            a_f = st.file_uploader("사진 및 동영상 (최대 10개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
                 with st.spinner("저장 중... (미디어가 많으면 오래 걸릴 수 있습니다)"):
-                    urls = [""] * 15
+                    urls = [""] * 10
                     if a_f: 
-                        for i, f in enumerate(a_f[:15]): urls[i] = upload_photo(f, a_t)
+                        for i, f in enumerate(a_f[:10]): urls[i] = upload_photo(f, a_t)
                     
                     act_sh_headers = ws_act.row_values(1)
-                    missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
+                    missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                     if missing_act:
                         start_col = len(act_sh_headers) + 1
                         h_cells = []
@@ -670,7 +648,7 @@ with tabs[4]:
                         try:
                             chunked_update(ws_act, h_cells)
                         except Exception:
-                            ws_act.add_cols(15)
+                            ws_act.add_cols(10)
                             chunked_update(ws_act, h_cells)
                     
                     act_sh_headers = ws_act.row_values(1)
@@ -683,7 +661,7 @@ with tabs[4]:
                     if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
                     if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
                     
-                    for k in range(1, 16):
+                    for k in range(1, 11):
                         if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
                     
                     ws_act.append_row(new_row)
@@ -860,10 +838,12 @@ with tabs[6]:
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
-            df_stat_calc = df_stat_calc.sort_values(by='sort_date').drop(columns=['sort_date'])
+            df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
             
-            rename_dict = {'비고': '내용(비고)', '학생재적': '유년부 재적', '학생출석': '출석', '새친구(기타)': '추가', '새친구/추가예배': '추가', '총합계': '총합'}
+            rename_dict = {'비고': '내용(비고)', '학생재적': '유년부 재적', '학생출석': '출석', '새친구(기타)': '추가', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계'}
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
+            df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
+            
             preferred_order = ["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"]
             
             for idx, row_st in df_stat_renamed.iterrows():
@@ -884,7 +864,8 @@ with tabs[6]:
                 
             actual_order = [c for c in preferred_order if c in df_stat_renamed.columns]
             for c in df_stat_renamed.columns:
-                if c not in actual_order and c != '출석률': actual_order.append(c)
+                if c not in actual_order and c != '출석률' and '유년부' not in c:
+                    actual_order.append(c)
                 
             df_stat_display = df_stat_renamed[actual_order]
             df_stat_display['주차'] = df_stat_display['주차'].apply(format_week_display)
