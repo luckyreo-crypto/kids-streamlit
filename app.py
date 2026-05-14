@@ -532,7 +532,7 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="250" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -585,7 +585,7 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="100%" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
