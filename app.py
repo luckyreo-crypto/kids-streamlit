@@ -36,24 +36,14 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진은 1/4 박스로 꽉 차게 크롭 */
+    /* [핵심 개선] 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 180px !important; 
         object-fit: cover !important;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    
-    /* [핵심 개선] 동영상은 UI 및 썸네일 잘림을 방지하기 위해 비율 유지(contain) 및 자동 높이 적용 */
-    div[data-testid="column"] div[data-testid="stVideo"] video {
-        width: 100% !important;
-        height: auto !important;
-        max-height: 180px !important;
-        object-fit: contain !important;
-        border-radius: 8px;
-        background-color: #000;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+    /* 동영상(stVideo)에 걸었던 강제 CSS는 플레이어 먹통의 원인이므로 완전히 삭제하여 순정 상태로 롤백함 */
     </style>
     """, unsafe_allow_html=True)
 
@@ -534,7 +524,7 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] 원본 복구: 에러 없던 순정 st.video()로 롤백. 단, CSS(height: auto)를 통해 썸네일 잘림 해결
+                                # [핵심 보완] CSS 삭제 후 순정 st.video() 롤백 (이전처럼 에러 없이 바로 플레이되도록 원상복구)
                                 if is_vid:
                                     st.video(clean_url)
                                 else:
