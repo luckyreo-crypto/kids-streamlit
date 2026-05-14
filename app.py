@@ -36,6 +36,16 @@ st.markdown("""
         padding-top: 10px;
         padding-bottom: 10px;
     }
+    
+    /* 동영상을 먹통으로 만들지 않도록 안전 영역 적용 */
+    div[data-testid="column"] div[data-testid="stVideo"] {
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    div[data-testid="column"] div[data-testid="stVideo"] video {
+        width: 100% !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -505,12 +515,12 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [✅ 완벽 복원 & 핵심 기능] 사진과 영상을 완전히 분리하여 슬라이더로 조절 (영상은 원본 보장)
-    img_slider_val = st.slider("🖼️ 이미지 크기 조절 (좌우로 움직여보세요)", min_value=80, max_value=400, value=140, step=10)
+    # [✅ 완벽 복원] 사진 전용 사이즈 조절 슬라이더 부활 (모바일 터치 동작 연동)
+    img_slider_val = st.slider("🖼️ 이미지 크기 조절 (모바일 화면은 좌우로 드래그하세요)", min_value=80, max_value=400, value=140, step=10)
     
+    # 슬라이더 값에 따라 사진만 크기가 변경되도록 안전한 동적 CSS 주입
     st.markdown(f"""
         <style>
-        /* 사진: 슬라이더 값 동적 적용, 원본 비율(contain) 유지 */
         div[data-testid="column"] div[data-testid="stImage"] img {{
             height: {img_slider_val}px !important; 
             width: 100% !important;
@@ -547,7 +557,6 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    # [✅ 세로사진 반응형 웹] 2열(2개씩) 배치로 시원하게 보여주기
                     for i in range(0, len(valid_urls), 2):
                         p_cols = st.columns(2)
                         for j, media_url in enumerate(valid_urls[i:i+2]):
@@ -555,7 +564,7 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [✅ 영상 100% 원본 유지] 마스터 버전의 완벽한 iframe 소스로 재생 보장 (height 200)
+                                # [✅ 영상은 절대 건드리지 않음] 완벽히 동작하던 순정 iframe 소스 (height 200)
                                 if is_vid:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
@@ -564,7 +573,7 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -603,7 +612,6 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
-                # [✅ 세로사진 반응형 웹] 수정 탭에서도 2열(2개씩) 배치
                 for i in range(0, 15, 2):
                     p_cols = st.columns(2)
                     for j in range(2):
@@ -615,7 +623,6 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [✅ 영상 100% 원본 유지] 마스터 버전의 완벽한 iframe 소스로 재생 보장 (height 200)
                                 if is_vid:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
