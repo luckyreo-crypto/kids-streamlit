@@ -254,7 +254,6 @@ def edit_student_dialog(target_dict):
                 p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                 actual_headers = ws.row_values(1)
                 
-                # [에러 해결 방어막] 누락된 헤더 칸 자동 치유 로직 (API 한도 방어 적용)
                 missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
                 if missing_headers:
                     start_col = len(actual_headers) + 1
@@ -265,7 +264,7 @@ def edit_student_dialog(target_dict):
                     try:
                         chunked_update(ws, h_cells)
                     except Exception:
-                        ws.add_cols(10)  # 칸이 모자라면 10칸 무한 확장
+                        ws.add_cols(10)
                         chunked_update(ws, h_cells)
                 
                 r_idx = int(target_dict['sheet_row'])
@@ -281,12 +280,83 @@ def edit_student_dialog(target_dict):
                 fetch_sheet_data.clear(); st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
-tabs = st.tabs(["📋 교적부", "🏫 반편성", "🎂 생일표", "🌱 새친구", "⚙️ 행사기록", "✅ 출석", "📊 통계"])
+# [요청 반영] 탭 순서 및 명칭 완전 변경
+tabs = st.tabs(["🏫 반편성", "📋 교적부", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
 
 # ==========================================
-# [탭 0] 교적부 통합 관리
+# [탭 0] 반편성
 # ==========================================
 with tabs[0]:
+    st.subheader("🏫 반별 명단")
+    all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
+    
+    for i in range(0, len(all_classes), 3):
+        cols = st.columns(3)
+        for j in range(3):
+            if i + j < len(all_classes):
+                c_name = all_classes[i+j]
+                group = df[df[class_col] == c_name].copy()
+                group['role'] = group.apply(get_role, axis=1)
+                
+                def get_sort_key(row):
+                    s = row[status_col]
+                    if s in INACTIVE_STATUS: return 100
+                    if row['role'] in ['teacher', 'pastor']: return get_teacher_rank(row['이름'], row.get('비고', ''))
+                    if s == '새친구': return 60
+                    return 80
+                    
+                group['sort_key'] = group.apply(get_sort_key, axis=1)
+                group = group.sort_values(by=['sort_key', '이름'])
+                
+                is_teacher_grp = any(k in str(c_name) for k in ['선생님', '교사'])
+                is_pastor_grp = any(k in str(c_name) for k in ['교역자', '전도사', '목사'])
+                
+                if is_teacher_grp:
+                    active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'teacher')])
+                    header_title = f"{c_name} ({active_count}명)"
+                elif is_pastor_grp:
+                    active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'pastor')])
+                    header_title = f"{c_name} ({active_count}명)"
+                else:
+                    active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')])
+                    header_title = f"{c_name} (학생 {active_count}명)"
+                
+                with cols[j]:
+                    with st.container(border=True):
+                        st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{header_title}</h4>", unsafe_allow_html=True)
+                        btn_cols = st.columns(2)
+                        for idx_j, (_, r) in enumerate(group.iterrows()):
+                            s = r[status_col]
+                            n = r['이름']
+                            if r['role'] == 'pastor': label = f"✝️ {n}"
+                            elif r['role'] == 'teacher': label = f"🧑‍🏫 {n}"
+                            elif s == '새친구': label = f"🔴 {n}"
+                            elif s in INACTIVE_STATUS: label = f"🚫 {n} ({s})"
+                            else: label = f"👤 {n}"
+                            
+                            with btn_cols[idx_j % 2]:
+                                if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 즉시 정보 수정", use_container_width=True):
+                                    edit_student_dialog(r.to_dict())
+                        
+                        with st.expander(f"➕ 새친구 추가"):
+                            with st.form(f"qa_{i+j}"):
+                                new_n = st.text_input("새친구 이름", placeholder="이름 입력")
+                                if st.form_submit_button("등록"):
+                                    if new_n:
+                                        new_row = [""] * len(headers)
+                                        h_map = {str(h): idx for idx, h in enumerate(headers)}
+                                        if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
+                                        if '이름' in h_map: new_row[h_map['이름']] = new_n
+                                        if class_col in h_map: new_row[h_map[class_col]] = c_name
+                                        if '생년월일' in h_map: new_row[h_map['생년월일']] = datetime.date.today().strftime("%Y-%m-%d")
+                                        if '학교상태' in h_map: new_row[h_map['학교상태']] = "새친구"
+                                        elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
+                                        ws.append_row(new_row); fetch_sheet_data.clear(); st.rerun()
+
+# ==========================================
+# [탭 1] 교적부 통합 관리
+# ==========================================
+with tabs[1]:
     st.subheader("📋 교적부 통합 관리")
     df['role'] = df.apply(get_role, axis=1)
     df['is_staff_flag'] = df.apply(check_is_staff, axis=1)
@@ -355,76 +425,6 @@ with tabs[0]:
                     ws.append_row(new_row); fetch_sheet_data.clear(); st.success("등록 완료!"); st.rerun()
 
 # ==========================================
-# [탭 1] 반편성
-# ==========================================
-with tabs[1]:
-    st.subheader("🏫 반별 명단")
-    all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
-    
-    for i in range(0, len(all_classes), 3):
-        cols = st.columns(3)
-        for j in range(3):
-            if i + j < len(all_classes):
-                c_name = all_classes[i+j]
-                group = df[df[class_col] == c_name].copy()
-                group['role'] = group.apply(get_role, axis=1)
-                
-                def get_sort_key(row):
-                    s = row[status_col]
-                    if s in INACTIVE_STATUS: return 100
-                    if row['role'] in ['teacher', 'pastor']: return get_teacher_rank(row['이름'], row.get('비고', ''))
-                    if s == '새친구': return 60
-                    return 80
-                    
-                group['sort_key'] = group.apply(get_sort_key, axis=1)
-                group = group.sort_values(by=['sort_key', '이름'])
-                
-                is_teacher_grp = any(k in str(c_name) for k in ['선생님', '교사'])
-                is_pastor_grp = any(k in str(c_name) for k in ['교역자', '전도사', '목사'])
-                
-                if is_teacher_grp:
-                    active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'teacher')])
-                    header_title = f"{c_name} ({active_count}명)"
-                elif is_pastor_grp:
-                    active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'pastor')])
-                    header_title = f"{c_name} ({active_count}명)"
-                else:
-                    active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')])
-                    header_title = f"{c_name} (학생 {active_count}명)"
-                
-                with cols[j]:
-                    with st.container(border=True):
-                        st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee;'>{header_title}</h4>", unsafe_allow_html=True)
-                        btn_cols = st.columns(2)
-                        for idx_j, (_, r) in enumerate(group.iterrows()):
-                            s = r[status_col]
-                            n = r['이름']
-                            if r['role'] == 'pastor': label = f"✝️ {n}"
-                            elif r['role'] == 'teacher': label = f"🧑‍🏫 {n}"
-                            elif s == '새친구': label = f"🔴 {n}"
-                            elif s in INACTIVE_STATUS: label = f"🚫 {n} ({s})"
-                            else: label = f"👤 {n}"
-                            
-                            with btn_cols[idx_j % 2]:
-                                if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 즉시 정보 수정", use_container_width=True):
-                                    edit_student_dialog(r.to_dict())
-                        
-                        with st.expander(f"➕ 새친구 추가"):
-                            with st.form(f"qa_{i+j}"):
-                                new_n = st.text_input("새친구 이름", placeholder="이름 입력")
-                                if st.form_submit_button("등록"):
-                                    if new_n:
-                                        new_row = [""] * len(headers)
-                                        h_map = {str(h): idx for idx, h in enumerate(headers)}
-                                        if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
-                                        if '이름' in h_map: new_row[h_map['이름']] = new_n
-                                        if class_col in h_map: new_row[h_map[class_col]] = c_name
-                                        if '생년월일' in h_map: new_row[h_map['생년월일']] = datetime.date.today().strftime("%Y-%m-%d")
-                                        if '학교상태' in h_map: new_row[h_map['학교상태']] = "새친구"
-                                        elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
-                                        ws.append_row(new_row); fetch_sheet_data.clear(); st.rerun()
-
-# ==========================================
 # [탭 2, 3] 생일표, 새친구
 # ==========================================
 with tabs[2]:
@@ -466,7 +466,7 @@ with tabs[3]:
     else: st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 4] 행사기록 
+# [탭 4] 행사 기록 관리
 # ==========================================
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
@@ -497,7 +497,10 @@ with tabs[4]:
                     for i in range(0, len(valid_urls), 4):
                         p_cols = st.columns(4)
                         for j, img_url in enumerate(valid_urls[i:i+4]):
-                            p_cols[j].image(img_url, use_container_width=True)
+                            with p_cols[j]:
+                                st.image(img_url, use_container_width=True)
+                                # [핵심 보완] 동영상 및 미디어를 바로 볼 수 있는 링크 버튼 추가
+                                st.markdown(f"<div style='text-align:center; margin-top:-10px;'><a href='{img_url}' target='_blank' style='text-decoration:none; font-size:0.85rem; color:#0366d6;'>📎 미디어 보기</a></div>", unsafe_allow_html=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
         event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
@@ -514,7 +517,7 @@ with tabs[4]:
                 e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
                 e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
                 
-                st.write("📸 개별 사진 수정 (기존 사진을 삭제하거나 새 사진으로 덮어쓸 수 있습니다)")
+                st.write("📸 개별 사진/동영상 수정 (기존 미디어를 삭제하거나 새 미디어로 덮어쓸 수 있습니다)")
                 old_urls = [""] * 10
                 for i in range(1, 11):
                     url = target_event.get(f'사진{i}', "")
@@ -530,11 +533,12 @@ with tabs[4]:
                         with p_cols[j]:
                             if old_urls[idx] and str(old_urls[idx]).startswith('http'):
                                 st.image(old_urls[idx], use_container_width=True)
+                                st.markdown(f"<div style='text-align:center; margin-top:-10px;'><a href='{old_urls[idx]}' target='_blank' style='text-decoration:none; font-size:0.85rem; color:#0366d6;'>📎 원본 보기</a></div>", unsafe_allow_html=True)
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
-                                new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed")
+                                new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                             else:
                                 st.markdown(f"**[{idx+1}] 빈 칸**")
-                                new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed")
+                                new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                 
                 if st.form_submit_button("📝 행사 수정 저장", type="primary"):
                     with st.spinner("개별 사진 및 내용 수정 중..."):
@@ -546,8 +550,6 @@ with tabs[4]:
                                 final_urls[k] = ""
                                 
                         act_sh_headers = ws_act.row_values(1)
-                        
-                        # [에러 방지 힐링] 사진 열 자동 추가 방어막
                         missing_act = [col for col in [f"사진{idx}" for idx in range(1, 11)] if col not in act_sh_headers]
                         if missing_act:
                             start_col = len(act_sh_headers) + 1
@@ -581,7 +583,8 @@ with tabs[4]:
         
     elif e_mode == "➕ 등록":
         with st.form("new_e"):
-            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항"); a_f = st.file_uploader("사진 (최대 10장)", accept_multiple_files=True)
+            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
+            a_f = st.file_uploader("사진 및 동영상 (최대 10개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
                 urls = [""] * 10
                 if a_f: 
