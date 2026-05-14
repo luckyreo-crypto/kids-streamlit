@@ -36,7 +36,7 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 (높이 200px 적용) */
+    /* 사진 가로/세로 혼합을 1/5 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 200px !important; 
         object-fit: cover !important;
@@ -139,23 +139,25 @@ def is_enrolled_at_date(row, target_date):
         else: return False
     return True
 
+# [핵심 보완] 상태가 이사(비활성)일 때 '선생님' 키워드를 인식하여 교사로 정확히 분류되도록 수정
 def check_is_staff(row):
     s = safe_str(row.get('학교상태', ''))
     c = safe_str(row.get('학년(담임)', row.get('반', '')))
     m = safe_str(row.get('비고', ''))
     if s in ['교사', '교역자', '전도사', '목사']: return True
     if s in INACTIVE_STATUS:
-        if any(k in c for k in ['교사', '교역자', '전도사', '목사', '임원']): return True
-        if any(k in m for k in ['교사', '교역자', '전도사', '목사', '부장', '부감', '총무']): return True
+        if any(k in c for k in ['교사', '교역자', '전도사', '목사', '임원', '선생님']): return True
+        if any(k in m for k in ['교사', '교역자', '전도사', '목사', '부장', '부감', '총무', '선생님']): return True
     return False
 
+# [핵심 보완] 상태가 이사(비활성)일 때 '선생님' 키워드를 인식하여 교사로 정확히 분류되도록 수정
 def get_role(row):
     s = safe_str(row.get('학교상태', ''))
     c = safe_str(row.get('학년(담임)', row.get('반', '')))
     m = safe_str(row.get('비고', ''))
-    if s in ['교역자', '전도사', '목사'] or any(k in m for k in ['전도사', '목사', '교역자']) or any(k in c for k in ['교역자', '전도사']):
+    if s in ['교역자', '전도사', '목사'] or any(k in m for k in ['전도사', '목사', '교역자']) or any(k in c for k in ['교역자', '전도사', '목사']):
         return 'pastor'
-    if s == '교사' or any(k in c for k in ['교사', '임원']) or any(k in m for k in ['교사', '부장', '부감', '총무', '회계']):
+    if s == '교사' or any(k in c for k in ['교사', '임원', '선생님']) or any(k in m for k in ['교사', '부장', '부감', '총무', '회계', '선생님']):
         return 'teacher'
     return 'student'
 
@@ -538,7 +540,17 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
@@ -586,7 +598,16 @@ with tabs[4]:
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
                                 if is_vid:
-                                    st.video(clean_url)
+                                    file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
+                                    if not file_id_match:
+                                        file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    if file_id_match:
+                                        f_id = file_id_match.group(1)
+                                        st.markdown(f"""
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
@@ -855,7 +876,6 @@ with tabs[6]:
     else: report_df = df[~df[status_col].isin(INACTIVE_STATUS)][[class_col, '이름', '학교상태'] + week_cols].copy()
     report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
     
-    # [핵심 보완] 학생 TOP3 통계를 위한 role 컬럼 안전하게 매핑
     report_df['role'] = df.loc[report_df.index].apply(get_role, axis=1)
     
     col_stat, col_cumul = st.columns([2, 1])
@@ -914,7 +934,6 @@ with tabs[6]:
     with col_cumul: 
         st.write("👤 **개인별 누적 출석**")
         
-        # [핵심 보완] 학생 누적 출석 TOP 3 대시보드 추가 (동점자 모두 표시, 선생님 이름 제외)
         student_report = report_df[report_df['role'] == 'student'].copy()
         student_report = student_report[student_report['출석수'] > 0]
         if not student_report.empty:
@@ -925,7 +944,6 @@ with tabs[6]:
                 medals = ["🥇", "🥈", "🥉"]
                 for i, score in enumerate(unique_scores):
                     group = student_report[student_report['출석수'] == score]
-                    # 괄호 안의 선생님 이름을 split('(')[0]를 통해 깔끔하게 제외
                     names = ", ".join([f"{row['이름']}({str(row[class_col]).split('(')[0].strip()})" for _, row in group.iterrows()])
                     st.markdown(f"**{medals[i]} {score}회** : {names}")
                 st.markdown("</div>", unsafe_allow_html=True)
