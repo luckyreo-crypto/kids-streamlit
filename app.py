@@ -36,7 +36,7 @@ st.markdown("""
         padding-bottom: 10px;
     }
     
-    /* [핵심 개선] 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
+    /* 사진 가로/세로 혼합을 1/4 사이즈 통일된 썸네일 박스로 강제 고정 */
     div[data-testid="column"] div[data-testid="stImage"] img {
         height: 180px !important; 
         object-fit: cover !important;
@@ -80,6 +80,7 @@ def upload_photo(file, name):
         res.raise_for_status()
         
         url = res.json().get("fileUrl", "")
+        # 백그라운드 식별용 vid 플래그 부착
         if file.type and file.type.startswith('video/'):
             url += "&vid=1" if "?" in url else "?vid=1"
         return url
@@ -522,7 +523,7 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [핵심 보완] 유튜브 스타일 스마트 썸네일 & 네이티브 플레이어 연동
+                                # [핵심 보완] 구글 드라이브 네이티브 Iframe 적용 (인라인 스틸컷 및 즉시재생)
                                 if is_vid:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
@@ -530,19 +531,16 @@ with tabs[4]:
                                     
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        thumb_url = f"https://drive.google.com/thumbnail?id={f_id}&sz=w600"
-                                        view_url = f"https://drive.google.com/file/d/{f_id}/view"
-                                        
                                         st.markdown(f"""
-                                        <a href="{view_url}" target="_blank" style="text-decoration:none; display:block; position:relative; margin-bottom:10px;">
-                                            <img src="{thumb_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#1e1e1e;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'%23ccc\\'><path d=\\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\\'/></svg>'; this.style.objectFit='contain'; this.style.padding='40px';"/>
-                                            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(0,0,0,0.5);">
-                                                <div style="width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 16px solid white; margin-left: 5px;"></div>
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                            <div style="text-align:center; margin-top:2px;">
+                                                <a href="https://drive.google.com/uc?export=download&id={f_id}" target="_blank" style="font-size:0.75rem; color:#0366d6; text-decoration:none; font-weight:bold;">📥 영상 다운로드</a>
                                             </div>
-                                        </a>
+                                        </div>
                                         """, unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f"""<a href="{clean_url}" target="_blank">🎥 동영상 재생 (새 창)</a>""", unsafe_allow_html=True)
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                     
@@ -587,18 +585,13 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        thumb_url = f"https://drive.google.com/thumbnail?id={f_id}&sz=w600"
-                                        view_url = f"https://drive.google.com/file/d/{f_id}/view"
                                         st.markdown(f"""
-                                        <a href="{view_url}" target="_blank" style="text-decoration:none; display:block; position:relative; margin-bottom:10px;">
-                                            <img src="{thumb_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#1e1e1e;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'%23ccc\\'><path d=\\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\\'/></svg>'; this.style.objectFit='contain'; this.style.padding='40px';"/>
-                                            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(0,0,0,0.5);">
-                                                <div style="width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 16px solid white; margin-left: 5px;"></div>
-                                            </div>
-                                        </a>
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="180" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                        </div>
                                         """, unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f"""<a href="{clean_url}" target="_blank">🎥 동영상 보기</a>""", unsafe_allow_html=True)
+                                        st.video(clean_url)
                                 else:
                                     st.image(clean_url, use_container_width=True)
                                 
