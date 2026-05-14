@@ -34,6 +34,18 @@ st.markdown("""
         padding-top: 10px;
         padding-bottom: 10px;
     }
+    
+    /* [핵심 개선] 행사기록 사진 1/2 축소 및 가로/세로 혼합 비율 깔끔하게 썸네일 고정 */
+    div[data-testid="column"] div[data-testid="stImage"] img {
+        height: 120px !important;
+        object-fit: cover !important;
+        border-radius: 8px;
+    }
+    div[data-testid="column"] div[data-testid="stVideo"] video {
+        height: 120px !important;
+        object-fit: cover !important;
+        border-radius: 8px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -280,7 +292,6 @@ def edit_student_dialog(target_dict):
                 fetch_sheet_data.clear(); st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
-# [요청 반영] 탭 순서 및 명칭 완전 변경
 tabs = st.tabs(["🏫 반편성", "📋 교적부", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
 
 # ==========================================
@@ -494,13 +505,16 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 11) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
-                    for i in range(0, len(valid_urls), 4):
-                        p_cols = st.columns(4)
-                        for j, img_url in enumerate(valid_urls[i:i+4]):
+                    # [핵심 보완] 1/2 축소를 위해 5열 구조로 변경
+                    for i in range(0, len(valid_urls), 5):
+                        p_cols = st.columns(5)
+                        for j, media_url in enumerate(valid_urls[i:i+5]):
                             with p_cols[j]:
-                                st.image(img_url, use_container_width=True)
-                                # [핵심 보완] 동영상 및 미디어를 바로 볼 수 있는 링크 버튼 추가
-                                st.markdown(f"<div style='text-align:center; margin-top:-10px;'><a href='{img_url}' target='_blank' style='text-decoration:none; font-size:0.85rem; color:#0366d6;'>📎 미디어 보기</a></div>", unsafe_allow_html=True)
+                                # [핵심 보완] 동영상과 사진 분기 처리 (네이티브 확대 적용 위해 링크 삭제)
+                                if any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
+                                    st.video(media_url)
+                                else:
+                                    st.image(media_url, use_container_width=True)
                     
     elif e_mode == "📝 수정" and not df_act.empty:
         event_options = ["행사 선택"] + df_act['sheet_row'].tolist()
@@ -526,14 +540,19 @@ with tabs[4]:
                 new_files = [None] * 10
                 delete_flags = [False] * 10
                 
+                # [핵심 보완] 5열로 변경하여 사진 10장이 2줄로 꽉 차게 나열됨
                 for i in range(0, 10, 5):
                     p_cols = st.columns(5)
                     for j in range(5):
                         idx = i + j
                         with p_cols[j]:
-                            if old_urls[idx] and str(old_urls[idx]).startswith('http'):
-                                st.image(old_urls[idx], use_container_width=True)
-                                st.markdown(f"<div style='text-align:center; margin-top:-10px;'><a href='{old_urls[idx]}' target='_blank' style='text-decoration:none; font-size:0.85rem; color:#0366d6;'>📎 원본 보기</a></div>", unsafe_allow_html=True)
+                            media_url = old_urls[idx]
+                            if media_url and str(media_url).startswith('http'):
+                                if any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
+                                    st.video(media_url)
+                                else:
+                                    st.image(media_url, use_container_width=True)
+                                
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                             else:
