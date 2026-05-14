@@ -15,37 +15,47 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon=
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# 정적인 공통 UI 스타일만 남겨둠 (이미지는 슬라이더 탭에서 동적 적용)
-st.markdown("""
+# [✅ 핵심 패치] 슬라이더 값을 최상단에서 세션으로 받아와서 글로벌 CSS로 뿌림 (모바일 즉각 반응)
+img_h = st.session_state.get('img_slider', 140)
+
+st.markdown(f"""
     <style>
-    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
-    div[data-testid="stToggle"] { border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }
-    div[data-testid="stToggle"]:hover { border-color: #0366d6; background-color: #f8fbff; }
-    .total-summary { background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }
-    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
-    div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
+    .class-header {{ background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }}
+    div[data-testid="stToggle"] {{ border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }}
+    div[data-testid="stToggle"]:hover {{ border-color: #0366d6; background-color: #f8fbff; }}
+    .total-summary {{ background-color: #e6f2ff; padding: 15px; border-radius: 10px; text-align: center; color: #005bb5; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; }}
+    .event-card {{ border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }}
+    div[data-testid="stButton"] button {{ width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }}
     
     /* 모바일 환경 탭 메뉴 자동 줄바꿈 적용 */
-    div[data-baseweb="tab-list"] {
+    div[data-baseweb="tab-list"] {{
         flex-wrap: wrap !important;
         gap: 5px;
-    }
-    div[data-baseweb="tab"] {
+    }}
+    div[data-baseweb="tab"] {{
         flex: 1 1 auto;
         justify-content: center;
         padding-top: 10px;
         padding-bottom: 10px;
-    }
+    }}
     
-    /* 동영상을 먹통으로 만들지 않도록 안전 영역 적용 */
-    div[data-testid="column"] div[data-testid="stVideo"] {
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        overflow: hidden;
-    }
-    div[data-testid="column"] div[data-testid="stVideo"] video {
+    /* [✅ 핵심 패치] 슬라이더 크기에 연동되는 사진 전용 CSS (동영상 간섭 차단) */
+    div[data-testid="column"] div[data-testid="stImage"] {{
+        height: {img_h}px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+    }}
+    div[data-testid="column"] div[data-testid="stImage"] img {{
+        height: {img_h}px !important;
+        max-height: 100% !important;
         width: 100% !important;
-    }
+        object-fit: contain !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        background-color: #f8f9fa !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -83,7 +93,6 @@ def upload_photo(file, name):
         res.raise_for_status()
         
         url = res.json().get("fileUrl", "")
-        # 백그라운드 식별용 vid 플래그 부착
         if file.type and file.type.startswith('video/'):
             url += "&vid=1" if "?" in url else "?vid=1"
         return url
@@ -215,7 +224,7 @@ def get_all_data():
         return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s
     except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame()
 
-# [✅ 새로고침 버튼 유지] 데이터 로드 전/후 상단 우측에 깔끔하게 배치
+# [새로고침 버튼]
 cols_top = st.columns([9, 1.5])
 with cols_top[1]:
     if st.button("🔄 데이터 새로고침", use_container_width=True):
@@ -515,22 +524,8 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [✅ 완벽 복원] 사진 전용 사이즈 조절 슬라이더 부활 (모바일 터치 동작 연동)
-    img_slider_val = st.slider("🖼️ 이미지 크기 조절 (모바일 화면은 좌우로 드래그하세요)", min_value=80, max_value=400, value=140, step=10)
-    
-    # 슬라이더 값에 따라 사진만 크기가 변경되도록 안전한 동적 CSS 주입
-    st.markdown(f"""
-        <style>
-        div[data-testid="column"] div[data-testid="stImage"] img {{
-            height: {img_slider_val}px !important; 
-            width: 100% !important;
-            object-fit: contain !important;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            background-color: #f8f9fa;
-        }}
-        </style>
-    """, unsafe_allow_html=True)
+    # [✅ 완벽 복원] 사진 크기 조절 슬라이더 (st.session_state 기반 글로벌 동적 변경)
+    st.slider("🖼️ 사진 크기 조절 (모바일 화면은 좌우로 드래그하세요)", min_value=80, max_value=400, value=st.session_state.get('img_slider', 140), step=10, key='img_slider')
     st.divider()
     
     e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
@@ -557,6 +552,7 @@ with tabs[4]:
                 valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if valid_urls:
                     st.markdown("---")
+                    # 2열 반응형 레이아웃
                     for i in range(0, len(valid_urls), 2):
                         p_cols = st.columns(2)
                         for j, media_url in enumerate(valid_urls[i:i+2]):
@@ -564,7 +560,7 @@ with tabs[4]:
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                                 is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
                                 
-                                # [✅ 영상은 절대 건드리지 않음] 완벽히 동작하던 순정 iframe 소스 (height 200)
+                                # [✅ 동영상 복구 완료] 완벽히 동작하던 Iframe 코드 100% 그대로 반영
                                 if is_vid:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
@@ -573,7 +569,9 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block;" allow="autoplay; fullscreen"></iframe>
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                        </div>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
@@ -630,7 +628,9 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f"""
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>
+                                        <div style="margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                        </div>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
