@@ -547,7 +547,7 @@ with tabs[4]:
                                         # height 값을 와이드 비율에 맞게 조정했습니다.
                                         st.markdown(f"""
                                         <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="130" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); aspect-ratio: 16 / 9;" allow="autoplay; fullscreen"></iframe>
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="130%" height="160" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); aspect-ratio: 16 / 9;" allow="autoplay; fullscreen"></iframe>
                                         </div>
                                         """, unsafe_allow_html=True)
                                     else:
