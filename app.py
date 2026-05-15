@@ -732,11 +732,11 @@ with tabs[4]:
                             if file_id_match:
                                 f_id = file_id_match.group(1)
                                 gallery_html += f'''
-                                <div style="width: 400px; max-width: 450px; margin-bottom: 10px;">
+                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            width="450" 
-                                            height="350" 
-                                            style="border: none; border-radius: 8px; background-color: none;" 
+                                            width="100%" 
+                                            height="400" 
+                                            style="border: none; border-radius: 8px; background-color: black;" 
                                             allow="autoplay; fullscreen">
                                     </iframe>
                                 </div>'''
@@ -744,7 +744,7 @@ with tabs[4]:
                                 gallery_html += f'''
                                 <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls 
-                                           style="width: 400px; height: 350px; object-fit: contain; border-radius: 8px; background-color: none; display: block;">
+                                           style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
@@ -805,7 +805,7 @@ with tabs[4]:
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f'''
-                                        <div style="width: 100%; max-width: 500px; margin-bottom: 10px;">
+                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                             <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
                                                     width="100%" height="400" 
                                                     style="border: none; border-radius: 8px; background-color: black;" 
@@ -814,14 +814,14 @@ with tabs[4]:
                                         </div>''', unsafe_allow_html=True)
                                     else:
                                         st.markdown(f'''
-                                        <div style="width: 100%; max-width: 500px; margin-bottom: 10px;">
+                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                             <video src="{clean_url}" controls 
                                                    style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                             </video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
                                     # 슬라이더 삭제로 인한 높이 임의값(250px) 설정
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:400px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:250px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
