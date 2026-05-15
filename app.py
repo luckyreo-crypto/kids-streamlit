@@ -684,7 +684,7 @@ with tabs[4]:
                                 #    - 따라서 가장 클래식하고 원초적이며 절대 에러가 나지 않는 방식으로 돌아왔습니다.
                                 # =====================================================================
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 300px; margin-bottom: 10px;">
+                                <div style="width: 100%; max-width: 250px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
                                             width="100%" 
                                             height="250" 
@@ -694,7 +694,7 @@ with tabs[4]:
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 300px; margin-bottom: 10px;">
+                                <div style="width: 100%; max-width: 250px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls 
                                            style="width: 100%; height: 250px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
