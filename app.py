@@ -24,9 +24,10 @@ st.markdown("""
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 모바일 탭 메뉴 가로 스크롤 (1줄 고정) */
+    /* 모바일 탭 메뉴 앱스타일 좌우 스크롤 적용 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
         -webkit-overflow-scrolling: touch; padding-bottom: 5px;
@@ -42,7 +43,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    /* 라디오 버튼 2줄(2x2) 고정 */
+    /* 라디오 버튼 강제 2줄(2x2 배열) 처리 */
     div[role="radiogroup"] { display: flex; flex-wrap: wrap !important; gap: 8px !important; }
     div[role="radiogroup"] > label { flex: 0 0 calc(50% - 8px) !important; margin: 0 !important; }
     </style>
@@ -245,7 +246,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 (View/Edit 분리 유지) ---
+# --- 모달 팝업용 수정 함수 (View/Edit 분리 및 생년월일 보호 추가) ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -273,19 +274,23 @@ def edit_student_dialog(target_dict):
         c1, c2 = col_f.columns(2)
         c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
         c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
-        c1.markdown(f"**생년월일:** {safe_str(target_dict.get('생년월일',''))}")
-        c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
-        c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
         
+        # [✅ 개선] 프라이버시 모드 적용 시 연락처/부모/주소뿐만 아니라 "생년월일"도 강력 블라인드 처리
         if st.session_state.get('privacy_mode', True):
             p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
             p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
             p_addr = "🔒 [보호됨]" if safe_str(target_dict.get('주소','')) else ""
+            p_birth = "🔒 [보호됨]" if safe_str(target_dict.get('생년월일','')) else ""
         else:
             p_phone = safe_str(target_dict.get('연락처',''))
             p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
             p_addr = safe_str(target_dict.get('주소',''))
+            p_birth = safe_str(target_dict.get('생년월일',''))
             
+        c1.markdown(f"**생년월일:** {p_birth}")
+        c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
+        c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
+        
         c2.markdown(f"**연락처:** {p_phone}")
         st.markdown(f"**부모(아빠/엄마):** {p_parent}")
         st.markdown(f"**주소:** {p_addr}")
@@ -510,7 +515,7 @@ with tabs[1]:
     
     st.markdown("##### 🔐 개인정보 보호 모드")
     if st.session_state['privacy_mode']:
-        st.warning("현재 부모, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
+        st.warning("현재 생년월일, 부모, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
         priv_pwd = st.text_input("열람을 위해 시스템 비밀번호를 입력하세요", type="password", key="priv_pwd_input")
         if st.button("🔒 블라인드 해제"):
             if priv_pwd == st.secrets.get("admin_password", ""):
@@ -527,13 +532,15 @@ with tabs[1]:
     st.divider()
     
     manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"], horizontal=True)
-    req_cols = ['학생ID', '학년(담임)', '이름', '학교상태', '등록일', '변동일', '학교', '부모(아빠/엄마)', '연락처', '주소', '비고']
+    # [✅ 데이터프레임 노출 컬럼에 '생년월일' 추가하여 마스킹 효과 확인 가능토록 설정]
+    req_cols = ['학생ID', '학년(담임)', '이름', '생년월일', '학교상태', '등록일', '변동일', '학교', '부모(아빠/엄마)', '연락처', '주소', '비고']
     available_cols = [c for c in req_cols if c in df.columns]
     
     if manage_mode == "👀 전체보기":
         df_display = df[available_cols].copy()
         if st.session_state['privacy_mode']:
-            for c_priv in ['부모(아빠/엄마)', '연락처', '주소']:
+            # [✅ 생년월일 보호 추가]
+            for c_priv in ['생년월일', '부모(아빠/엄마)', '연락처', '주소']:
                 if c_priv in df_display.columns:
                     df_display[c_priv] = df_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
         st.dataframe(df_display, use_container_width=True, hide_index=True)
@@ -608,9 +615,17 @@ with tabs[2]:
 
 with tabs[3]:
     st.subheader("🌱 최근 등록 새친구")
-    news = df[df[status_col] == '새친구']
-    if not news.empty: st.dataframe(news[available_cols], use_container_width=True, hide_index=True)
-    else: st.info("등록된 새친구가 없습니다.")
+    news = df[df[status_col] == '새친구'].copy()
+    if not news.empty: 
+        news_display = news[available_cols].copy()
+        # [✅ 새친구 탭에도 완벽한 데이터 블라인드 마스킹 적용]
+        if st.session_state.get('privacy_mode', True):
+            for c_priv in ['생년월일', '부모(아빠/엄마)', '연락처', '주소']:
+                if c_priv in news_display.columns:
+                    news_display[c_priv] = news_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
+        st.dataframe(news_display, use_container_width=True, hide_index=True)
+    else: 
+        st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
 # [탭 4] 행사 기록 관리
@@ -658,31 +673,9 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
+                            # [✅ PM님이 찾아내신 완벽한 400px 안정성 코드 유지]
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                # =====================================================================
-                                # [동영상 렌더링 핵심 소스 상세 설명]
-                                # 여기부터가 PM님께서 직접 확인/수정하실 수 있는 구글 드라이브 iframe 영역입니다.
-                                #
-                                # 1. <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
-                                #    - 영상을 감싸는 가장 바깥쪽 상자입니다.
-                                #    - width: 100%: 모바일 등 화면이 좁아지면 가로폭에 꽉 차게 자동으로 줄어듭니다.
-                                #    - max-width: 400px: PC 화면에서 영상이 무식하게 커지는 것을 막아주는 최대 한계선입니다.
-                                #
-                                # 2. <iframe src="..." width="100%" height="250" ...>
-                                #    - 구글 드라이브 플레이어를 불러옵니다.
-                                #    - width="100%": 부모 div 상자의 너비를 그대로 따라갑니다.
-                                #    - height="250": [가장 중요한 부분!] 세로 길이를 250픽셀로 고정했습니다.
-                                #      모바일이나 안드로이드 웹뷰에서 세로 높이가 너무 짧으면(예: 150px 이하) 
-                                #      구글 플레이어 내부의 재생버튼/진행바 컨트롤러가 갈 곳을 잃어 화면을 뚫고 나가거나 검은 화면으로 에러가 납니다.
-                                #      이를 방지하기 위해 최소한의 안전 높이(250)를 확보한 것입니다.
-                                #
-                                # 3. 왜 이전 기술들(position:absolute, aspect-ratio)을 다 버렸는가?
-                                #    - 해당 CSS 기술들은 '영상' 자체에는 반응형으로 잘 작동하지만,
-                                #      구글이 만든 '웹 플레이어(iframe)' 통째로 씌우게 되면 내부 레이어와 Z-index 충돌이 발생해
-                                #      모바일에서 썸네일을 검은색으로 덮어버리는 치명적 버그가 발생했기 때문입니다.
-                                #    - 따라서 가장 클래식하고 원초적이며 절대 에러가 나지 않는 방식으로 돌아왔습니다.
-                                # =====================================================================
                                 gallery_html += f'''
                                 <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
@@ -700,7 +693,7 @@ with tabs[4]:
                                     </video>
                                 </div>'''
                         else:
-                            # 사진은 슬라이더 값(img_slider_val)에 따라 크기가 자유롭게 변합니다.
+                            # [✅ 이미지 지연로딩(lazy) 및 max-width 완벽 적용]
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
@@ -754,13 +747,12 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
-                                    # 수정 모드에서도 동일하게 안전한 구글 iframe 소스 적용
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f'''
                                         <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                             <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                                    width="100%" height="250" 
+                                                    width="100%" height="400" 
                                                     style="border: none; border-radius: 8px; background-color: black;" 
                                                     allow="autoplay; fullscreen">
                                             </iframe>
@@ -769,7 +761,7 @@ with tabs[4]:
                                         st.markdown(f'''
                                         <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                             <video src="{clean_url}" controls 
-                                                   style="width: 100%; height: 250px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                                   style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                             </video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
@@ -807,7 +799,7 @@ with tabs[4]:
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
-                                ws.add_cols(15)
+                                ws_act.add_cols(15)
                                 chunked_update(ws_act, h_cells)
                                 
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
