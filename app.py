@@ -234,7 +234,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- [✅ 개선] 모달 팝업: 보기(View) & 수정(Edit) 분리 구현 ---
+# --- 모달 팝업용 수정 함수 ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -244,9 +244,7 @@ def edit_student_dialog(target_dict):
         st.session_state[edit_key] = False
         
     if not st.session_state[edit_key]:
-        # ==========================================
-        # [모드 1] 단순 정보 확인 모드 (View)
-        # ==========================================
+        # View 모드
         st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 등록 정보입니다.")
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
@@ -262,7 +260,6 @@ def edit_student_dialog(target_dict):
         c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
         c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
         
-        # 보안 모드 적용
         if st.session_state.get('privacy_mode', True):
             p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
             p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
@@ -284,9 +281,7 @@ def edit_student_dialog(target_dict):
             st.rerun()
             
     else:
-        # ==========================================
-        # [모드 2] 정보 수정 모드 (Edit)
-        # ==========================================
+        # Edit 모드
         st.warning("⚠️ 현재 정보를 수정 중입니다.")
         with st.form("modal_edit_form"):
             col_i, col_f = st.columns([1, 2])
@@ -462,7 +457,6 @@ with tabs[1]:
     inact_count = len(df[df[status_col] == '비활성'])
     total_inact = mv_count + gr_count + other_ch_count + inact_count
     
-    # [✅ UI 개선] 부제목 옆 초소형 새로고침 버튼 배치
     col_dash1, col_dash2 = st.columns([8.5, 1.5])
     with col_dash1:
         st.markdown("##### 👥 전체 인원 현황 (Live)")
@@ -473,7 +467,6 @@ with tabs[1]:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # [✅ UI 개선] 반응형 1줄 고정 대시보드 (툴팁 기능 추가)
     active_sum_calc = len(df) - total_inact
     html_dashboard = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; background-color:#f1f8ff; border-radius:10px; border: 1px solid #cce5ff; overflow: hidden;">
@@ -497,7 +490,6 @@ with tabs[1]:
     """
     st.markdown(html_dashboard, unsafe_allow_html=True)
     
-    # 개인정보 보호 모드
     if 'privacy_mode' not in st.session_state:
         st.session_state['privacy_mode'] = True
     
@@ -641,7 +633,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 완벽 패치] 동영상의 16:9 비율 강제 유지 래퍼 박스 (짤림 절대 방어)
+                    # [✅ 핵심] 동영상 짤림 완벽 방지: 200px 강제가 아닌 폭 기반의 16:9 비율 컨테이너만 지정하여 순수하게 출력
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -652,13 +644,11 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # 슬라이더 높이에 맞춘 16:9 비율의 너비를 자동계산하여 박스 생성 (내부 iframe은 무조건 100% 꽉참)
-                            calc_width = int(img_slider_val * 1.778)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto; width: 350px; max-width: 100%;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
                             else:
-                                gallery_html += f'<div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%;"></video></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto; width: 350px; max-width: 100%;"><video src="{clean_url}" controls style="width:100%; height:200px; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); object-fit: contain;"></video></div>'
                         else:
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
@@ -714,10 +704,9 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        calc_width = int(img_slider_val * 1.778)
                                         st.markdown(f"""
-                                        <div style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
+                                        <div style="width: 350px; max-width: 100%; margin-bottom: 10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
                                         </div>
                                         """, unsafe_allow_html=True)
                                     else:
