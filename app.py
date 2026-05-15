@@ -483,20 +483,20 @@ with tabs[1]:
     html_dashboard = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; background-color:#f1f8ff; border-radius:10px; border: 1px solid #cce5ff; overflow: hidden;">
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_st}">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
         </div>
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_tc}">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
         </div>
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_inact}">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
         </div>
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_total}">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.5rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
         </div>
     </div>
     """
@@ -645,7 +645,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 초강력 철통방어] 동영상은 슬라이더를 완전 무시! 오직 320x180 (16:9) 절대 크기로만 박아넣어 모바일 버그 원천 봉쇄
+                    # [✅ 최강의 결론] 모든 껍데기 박스 철거. iframe에만 직접 폭 320, 높이 200을 명시.
+                    # 사진은 슬라이더 적용. 영상은 독립적으로 안정성 100% 확보!
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -656,21 +657,15 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
+                            # 래퍼 삭제. 순수 iframe 태그만 남겨서 모바일 WebView 충돌을 완전히 제거함.
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; display: flex; align-items: center; justify-content: center;">
-                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="320" height="180" frameborder="0" scrolling="no" style="border:none; margin:0; padding:0; display:block;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe>
-                                </div>'''
+                                gallery_html += f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" width="320" height="200" style="flex: 0 0 auto; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;" allow="autoplay; fullscreen"></iframe>'
                             else:
-                                gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; display: flex; align-items: center; justify-content: center;">
-                                    <video src="{clean_url}" controls width="320" height="180" style="object-fit: contain; margin:0; padding:0; display:block;"></video>
-                                </div>'''
+                                gallery_html += f'<video src="{clean_url}" controls width="320" height="200" style="flex: 0 0 auto; object-fit: contain; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;"></video>'
                         else:
-                            # 사진은 슬라이더 값 적용
-                            calc_width = int(img_slider_val * 1.778)
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s; display:block;"></a></div>'
+                            # 사진 팝업 링크 & 슬라이더 연동
+                            gallery_html += f'<a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link" style="flex: 0 0 auto;"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; margin-bottom:10px; transition: transform 0.2s;"></a>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -722,19 +717,15 @@ with tabs[4]:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    # [✅ 수정 탭도 동일하게 래퍼 없이 직접 주입]
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f'''
-                                        <div style="width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="320" height="180" frameborder="0" scrolling="no" style="border:none; margin:0; padding:0; display:block;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe>
-                                        </div>''', unsafe_allow_html=True)
+                                        st.markdown(f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" width="320" height="200" style="border:none; border-radius:8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px; display: block;" allow="autoplay; fullscreen"></iframe>', unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f'''
-                                        <div style="width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">
-                                            <video src="{clean_url}" controls width="320" height="180" style="object-fit: contain; margin:0; padding:0; display:block;"></video>
-                                        </div>''', unsafe_allow_html=True)
+                                        st.markdown(f'<video src="{clean_url}" controls width="320" height="200" style="object-fit: contain; border-radius:8px; background-color:#000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px; display: block;"></video>', unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
@@ -819,7 +810,7 @@ with tabs[4]:
                             chunked_update(ws_act, h_cells)
                         except Exception:
                             ws.add_cols(15)
-                            chunked_update(ws_act, h_cells)
+                            chunked_update(ws, h_cells)
                     
                     act_sh_headers = ws_act.row_values(1)
                     h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
