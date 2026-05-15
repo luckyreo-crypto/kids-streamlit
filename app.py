@@ -28,8 +28,17 @@ st.markdown("""
     div[data-baseweb="tab-list"] { flex-wrap: wrap !important; gap: 5px; }
     div[data-baseweb="tab"] { flex: 1 1 auto; justify-content: center; padding-top: 10px; padding-bottom: 10px; }
     
-    /* [✅ 개선] 팝업 보기 가능한 이미지 마우스오버 효과 */
+    /* 팝업 보기 가능한 이미지 마우스오버 효과 */
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    
+    /* [✅ 개선] 대시보드 메트릭 글자 짤림 방지 및 한줄 고정 (반응형 폰트 축소 적용) */
+    div[data-testid="stMetric"] { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    div[data-testid="stMetricLabel"] { font-size: clamp(0.7rem, 1.2vw, 1rem) !important; white-space: nowrap !important; }
+    div[data-testid="stMetricValue"] { font-size: clamp(1rem, 2vw, 1.8rem) !important; white-space: nowrap !important; }
+    div[data-testid="stMetricDelta"] { font-size: clamp(0.6rem, 1vw, 0.9rem) !important; white-space: nowrap !important; }
+    
+    /* [✅ 개선] 새로고침 버튼 소형화 커스텀 */
+    .refresh-btn button { padding: 2px 10px !important; font-size: 0.8rem !important; min-height: 30px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -197,12 +206,14 @@ def get_all_data():
         return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s
     except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame()
 
-# [새로고침 버튼]
-cols_top = st.columns([9, 1.5])
+# [✅ 개선] 데이터 로드 전/후 상단에 아담하게 배치되는 새로고침 버튼
+cols_top = st.columns([8.5, 1.5])
 with cols_top[1]:
-    if st.button("🔄 데이터 새로고침", use_container_width=True):
+    st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+    if st.button("🔄 새로고침", use_container_width=True):
         fetch_sheet_data.clear()
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 ws, df, headers, ws_act, df_act, ws_stat, df_stat = get_all_data()
 
@@ -409,7 +420,7 @@ with tabs[1]:
     active_sum_calc = len(df) - total_inact
     dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
     
-    # [✅ 전문가 제안 반영] 개인정보 보호 모드 (Security by Default)
+    # [전문가 제안 반영] 개인정보 보호 모드 (Security by Default)
     if 'privacy_mode' not in st.session_state:
         st.session_state['privacy_mode'] = True
     
@@ -439,7 +450,7 @@ with tabs[1]:
     if manage_mode == "👀 전체보기":
         df_display = df[available_cols].copy()
         
-        # [✅ 보안 로직] 마스킹 적용
+        # 보안 로직 적용
         if st.session_state['privacy_mode']:
             for c_priv in ['부모(아빠/엄마)', '연락처', '주소']:
                 if c_priv in df_display.columns:
@@ -527,10 +538,13 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    img_slider_val = st.slider("🖼️ 미디어 크기 조절 (좌우로 드래그하세요)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider')
+    # [✅ 개선] 라디오 버튼과 슬라이더를 한 줄에 나란히 배치하여 공간 확보 및 UI 개선
+    col_radio, col_slider = st.columns([4, 6])
+    with col_radio:
+        e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
+    with col_slider:
+        img_slider_val = st.slider("🖼️ 미디어 크기 조절 (모바일 화면은 좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
-    
-    e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
     
     def format_event(row_id):
         if row_id == "행사 선택": return "행사 선택"
@@ -555,7 +569,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 반응형 갤러리 + 팝업(새창) 보기 + 동영상 연동 조절]
+                    # [✅ 핵심 패치 완료] 순수 반응형 HTML 갤러리 + 영상 짤림 방지 (16:9 비율 계산)
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -566,15 +580,15 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # 동영상: 슬라이더 값에 따라 높이가 연동되며 가로 길이는 16:9 비율로 자동 산출하여 잘림 방지
+                            # [✅ 짤림 방지] 동영상을 이미지 높이(슬라이더)에 맞추고 너비는 16:9 비율(1.77배)로 자동 확장 (팝업 불가, iframe 내부 UI 보호)
+                            # 모바일에서 너무 튀어나가지 않도록 max-width:90vw, position:relative 구조화
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                w = int(img_slider_val * 1.77) # 16:9 ratio
-                                gallery_html += f'<div style="flex: 0 0 auto;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width:{w}px; max-width:90vw; height:{img_slider_val}px; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto; height:{img_slider_val}px; aspect-ratio: 16/9; max-width:90vw; position: relative;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
                             else:
-                                gallery_html += f'<div style="flex: 0 0 auto;"><video src="{clean_url}" controls style="height:{img_slider_val}px; width:auto; max-width:90vw; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto; height:{img_slider_val}px; aspect-ratio: 16/9; max-width:90vw; position: relative;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video></div>'
                         else:
-                            # 사진: 누르면 팝업처럼 새창으로 원본 크게 띄움 (<a> 태그 연동)
+                            # [✅ 전문가 제안 추가] 사진 클릭 시 새 창 팝업(크게 보기) 하이퍼링크 <a> 적용
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
@@ -629,10 +643,9 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        w = int(img_slider_val * 1.77)
                                         st.markdown(f"""
-                                        <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width:{w}px; max-width:100%; height:{img_slider_val}px; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                        <div style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width:100%; position: relative; margin-bottom:10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
                                         </div>
                                         """, unsafe_allow_html=True)
                                     else:
