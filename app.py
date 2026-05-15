@@ -27,6 +27,9 @@ st.markdown("""
     /* 모바일 환경 탭 메뉴 자동 줄바꿈 적용 */
     div[data-baseweb="tab-list"] { flex-wrap: wrap !important; gap: 5px; }
     div[data-baseweb="tab"] { flex: 1 1 auto; justify-content: center; padding-top: 10px; padding-bottom: 10px; }
+    
+    /* [✅ 개선] 팝업 보기 가능한 이미지 마우스오버 효과 */
+    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -194,7 +197,7 @@ def get_all_data():
         return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s
     except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame()
 
-# [✅ 새로고침 버튼]
+# [새로고침 버튼]
 cols_top = st.columns([9, 1.5])
 with cols_top[1]:
     if st.button("🔄 데이터 새로고침", use_container_width=True):
@@ -231,7 +234,7 @@ def edit_student_dialog(target_dict):
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
         if clean_p_url and str(clean_p_url).startswith('http'): 
-            col_i.markdown(f'<img src="{clean_p_url}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
+            col_i.image(clean_p_url, use_container_width=True)
         
         c1, c2 = col_f.columns(2)
         e_name = c1.text_input("이름", value=safe_str(target_dict.get('이름','')))
@@ -405,6 +408,28 @@ with tabs[1]:
     
     active_sum_calc = len(df) - total_inact
     dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
+    
+    # [✅ 전문가 제안 반영] 개인정보 보호 모드 (Security by Default)
+    if 'privacy_mode' not in st.session_state:
+        st.session_state['privacy_mode'] = True
+    
+    st.markdown("---")
+    st.markdown("##### 🔐 개인정보 보호 모드")
+    if st.session_state['privacy_mode']:
+        st.warning("현재 부모, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
+        priv_pwd = st.text_input("열람을 위해 시스템 비밀번호를 입력하세요", type="password", key="priv_pwd_input")
+        if st.button("🔒 블라인드 해제"):
+            if priv_pwd == st.secrets.get("admin_password", ""):
+                st.session_state['privacy_mode'] = False
+                st.rerun()
+            else:
+                st.error("비밀번호가 일치하지 않습니다.")
+    else:
+        st.success("🔓 개인정보 열람 모드 활성화됨")
+        if st.button("🔒 다시 블라인드 처리하기"):
+            st.session_state['privacy_mode'] = True
+            st.rerun()
+
     st.divider()
     
     manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"], horizontal=True)
@@ -412,7 +437,15 @@ with tabs[1]:
     available_cols = [c for c in req_cols if c in df.columns]
     
     if manage_mode == "👀 전체보기":
-        st.dataframe(df[available_cols], use_container_width=True, hide_index=True)
+        df_display = df[available_cols].copy()
+        
+        # [✅ 보안 로직] 마스킹 적용
+        if st.session_state['privacy_mode']:
+            for c_priv in ['부모(아빠/엄마)', '연락처', '주소']:
+                if c_priv in df_display.columns:
+                    df_display[c_priv] = df_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
+                    
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
         
     elif manage_mode == "📝 수정/비활성":
         search_list = ["학생 선택"] + df.apply(lambda r: f"{r['이름']} | {r.get(class_col,'')} ({r.get('학교상태','일반')})", axis=1).tolist()
@@ -494,8 +527,7 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [✅ 완벽 복원] 사진 크기 조절 슬라이더 (st.columns 제약 탈피)
-    img_slider_val = st.slider("🖼️ 사진 크기 조절 (모바일 화면은 좌우로 드래그하세요)", min_value=80, max_value=600, value=200, step=10, key='img_size_slider')
+    img_slider_val = st.slider("🖼️ 미디어 크기 조절 (좌우로 드래그하세요)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider')
     st.divider()
     
     e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
@@ -523,8 +555,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 핵심 패치] st.columns()의 너비 제약을 벗어난 순수 반응형 HTML 갤러리 구현!
-                    # 슬라이더 값을 즉시 적용하며 동영상은 200px로 짤림 없이 안전 보장.
+                    # [✅ 반응형 갤러리 + 팝업(새창) 보기 + 동영상 연동 조절]
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -535,15 +566,16 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # 동영상은 무조건 높이 200px 보장
+                            # 동영상: 슬라이더 값에 따라 높이가 연동되며 가로 길이는 16:9 비율로 자동 산출하여 잘림 방지
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<div style="flex: 0 0 auto;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width:350px; height:200px; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
+                                w = int(img_slider_val * 1.77) # 16:9 ratio
+                                gallery_html += f'<div style="flex: 0 0 auto;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width:{w}px; max-width:90vw; height:{img_slider_val}px; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
                             else:
-                                gallery_html += f'<div style="flex: 0 0 auto;"><video src="{clean_url}" controls style="width:350px; height:200px; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto;"><video src="{clean_url}" controls style="height:{img_slider_val}px; width:auto; max-width:90vw; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video></div>'
                         else:
-                            # [✅ 이미지 깨짐 완벽 방지] st.image 대신 네이티브 브라우저 렌더링 사용
-                            gallery_html += f'<div style="flex: 0 0 auto;"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa;"></div>'
+                            # 사진: 누르면 팝업처럼 새창으로 원본 크게 띄움 (<a> 태그 연동)
+                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -580,7 +612,6 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
-                # 수정 모드 컨트롤러(st.columns 2열)
                 for i in range(0, 15, 2):
                     p_cols = st.columns(2)
                     for j in range(2):
@@ -598,16 +629,16 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
+                                        w = int(img_slider_val * 1.77)
                                         st.markdown(f"""
                                         <div style="margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width:{w}px; max-width:100%; height:{img_slider_val}px; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
                                         </div>
                                         """, unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
                                 else:
-                                    # [✅ 이미지 깨짐 완벽 방지] st.image 대신 네이티브 브라우저 렌더링 사용
-                                    st.markdown(f'<img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px;">', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
