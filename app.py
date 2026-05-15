@@ -12,8 +12,9 @@ import time
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
+st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True) # 맨 위로 올라가기 기준점
 
-# [✅ 개선] 가볍고 안전한 '뒤로 가기(튕김)' 방지 스크립트 (앱 멈춤 없음)
+# 모바일 '뒤로 가기' 누를 시 비번창으로 튕기는 현상 완벽 차단
 components.html(
     """
     <script>
@@ -29,30 +30,34 @@ components.html(
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# [✅ 개선] 메뉴바 최상단 고정 및 스크롤 충돌 방지 CSS
 st.markdown("""
     <style>
-    /* 스트림릿 기본 상단 헤더 숨김 (공간 확보) */
-    header[data-testid="stHeader"] { display: none !important; }
-    .block-container { padding-top: 1rem !important; overflow: visible !important; }
+    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
+    div[data-testid="stToggle"] { border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }
+    div[data-testid="stToggle"]:hover { border-color: #0366d6; background-color: #f8fbff; }
+    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
+    div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
-    /* 탭 메뉴 상단 영구 고정 (Sticky Header) */
+    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
+    
+    /* [✅ 완벽 개선] 스트림릿 헤더 복구 & 탭 메뉴 그 아래에 영구 고정 */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 0px !important;
+        top: 3.5rem !important; /* 스트림릿 헤더 높이(약 56px) 바로 아래에 고정 */
         background-color: #ffffff !important;
-        z-index: 999999 !important;
+        z-index: 999990 !important;
         padding-top: 10px !important;
         padding-bottom: 10px !important;
         border-bottom: 2px solid #eef2f6 !important;
     }
     
-    /* 모바일 탭 스와이프 및 1줄 고정 */
+    /* 모바일 탭 메뉴 가로 스크롤 및 1줄 고정 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
-        -webkit-overflow-scrolling: touch;
+        -webkit-overflow-scrolling: touch; padding-bottom: 5px;
     }
     div[data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
     div[data-baseweb="tab"] {
@@ -65,12 +70,31 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
-    /* 기타 UI 최적화 */
-    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
+    /* 라디오 버튼 강제 2줄(2x2 배열) 처리 */
     div[role="radiogroup"] { display: flex; flex-wrap: wrap !important; gap: 8px !important; }
     div[role="radiogroup"] > label { flex: 0 0 calc(50% - 8px) !important; margin: 0 !important; }
-    .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
-    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    
+    /* [✅ 추가] 플로팅 액션 버튼 (맨 위로 가기) */
+    .fab-button {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background-color: rgba(3, 102, 214, 0.85); /* 반투명 효과 */
+        color: white !important;
+        padding: 12px 20px;
+        border-radius: 30px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        z-index: 999999;
+        backdrop-filter: blur(4px);
+        transition: all 0.3s ease;
+    }
+    .fab-button:hover {
+        background-color: rgba(3, 102, 214, 1);
+        transform: translateY(-3px);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,8 +104,6 @@ if "authenticated" not in st.session_state:
 
 if 'privacy_mode' not in st.session_state:
     st.session_state['privacy_mode'] = True
-if 'img_slider' not in st.session_state:
-    st.session_state['img_slider'] = 200
 
 if not st.session_state["authenticated"]:
     st.markdown("## 🔒 26년 슈팅스타 시스템 접근 제어")
@@ -99,7 +121,7 @@ else: st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!"
 
 start_date = datetime.date(2026, 1, 4)
 
-# --- 3. 공통 유틸리티 함수 (오류 10종 방어 로직 적용) ---
+# --- 3. 공통 유틸리티 함수 ---
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
     return str(val).strip()
@@ -654,11 +676,8 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    col_radio, col_slider = st.columns([5, 5])
-    with col_radio:
-        e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
-    with col_slider:
-        img_slider_val = st.slider("🖼️ 사진 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+    # [✅ 개선] 조작 모드 선택 라디오 버튼 (슬라이더 삭제됨)
+    e_mode = st.radio("작업 선택", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -669,6 +688,9 @@ with tabs[4]:
         return "알 수 없음"
 
     if e_mode == "📂 보기" and not df_act.empty:
+        # [✅ 플로팅 버튼 추가] 화면 하단에 고정된 맨 위로 가기 버튼
+        st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
+        
         view_act_df = df_act.copy()
         view_act_df['sort_date'] = pd.to_datetime(view_act_df['날짜'], errors='coerce')
         view_act_df = view_act_df.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
@@ -684,7 +706,9 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
+                    # [✅ 최강 방어막 결계 & 반응형 그리드] 
+                    # 슬라이더를 없애고 Grid Layout을 적용하여 화면 크기에 맞춰 알아서 꽉 차게 조절됩니다.
+                    gallery_html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; align-items: start; width: 100%;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                         is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -697,23 +721,17 @@ with tabs[4]:
                             if file_id_match:
                                 f_id = file_id_match.group(1)
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
-                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            width="100%" 
-                                            height="400" 
-                                            style="border: none; border-radius: 8px; background-color: black;" 
-                                            allow="autoplay; fullscreen">
-                                    </iframe>
+                                <div style="width: 100%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; display: flex; align-items: center; justify-content: center;">
+                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: 100%; aspect-ratio: 16/9; border: none; display: block;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe>
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
-                                    <video src="{clean_url}" controls 
-                                           style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
-                                    </video>
+                                <div style="width: 100%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; display: flex; align-items: center; justify-content: center;">
+                                    <video src="{clean_url}" controls style="width: 100%; aspect-ratio: 16/9; object-fit: contain; display: block;"></video>
                                 </div>'''
                         else:
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            # 사진은 지연 로딩 적용 및 화면 비율에 맞춰 자동으로 크기 조절
+                            gallery_html += f'<div style="width: 100%;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link" style="display: block;"><img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -766,25 +784,20 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
+                                    # 수정 모드에서도 동일하게 반응형 16:9 코드 적용
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f'''
-                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                                    width="100%" height="400" 
-                                                    style="border: none; border-radius: 8px; background-color: black;" 
-                                                    allow="autoplay; fullscreen">
-                                            </iframe>
+                                        <div style="width: 100%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: 100%; aspect-ratio: 16/9; border: none; display: block;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe>
                                         </div>''', unsafe_allow_html=True)
                                     else:
                                         st.markdown(f'''
-                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
-                                            <video src="{clean_url}" controls 
-                                                   style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
-                                            </video>
+                                        <div style="width: 100%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">
+                                            <video src="{clean_url}" controls style="width: 100%; aspect-ratio: 16/9; object-fit: contain; display: block;"></video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; margin-bottom: 10px; transition: transform 0.2s; display: block;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
