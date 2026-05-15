@@ -724,9 +724,9 @@ with tabs[4]:
                             if file_id_match:
                                 f_id = file_id_match.group(1)
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
+                                <div style="width: 100%; max-width: 800px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            width="100%" height="400" 
+                                            width="100%" height="500" 
                                             style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" 
                                             allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen>
                                     </iframe>
@@ -736,9 +736,9 @@ with tabs[4]:
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
+                                <div style="width: 100%; max-width: 800px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls playsinline preload="metadata" 
-                                           style="width: 100%; height: 315px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                           style="width: 100%; height: 515px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
