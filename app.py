@@ -23,13 +23,10 @@ st.markdown("""
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
-    /* 팝업 보기 가능한 이미지 마우스오버 효과 */
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     
-    /* 새로고침 버튼 소형화 커스텀 */
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 모바일 탭 메뉴 무조건 4개씩(25%) 배치 & 선택된 탭 파란색 하이라이트 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: wrap !important; gap: 5px; justify-content: flex-start;
     }
@@ -43,7 +40,6 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.85rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    /* 라디오 버튼 강제 1줄 고정 (모바일에서 '등록'이 내려가지 않도록) */
     div[role="radiogroup"] { flex-wrap: nowrap !important; overflow-x: auto; gap: 0.2rem !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -234,7 +230,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- [✅ 개선] 모달 팝업: 보기(View) & 수정(Edit) 완벽 분리 ---
+# --- 모달 팝업용 수정 함수 ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -250,9 +246,7 @@ def edit_student_dialog(target_dict):
         st.session_state[edit_key] = False
         
     if not st.session_state[edit_key]:
-        # ==========================================
-        # [모드 1] 단순 정보 확인 모드 (View)
-        # ==========================================
+        # View 모드
         st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 등록 정보입니다.")
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
@@ -268,7 +262,6 @@ def edit_student_dialog(target_dict):
         c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
         c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
         
-        # 보안 모드 적용
         if st.session_state.get('privacy_mode', True):
             p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
             p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
@@ -288,9 +281,7 @@ def edit_student_dialog(target_dict):
         st.button("✏️ 정보 수정하기", use_container_width=True, on_click=set_edit_true)
             
     else:
-        # ==========================================
-        # [모드 2] 정보 수정 모드 (Edit)
-        # ==========================================
+        # Edit 모드
         st.warning("⚠️ 현재 정보를 수정 중입니다.")
         with st.form("modal_edit_form"):
             col_i, col_f = st.columns([1, 2])
@@ -614,7 +605,7 @@ with tabs[4]:
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     with col_slider:
-        img_slider_val = st.slider("🖼️ 미디어 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+        img_slider_val = st.slider("🖼️ 사진 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -640,7 +631,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 핵심 해결] 동영상 짤림 완전 방지 16:9 비율 유지 (padding-bottom Hack 적용)
+                    # [✅ 최강 해결책] 동영상은 100% 분리, 무조건 16:9 반응형으로 짤림 방어. 사진만 슬라이더 적용!
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -651,22 +642,14 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # 슬라이더로 조절한 높이를 바탕으로 너비를 16:9 래퍼로 씌움
-                            calc_width = int(img_slider_val * 1.778)
+                            # 동영상은 슬라이더를 무시하고 항상 안전한 너비와 16:9 비율 유지 (플레이버튼 정중앙 유지)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%;">
-                                    <div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
-                                    </div>
-                                </div>'''
+                                gallery_html += f'<div style="flex: 1 1 300px; max-width: 100%;"><div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe></div></div>'
                             else:
-                                gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%;">
-                                    <video src="{clean_url}" controls style="width: 100%; height: auto; border-radius: 8px; background-color: #000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: block;"></video>
-                                </div>'''
+                                gallery_html += f'<div style="flex: 1 1 300px; max-width: 100%;"><div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit: contain;"></video></div></div>'
                         else:
+                            # 사진은 슬라이더 값 적용 & 팝업 링크
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
@@ -721,13 +704,12 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        calc_width = int(img_slider_val * 1.778)
-                                        st.markdown(f'''
-                                        <div style="width: {calc_width}px; max-width: 100%; margin-bottom: 10px;">
+                                        st.markdown(f"""
+                                        <div style="width: 100%; margin-bottom: 10px;">
                                             <div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
                                                 <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
                                             </div>
-                                        </div>''', unsafe_allow_html=True)
+                                        </div>""", unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
                                 else:
