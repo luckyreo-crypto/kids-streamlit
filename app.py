@@ -726,7 +726,7 @@ with tabs[4]:
                                 gallery_html += f'''
                                 <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            width="100%" height="315" 
+                                            width="100%" height="400" 
                                             style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" 
                                             allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen>
                                     </iframe>
@@ -738,7 +738,7 @@ with tabs[4]:
                                 gallery_html += f'''
                                 <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls playsinline preload="metadata" 
-                                           style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                           style="width: 100%; height: 315px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
