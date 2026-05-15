@@ -12,7 +12,7 @@ import time
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
-st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True) # 맨 위로 올라가기 기준점
+st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 # 모바일 '뒤로 가기' 누를 시 비번창으로 튕기는 현상 완벽 차단
 components.html(
@@ -36,11 +36,13 @@ st.markdown("""
     .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
     div[data-testid="stToggle"] { border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }
     div[data-testid="stToggle"]:hover { border-color: #0366d6; background-color: #f8fbff; }
+    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
-    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    
+    .media-link img:hover { transform: scale(1.01); filter: brightness(0.95); cursor: zoom-in; }
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 스트림릿 헤더 하단에 탭 메뉴 영구 고정 (Sticky Header) */
+    /* 탭 메뉴 영구 고정 (Sticky Header) */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important;
@@ -69,7 +71,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
-    /* [✅ 변경] 라디오 버튼 1줄 고정 및 스와이프 스크롤 적용 */
+    /* 라디오 버튼 2줄 고정 */
     div[role="radiogroup"] { 
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; gap: 5px !important; padding-bottom: 5px;
         -webkit-overflow-scrolling: touch;
@@ -77,11 +79,11 @@ st.markdown("""
     div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     div[role="radiogroup"] > label { flex: 0 0 auto !important; margin: 0 !important; padding: 0 5px; }
     
-    /* [✅ 변경] 플로팅 액션 버튼 (좌측 하단으로 이동) */
+    /* 플로팅 액션 버튼 (좌측 하단) */
     .fab-button {
         position: fixed;
         bottom: 30px;
-        left: 30px;  /* 우측(right)에서 좌측(left)으로 이동 */
+        left: 30px;
         background-color: rgba(3, 102, 214, 0.85);
         color: white !important;
         padding: 12px 20px;
@@ -98,8 +100,6 @@ st.markdown("""
         background-color: rgba(3, 102, 214, 1);
         transform: translateY(-3px);
     }
-    
-    /* Expander(아코디언) 제목 스타일 약간의 커스텀 */
     .streamlit-expanderHeader { font-weight: bold; color: #0366d6; }
     </style>
     """, unsafe_allow_html=True)
@@ -315,7 +315,6 @@ def edit_student_dialog(target_dict):
         st.session_state[edit_key] = False
         
     if not st.session_state[edit_key]:
-        # View 모드
         st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 등록 정보입니다.")
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
@@ -353,7 +352,6 @@ def edit_student_dialog(target_dict):
         st.button("✏️ 정보 수정하기", use_container_width=True, on_click=set_edit_true)
             
     else:
-        # Edit 모드
         st.warning("⚠️ 현재 정보를 수정 중입니다.")
         with st.form("modal_edit_form"):
             col_i, col_f = st.columns([1, 2])
@@ -424,9 +422,7 @@ tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "
 # [탭 0] 반편성
 # ==========================================
 with tabs[0]:
-    # [✅ 추가] 반편성 탭 맨 위로 가기 버튼 (좌측 하단)
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
-    
     st.subheader("🏫 반별 명단")
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     
@@ -683,16 +679,11 @@ with tabs[3]:
 # [탭 4] 행사 기록 관리
 # ==========================================
 with tabs[4]:
-    # [✅ 추가] 행사 기록 관리 탭 맨 위로 가기 버튼 (좌측 하단)
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
-    
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [✅ 변경] 라디오 버튼 1줄 고정 (CSS에서 flex-wrap: nowrap 적용됨)
     e_mode = st.radio("작업 선택", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     st.divider()
-    
-    # [✅ 변경] 미디어 크기 조절 슬라이더 완전 제거 (CSS 반응형 그리드 & 고정 400px 활용)
     
     def format_event(row_id):
         if row_id == "행사 선택": return "행사 선택"
@@ -707,7 +698,6 @@ with tabs[4]:
         view_act_df = view_act_df.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
         
         for _, row in view_act_df.iterrows():
-            # [✅ 완벽 개선] 요약 보기 UI (Accordion / Expander 형식 도입)
             expander_title = f"📅 {row.get('날짜', '')} | {row.get('활동명', '')}"
             with st.expander(expander_title):
                 st.write(f"**내용:** {row.get('세부내용', '')}")
@@ -718,8 +708,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 최강의 결론 유지] PM님이 검증하신 width=100% height=400px 영상 무조건 하드코딩
-                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
+                    # [✅ 개선 1, 2 반영] 이미지/영상 너비 100% (화면 꽉 채움 적용)
+                    gallery_html = '<div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                         is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -732,24 +722,27 @@ with tabs[4]:
                             if file_id_match:
                                 f_id = file_id_match.group(1)
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                <div style="width: 100%; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            width="100%" 
-                                            height="400" 
-                                            style="border: none; border-radius: 8px; background-color: black;" 
+                                            style="width: 100%; height: 400px; border: none; border-radius: 8px; background-color: black;" 
                                             allow="autoplay; fullscreen">
                                     </iframe>
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                <div style="width: 100%; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls 
                                            style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
-                            # [✅ 이미지 슬라이더 삭제로 인해 사진도 자동으로 예쁘게 맞춰지도록 수정]
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:250px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            # 사진도 가로폭 화면 꽉 차게 100% 지정 (세로 길이는 이미지 비율에 맞춰 자연스럽게 늘어남)
+                            gallery_html += f'''
+                            <div style="width: 100%; margin-bottom: 10px;">
+                                <a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;">
+                                    <img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block;">
+                                </a>
+                            </div>'''
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -802,26 +795,30 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
+                                    # 수정 탭도 100% 꽉 채우기 적용
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
                                         st.markdown(f'''
-                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                        <div style="width: 100%; margin-bottom: 10px;">
                                             <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                                    width="100%" height="400" 
-                                                    style="border: none; border-radius: 8px; background-color: black;" 
+                                                    style="width: 100%; height: 400px; border: none; border-radius: 8px; background-color: black;" 
                                                     allow="autoplay; fullscreen">
                                             </iframe>
                                         </div>''', unsafe_allow_html=True)
                                     else:
                                         st.markdown(f'''
-                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                        <div style="width: 100%; margin-bottom: 10px;">
                                             <video src="{clean_url}" controls 
                                                    style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                             </video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
-                                    # 슬라이더 삭제로 인한 높이 임의값(250px) 설정
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:250px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'''
+                                    <div style="width: 100%; margin-bottom: 10px;">
+                                        <a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;">
+                                            <img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: block;">
+                                        </a>
+                                    </div>''', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
