@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components  # [✅ 추가] 자바스크립트 주입용 컴포넌트
+import streamlit.components.v1 as components
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -13,7 +13,7 @@ import time
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
 
-# [✅ 핵심 개선 2] 모바일 '뒤로 가기' 누를 시 비번창으로 튕기는 현상(앱 이탈) 완벽 차단
+# 모바일 '뒤로 가기' 누를 시 비번창으로 튕기는 현상 완벽 차단
 components.html(
     """
     <script>
@@ -39,21 +39,28 @@ st.markdown("""
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
-    
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* [✅ 핵심 개선 1] 메인 메뉴 스크롤 무시하고 상단에 영구 고정 (Sticky Header) */
-    div[data-baseweb="tab-list"] {
-        display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
-        -webkit-overflow-scrolling: touch; padding-bottom: 8px;
-        
+    /* [✅ 완벽 개선] 탭 메뉴 상단 고정 (Sticky) - Streamlit 구조 타겟팅 */
+    div[data-testid="stTabs"] {
+        overflow: visible !important; /* 부모 영역의 넘침 제한을 해제하여 고정 가능하게 만듦 */
+    }
+    div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 2.8rem !important; /* Streamlit 기본 헤더 밑에 딱 붙임 */
-        z-index: 9999 !important; /* 가장 위에 노출 */
-        background-color: white !important; /* 스크롤 시 뒤에 글씨 비침 방지 */
-        border-bottom: 2px solid #eef2f6;
-        margin-bottom: 15px;
+        top: 3.5rem !important; /* 스트림릿 기본 헤더 높이 바로 아래에 안착 */
+        background-color: #ffffff !important; /* 뒷배경 글씨 비침 방지 */
+        z-index: 99999 !important; /* 무조건 최상단에 뜨도록 강제 */
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+        margin-top: -10px !important;
+        border-bottom: 1px solid #eee;
+    }
+    
+    /* 모바일 탭 메뉴 가로 스크롤 및 1줄 고정 */
+    div[data-baseweb="tab-list"] {
+        display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
+        -webkit-overflow-scrolling: touch; padding-bottom: 5px;
     }
     div[data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
     div[data-baseweb="tab"] {
@@ -711,7 +718,7 @@ with tabs[4]:
                                     </video>
                                 </div>'''
                         else:
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
