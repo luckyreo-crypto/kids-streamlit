@@ -738,7 +738,7 @@ with tabs[4]:
                                 gallery_html += f'''
                                 <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls playsinline preload="metadata" 
-                                           style="width: 100%; height: 315px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                           style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
