@@ -735,7 +735,7 @@ with tabs[4]:
                                 <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
                                             width="100%" 
-                                            height="400" 
+                                            height="300" 
                                             style="border: none; border-radius: 8px; background-color: black;" 
                                             allow="autoplay; fullscreen">
                                     </iframe>
@@ -744,7 +744,7 @@ with tabs[4]:
                                 gallery_html += f'''
                                 <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls 
-                                           style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                           style="width: 100%; height: 300px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
