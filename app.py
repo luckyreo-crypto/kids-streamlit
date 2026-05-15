@@ -13,16 +13,14 @@ import time
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
 
-# [✅ 안정화된 뒤로가기 방지 로직] 앱을 멈추게 하지 않는 안전한 JS 리스너 적용
+# [✅ 개선] 가볍고 안전한 '뒤로 가기(튕김)' 방지 스크립트 (앱 멈춤 없음)
 components.html(
     """
     <script>
-    if (window.history.replaceState) {
-        window.history.replaceState(null, null, window.location.href);
-    }
-    window.addEventListener('popstate', function () {
-        window.history.pushState(null, null, window.location.href);
-    });
+    window.history.pushState(null, "", window.location.href);
+    window.onpopstate = function() {
+        window.history.pushState(null, "", window.location.href);
+    };
     </script>
     """,
     height=0, width=0
@@ -31,34 +29,30 @@ components.html(
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
+# [✅ 개선] 메뉴바 최상단 고정 및 스크롤 충돌 방지 CSS
 st.markdown("""
     <style>
-    /* 스트림릿 기본 상단 빈공간(헤더) 제거 -> 탭 고정을 위해 필수 */
-    header { visibility: hidden !important; }
-    .stApp { margin-top: -50px; }
+    /* 스트림릿 기본 상단 헤더 숨김 (공간 확보) */
+    header[data-testid="stHeader"] { display: none !important; }
+    .block-container { padding-top: 1rem !important; overflow: visible !important; }
     
-    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
-    div[data-testid="stToggle"] { border: 2px solid #eef2f6; padding: 12px 18px; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; margin-bottom: 10px; }
-    div[data-testid="stToggle"]:hover { border-color: #0366d6; background-color: #f8fbff; }
-    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
-    div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
-    
-    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
-    .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
-    
-    /* [✅ 완벽 개선] 탭 메뉴 최상단 영구 고정 (Sticky Header) */
-    div[data-baseweb="tab-list"] {
-        display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
-        -webkit-overflow-scrolling: touch; 
-        
+    /* 탭 메뉴 상단 영구 고정 (Sticky Header) */
+    div[data-testid="stTabs"] { overflow: visible !important; }
+    div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 0px !important; /* 화면 맨 위에 딱 붙임 */
+        top: 0px !important;
         background-color: #ffffff !important;
-        z-index: 99999 !important;
-        padding-top: 15px !important;
+        z-index: 999999 !important;
+        padding-top: 10px !important;
         padding-bottom: 10px !important;
         border-bottom: 2px solid #eef2f6 !important;
+    }
+    
+    /* 모바일 탭 스와이프 및 1줄 고정 */
+    div[data-baseweb="tab-list"] {
+        display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
+        -webkit-overflow-scrolling: touch;
     }
     div[data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
     div[data-baseweb="tab"] {
@@ -71,9 +65,12 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
-    /* 라디오 버튼 2줄(2x2) 고정 */
+    /* 기타 UI 최적화 */
+    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
     div[role="radiogroup"] { display: flex; flex-wrap: wrap !important; gap: 8px !important; }
     div[role="radiogroup"] > label { flex: 0 0 calc(50% - 8px) !important; margin: 0 !important; }
+    .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
+    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -102,7 +99,7 @@ else: st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!"
 
 start_date = datetime.date(2026, 1, 4)
 
-# --- 3. 공통 유틸리티 함수 ---
+# --- 3. 공통 유틸리티 함수 (오류 10종 방어 로직 적용) ---
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
     return str(val).strip()
@@ -274,7 +271,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 (View/Edit 분리 및 보호) ---
+# --- 모달 팝업용 수정 함수 (View/Edit 분리 유지) ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -697,7 +694,6 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # [✅ PM님이 찾으신 완벽한 400px 세팅 적용 유지]
                             if file_id_match:
                                 f_id = file_id_match.group(1)
                                 gallery_html += f'''
