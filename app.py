@@ -15,7 +15,6 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon=
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# [✅ 핵심 UI 패치] 모바일 4열 탭, 라디오버튼 1줄 고정, 툴팁 등 CSS
 st.markdown("""
     <style>
     .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
@@ -27,10 +26,10 @@ st.markdown("""
     /* 팝업 보기 가능한 이미지 마우스오버 효과 */
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     
-    /* [✅ 개선] 새로고침 버튼 초소형화 (부제목 옆 배치용) */
+    /* 새로고침 버튼 소형화 커스텀 */
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* [✅ 개선] 모바일 탭 메뉴 무조건 4개씩(25%) 배치 & 선택된 탭 파란색 하이라이트 */
+    /* 모바일 탭 메뉴 무조건 4개씩(25%) 배치 & 선택된 탭 파란색 하이라이트 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: wrap !important; gap: 5px; justify-content: flex-start;
     }
@@ -44,7 +43,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.85rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    /* [✅ 개선] 라디오 버튼 강제 1줄 고정 (모바일에서 '등록'이 내려가지 않도록) */
+    /* 라디오 버튼 강제 1줄 고정 (모바일에서 '등록'이 내려가지 않도록) */
     div[role="radiogroup"] { flex-wrap: nowrap !important; overflow-x: auto; gap: 0.2rem !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -235,67 +234,123 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 ---
-@st.dialog("📝 인원 정보 수정 팝업")
+# --- [✅ 개선] 모달 팝업: 보기(View) & 수정(Edit) 분리 구현 ---
+@st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
-    st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 정보를 수정합니다.")
-    with st.form("modal_edit_form"):
+    row_id = target_dict['sheet_row']
+    edit_key = f"edit_mode_{row_id}"
+    
+    if edit_key not in st.session_state:
+        st.session_state[edit_key] = False
+        
+    if not st.session_state[edit_key]:
+        # ==========================================
+        # [모드 1] 단순 정보 확인 모드 (View)
+        # ==========================================
+        st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 등록 정보입니다.")
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
         if clean_p_url and str(clean_p_url).startswith('http'): 
             col_i.image(clean_p_url, use_container_width=True)
-        
+        else:
+            col_i.info("등록된 사진이 없습니다.")
+            
         c1, c2 = col_f.columns(2)
-        e_name = c1.text_input("이름", value=safe_str(target_dict.get('이름','')))
-        e_class = c2.text_input("학년(담임)", value=safe_str(target_dict.get(class_col,'')))
+        c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
+        c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
+        c1.markdown(f"**생년월일:** {safe_str(target_dict.get('생년월일',''))}")
+        c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
+        c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
         
-        bd_val = parse_date_safe(safe_str(target_dict.get('생년월일', '')))
-        e_birth = c1.date_input("생년월일", value=bd_val, min_value=datetime.date(1900,1,1)).strftime("%Y-%m-%d")
+        # 보안 모드 적용
+        if st.session_state.get('privacy_mode', True):
+            p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
+            p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
+            p_addr = "🔒 [보호됨]" if safe_str(target_dict.get('주소','')) else ""
+        else:
+            p_phone = safe_str(target_dict.get('연락처',''))
+            p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
+            p_addr = safe_str(target_dict.get('주소',''))
+            
+        c2.markdown(f"**연락처:** {p_phone}")
+        st.markdown(f"**부모(아빠/엄마):** {p_parent}")
+        st.markdown(f"**주소:** {p_addr}")
+        st.markdown(f"**비고:** {safe_str(target_dict.get('비고',''))}")
+        st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
-        e_reg = c1.text_input("등록일 (YYYY-MM-DD)", value=safe_str(target_dict.get('등록일','')), placeholder="예: 2026-05-10")
-        e_change = c2.text_input("변동일 (이사/졸업/타교회 등)", value=safe_str(target_dict.get('변동일','')), placeholder="변동 발생 날짜")
-        
-        e_school = c1.text_input("학교", value=safe_str(target_dict.get('학교','')))
-        e_phone = c2.text_input("연락처", value=safe_str(target_dict.get('연락처','')))
-        
-        curr_s = safe_str(target_dict.get('학교상태', '일반'))
-        e_status = col_f.selectbox("구분 (상태)", ALL_STATUS_OPTS, index=ALL_STATUS_OPTS.index(curr_s) if curr_s in ALL_STATUS_OPTS else 0)
-        e_parents = col_f.text_input("부모", value=safe_str(target_dict.get('부모(아빠/엄마)','')))
-        e_addr = col_f.text_input("주소", value=safe_str(target_dict.get('주소','')))
-        e_memo = col_f.text_input("비고", value=safe_str(target_dict.get('비고','')))
-        e_photo = col_f.file_uploader("사진변경")
-        
-        if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
-            with st.spinner("저장 중..."):
-                p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
-                actual_headers = ws.row_values(1)
-                
-                missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
-                if missing_headers:
-                    start_col = len(actual_headers) + 1
-                    h_cells = []
-                    for i, mh in enumerate(missing_headers):
-                        actual_headers.append(mh)
-                        h_cells.append(gspread.Cell(1, start_col + i, mh))
-                    try:
-                        chunked_update(ws, h_cells)
-                    except Exception:
-                        ws.add_cols(15)
-                        chunked_update(ws, h_cells)
-                
-                r_idx = int(target_dict['sheet_row'])
-                update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
-                
-                cells_to_update = []
-                for k, v in update_map.items():
-                    if k in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index(k)+1, str(v)))
-                if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
-                elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
-                
-                if cells_to_update: chunked_update(ws, cells_to_update)
-                st.success("✅ 저장이 완료되었습니다!")
-                time.sleep(1.5)
-                fetch_sheet_data.clear(); st.rerun()
+        st.divider()
+        if st.button("✏️ 정보 수정하기", use_container_width=True):
+            st.session_state[edit_key] = True
+            st.rerun()
+            
+    else:
+        # ==========================================
+        # [모드 2] 정보 수정 모드 (Edit)
+        # ==========================================
+        st.warning("⚠️ 현재 정보를 수정 중입니다.")
+        with st.form("modal_edit_form"):
+            col_i, col_f = st.columns([1, 2])
+            clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+            if clean_p_url and str(clean_p_url).startswith('http'): 
+                col_i.image(clean_p_url, use_container_width=True)
+            
+            c1, c2 = col_f.columns(2)
+            e_name = c1.text_input("이름", value=safe_str(target_dict.get('이름','')))
+            e_class = c2.text_input("학년(담임)", value=safe_str(target_dict.get(class_col,'')))
+            
+            bd_val = parse_date_safe(safe_str(target_dict.get('생년월일', '')))
+            e_birth = c1.date_input("생년월일", value=bd_val, min_value=datetime.date(1900,1,1)).strftime("%Y-%m-%d")
+            
+            e_reg = c1.text_input("등록일 (YYYY-MM-DD)", value=safe_str(target_dict.get('등록일','')), placeholder="예: 2026-05-10")
+            e_change = c2.text_input("변동일 (이사/졸업/타교회 등)", value=safe_str(target_dict.get('변동일','')), placeholder="변동 발생 날짜")
+            
+            e_school = c1.text_input("학교", value=safe_str(target_dict.get('학교','')))
+            e_phone = c2.text_input("연락처", value=safe_str(target_dict.get('연락처','')))
+            
+            curr_s = safe_str(target_dict.get('학교상태', '일반'))
+            e_status = col_f.selectbox("구분 (상태)", ALL_STATUS_OPTS, index=ALL_STATUS_OPTS.index(curr_s) if curr_s in ALL_STATUS_OPTS else 0)
+            e_parents = col_f.text_input("부모", value=safe_str(target_dict.get('부모(아빠/엄마)','')))
+            e_addr = col_f.text_input("주소", value=safe_str(target_dict.get('주소','')))
+            e_memo = col_f.text_input("비고", value=safe_str(target_dict.get('비고','')))
+            e_photo = col_f.file_uploader("사진변경")
+            
+            if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
+                with st.spinner("저장 중..."):
+                    p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
+                    actual_headers = ws.row_values(1)
+                    
+                    missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
+                    if missing_headers:
+                        start_col = len(actual_headers) + 1
+                        h_cells = []
+                        for i, mh in enumerate(missing_headers):
+                            actual_headers.append(mh)
+                            h_cells.append(gspread.Cell(1, start_col + i, mh))
+                        try:
+                            chunked_update(ws, h_cells)
+                        except Exception:
+                            ws.add_cols(15)
+                            chunked_update(ws, h_cells)
+                    
+                    r_idx = int(target_dict['sheet_row'])
+                    update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
+                    
+                    cells_to_update = []
+                    for k, v in update_map.items():
+                        if k in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index(k)+1, str(v)))
+                    if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
+                    elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
+                    
+                    if cells_to_update: chunked_update(ws, cells_to_update)
+                    
+                    st.session_state[edit_key] = False
+                    st.success("✅ 저장이 완료되었습니다!")
+                    time.sleep(1.5)
+                    fetch_sheet_data.clear(); st.rerun()
+                    
+        if st.button("❌ 수정 취소", use_container_width=True):
+            st.session_state[edit_key] = False
+            st.rerun()
 
 # --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반편성", "📋 교적부", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
@@ -364,7 +419,7 @@ with tabs[0]:
                             else: label = f"{prefix}👤 {n}{suffix}{bd_disp}"
                             
                             with btn_cols[idx_j % 2]:
-                                if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 즉시 정보 수정", use_container_width=True):
+                                if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭하여 상세정보 확인", use_container_width=True):
                                     edit_student_dialog(r.to_dict())
                         
                         with st.expander(f"➕ 새친구 추가"):
@@ -407,7 +462,7 @@ with tabs[1]:
     inact_count = len(df[df[status_col] == '비활성'])
     total_inact = mv_count + gr_count + other_ch_count + inact_count
     
-    # [✅ 기능 추가] 제목 옆에 소형 새로고침 버튼 배치
+    # [✅ UI 개선] 부제목 옆 초소형 새로고침 버튼 배치
     col_dash1, col_dash2 = st.columns([8.5, 1.5])
     with col_dash1:
         st.markdown("##### 👥 전체 인원 현황 (Live)")
@@ -418,31 +473,31 @@ with tabs[1]:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # [✅ 레이아웃 고도화] 폰트 크기 확대 및 툴팁 추가, 1줄 강제 고정 대시보드
+    # [✅ UI 개선] 반응형 1줄 고정 대시보드 (툴팁 기능 추가)
     active_sum_calc = len(df) - total_inact
     html_dashboard = f"""
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; background-color:#f1f8ff; border-radius:10px; border: 1px solid #cce5ff;">
-        <div style="text-align: center; flex: 1;" title="일반학생과 새친구를 합친 숫자입니다.">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; background-color:#f1f8ff; border-radius:10px; border: 1px solid #cce5ff; overflow: hidden;">
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="일반학생과 새친구를 합친 숫자입니다.">
+            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
+            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
         </div>
-        <div style="text-align: center; flex: 1;" title="선생님, 목사님, 전도사님을 합친 숫자입니다.">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="선생님, 목사님, 전도사님을 합친 숫자입니다.">
+            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
+            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
         </div>
-        <div style="text-align: center; flex: 1;" title="이사, 졸업, 타교회, 비활성 인원을 모두 합친 숫자입니다.">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="이사, 졸업, 타교회, 비활성 인원을 모두 합친 숫자입니다.">
+            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
+            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
         </div>
-        <div style="text-align: center; flex: 1;" title="전체 등록된 명단에서 비활성 인원을 뺀 실제 활동 인원입니다.">
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="전체 등록된 명단에서 비활성 인원을 뺀 실제 활동 인원입니다.">
+            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
+            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
         </div>
     </div>
     """
     st.markdown(html_dashboard, unsafe_allow_html=True)
     
-    # 개인정보 보호 모드 (Security by Default)
+    # 개인정보 보호 모드
     if 'privacy_mode' not in st.session_state:
         st.session_state['privacy_mode'] = True
     
@@ -470,13 +525,10 @@ with tabs[1]:
     
     if manage_mode == "👀 전체보기":
         df_display = df[available_cols].copy()
-        
-        # 보안 로직 적용
         if st.session_state['privacy_mode']:
             for c_priv in ['부모(아빠/엄마)', '연락처', '주소']:
                 if c_priv in df_display.columns:
                     df_display[c_priv] = df_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
-                    
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
     elif manage_mode == "📝 수정/비활성":
@@ -559,7 +611,6 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [✅ UI 개선] 라디오 버튼과 슬라이더 위치 변경 (라디오가 왼쪽, 슬라이더가 오른쪽)
     col_radio, col_slider = st.columns([5, 5])
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
@@ -590,7 +641,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 완벽 패치] 동영상의 16:9 비율 강제 유지 (짤림 완벽 차단) + 순수 반응형 갤러리
+                    # [✅ 완벽 패치] 동영상의 16:9 비율 강제 유지 래퍼 박스 (짤림 절대 방어)
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -601,7 +652,7 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # width 기반으로 강제 16:9 고정 박스 (절대 안짤림)
+                            # 슬라이더 높이에 맞춘 16:9 비율의 너비를 자동계산하여 박스 생성 (내부 iframe은 무조건 100% 꽉참)
                             calc_width = int(img_slider_val * 1.778)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
@@ -609,7 +660,6 @@ with tabs[4]:
                             else:
                                 gallery_html += f'<div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%;"></video></div>'
                         else:
-                            # 사진 팝업 확대 링크 유지
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
@@ -647,7 +697,6 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
-                # 수정 화면은 입력창 배치를 위해 2열 유지
                 for i in range(0, 15, 2):
                     p_cols = st.columns(2)
                     for j in range(2):
@@ -674,7 +723,7 @@ with tabs[4]:
                                     else:
                                         st.video(clean_url)
                                 else:
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
