@@ -31,14 +31,8 @@ st.markdown("""
     /* 팝업 보기 가능한 이미지 마우스오버 효과 */
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     
-    /* [✅ 개선] 대시보드 메트릭 글자 짤림 방지 및 한줄 고정 (반응형 폰트 축소 적용) */
-    div[data-testid="stMetric"] { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    div[data-testid="stMetricLabel"] { font-size: clamp(0.7rem, 1.2vw, 1rem) !important; white-space: nowrap !important; }
-    div[data-testid="stMetricValue"] { font-size: clamp(1rem, 2vw, 1.8rem) !important; white-space: nowrap !important; }
-    div[data-testid="stMetricDelta"] { font-size: clamp(0.6rem, 1vw, 0.9rem) !important; white-space: nowrap !important; }
-    
-    /* [✅ 개선] 새로고침 버튼 소형화 커스텀 */
-    .refresh-btn button { padding: 2px 10px !important; font-size: 0.8rem !important; min-height: 30px !important; }
+    /* 새로고침 버튼 소형화 */
+    .refresh-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; min-height: 30px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -205,15 +199,6 @@ def get_all_data():
         df_s = pd.DataFrame(vals_s[1:], columns=vals_s[0]) if len(vals_s) > 1 else pd.DataFrame()
         return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s
     except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame()
-
-# [✅ 개선] 데이터 로드 전/후 상단에 아담하게 배치되는 새로고침 버튼
-cols_top = st.columns([8.5, 1.5])
-with cols_top[1]:
-    st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
-    if st.button("🔄 새로고침", use_container_width=True):
-        fetch_sheet_data.clear()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 ws, df, headers, ws_act, df_act, ws_stat, df_stat = get_all_data()
 
@@ -409,22 +394,45 @@ with tabs[1]:
     inact_count = len(df[df[status_col] == '비활성'])
     total_inact = mv_count + gr_count + other_ch_count + inact_count
     
-    st.markdown("##### 👥 전체 인원 현황 (Live)")
-    dash_r1_1, dash_r1_2 = st.columns(2)
-    dash_r1_1.metric("총 재적 (유년부)", f"{st_count + new_count}명", f"일반 {st_count}명 / 새친구 {new_count}명")
-    dash_r1_2.metric("사역자 (선생님/교역자)", f"{tc_count + ps_count}명", f"선생님 {tc_count}명 / 전도사님, 목사님 {ps_count}명")
+    # [✅ UI 개선] 제목 옆에 딱 붙는 앙증맞은 새로고침 버튼 
+    col_dash1, col_dash2 = st.columns([8.5, 1.5])
+    with col_dash1:
+        st.markdown("##### 👥 전체 인원 현황 (Live)")
+    with col_dash2:
+        st.markdown('<div class="refresh-btn">', unsafe_allow_html=True)
+        if st.button("🔄 새로고침", use_container_width=True):
+            fetch_sheet_data.clear()
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    dash_r2_1, dash_r2_2 = st.columns(2)
-    dash_r2_1.metric("비활성 총합 (이사/졸업/타교회/단순비활성)", f"{total_inact}명", f"이사 {mv_count} / 졸업 {gr_count} / 타교회 {other_ch_count} / 단순비활성 {inact_count}")
-    
+    # [✅ UI 개선] 모바일에서 절대 줄바꿈되지 않는 강제 1열 배치 대시보드
     active_sum_calc = len(df) - total_inact
-    dash_r2_2.metric("실제 활동 데이터 총합", f"{active_sum_calc}명", f"전체 DB {len(df)}명 - 비활성 제외")
+    html_dashboard = f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; border-bottom: 1px solid #eee;">
+        <div style="text-align: left;">
+            <div style="font-size: clamp(0.7rem, 1.2vw, 0.9rem); color: #555; margin-bottom: 4px; white-space: nowrap;">총 재적 (유년부)</div>
+            <div style="font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 700; color: #333; white-space: nowrap;">{st_count + new_count}명</div>
+        </div>
+        <div style="text-align: left;">
+            <div style="font-size: clamp(0.7rem, 1.2vw, 0.9rem); color: #555; margin-bottom: 4px; white-space: nowrap;">사역자</div>
+            <div style="font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 700; color: #333; white-space: nowrap;">{tc_count + ps_count}명</div>
+        </div>
+        <div style="text-align: left;">
+            <div style="font-size: clamp(0.7rem, 1.2vw, 0.9rem); color: #555; margin-bottom: 4px; white-space: nowrap;">비활성</div>
+            <div style="font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 700; color: #333; white-space: nowrap;">{total_inact}명</div>
+        </div>
+        <div style="text-align: left;">
+            <div style="font-size: clamp(0.7rem, 1.2vw, 0.9rem); color: #555; margin-bottom: 4px; white-space: nowrap;">총합</div>
+            <div style="font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 700; color: #333; white-space: nowrap;">{active_sum_calc}명</div>
+        </div>
+    </div>
+    """
+    st.markdown(html_dashboard, unsafe_allow_html=True)
     
-    # [전문가 제안 반영] 개인정보 보호 모드 (Security by Default)
+    # 개인정보 보호 모드 (Security by Default)
     if 'privacy_mode' not in st.session_state:
         st.session_state['privacy_mode'] = True
     
-    st.markdown("---")
     st.markdown("##### 🔐 개인정보 보호 모드")
     if st.session_state['privacy_mode']:
         st.warning("현재 부모, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
@@ -538,12 +546,12 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [✅ 개선] 라디오 버튼과 슬라이더를 한 줄에 나란히 배치하여 공간 확보 및 UI 개선
+    # [✅ UI 개선] 라디오 버튼과 슬라이더를 한 줄에 나란히 배치하여 공간 확보
     col_radio, col_slider = st.columns([4, 6])
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     with col_slider:
-        img_slider_val = st.slider("🖼️ 미디어 크기 조절 (모바일 화면은 좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+        img_slider_val = st.slider("🖼️ 미디어 크기 조절 (좌우로 드래그하세요)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -569,7 +577,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 핵심 패치 완료] 순수 반응형 HTML 갤러리 + 영상 짤림 방지 (16:9 비율 계산)
+                    # [✅ 짤림 방지 완벽 해결] 동영상을 이미지 높이에 맞추되 너비를 16:9 비율(1.77배)로 자동 계산, 
+                    # 좁은 모바일에서는 max-width:100% 와 aspect-ratio를 통해 완벽히 박스 안에 담김!
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -580,16 +589,16 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # [✅ 짤림 방지] 동영상을 이미지 높이(슬라이더)에 맞추고 너비는 16:9 비율(1.77배)로 자동 확장 (팝업 불가, iframe 내부 UI 보호)
-                            # 모바일에서 너무 튀어나가지 않도록 max-width:90vw, position:relative 구조화
+                            # 수학적 16:9 계산 래퍼 (height 기준 폭 확장)
+                            calc_width = int(img_slider_val * 1.778)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<div style="flex: 0 0 auto; height:{img_slider_val}px; aspect-ratio: 16/9; max-width:90vw; position: relative;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; height: {img_slider_val}px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe></div>'
                             else:
-                                gallery_html += f'<div style="flex: 0 0 auto; height:{img_slider_val}px; aspect-ratio: 16/9; max-width:90vw; position: relative;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video></div>'
+                                gallery_html += f'<div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; height: {img_slider_val}px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%;"></video></div>'
                         else:
-                            # [✅ 전문가 제안 추가] 사진 클릭 시 새 창 팝업(크게 보기) 하이퍼링크 <a> 적용
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            # 사진 팝업 하이퍼링크 유지
+                            gallery_html += f'<div style="flex: 0 0 auto; height: {img_slider_val}px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height: 100%; width: auto; max-width: 100vw; object-fit: contain; border-radius: 8px; background-color: #f8f9fa;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -643,9 +652,10 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
+                                        calc_width = int(img_slider_val * 1.778)
                                         st.markdown(f"""
-                                        <div style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width:100%; position: relative; margin-bottom:10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
+                                        <div style="width: {calc_width}px; max-width: 100%; height: {img_slider_val}px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
                                         </div>
                                         """, unsafe_allow_html=True)
                                     else:
