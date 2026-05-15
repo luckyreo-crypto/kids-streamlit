@@ -24,9 +24,10 @@ st.markdown("""
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 모바일 탭 메뉴 가로 스크롤 (1줄 고정) */
+    /* 모바일 탭 메뉴 앱스타일 좌우 스크롤 적용 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
         -webkit-overflow-scrolling: touch; padding-bottom: 5px;
@@ -42,7 +43,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    /* 라디오 버튼 2줄(2x2) 고정 */
+    /* 라디오 버튼 강제 2줄(2x2 배열) 처리 */
     div[role="radiogroup"] { display: flex; flex-wrap: wrap !important; gap: 8px !important; }
     div[role="radiogroup"] > label { flex: 0 0 calc(50% - 8px) !important; margin: 0 !important; }
     </style>
@@ -52,7 +53,6 @@ st.markdown("""
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
-# [✅ 제안 14, 16 반영] 글로벌 상태(Privacy, Slider)를 최상단에서 초기화
 if 'privacy_mode' not in st.session_state:
     st.session_state['privacy_mode'] = True
 if 'img_slider' not in st.session_state:
@@ -87,16 +87,15 @@ def upload_photo(file, name):
         res = requests.post(GOOGLE_PROXY_URL, json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64}, headers=headers, timeout=120)
         res.raise_for_status()
         url = res.json().get("fileUrl", "")
-        # [✅ 제안 12 반영] URL 쿼리 중복 추가 방지
         if file.type and file.type.startswith('video/'):
             if "vid=1" not in url:
                 url += "&vid=1" if "?" in url else "?vid=1"
         return url
     except Exception as e: 
-        st.error(f"업로드 에러 발생: {e}") # [✅ 제안 4 반영]
+        st.error(f"업로드 에러 발생: {e}")
         return ""
 
-def chunked_update(worksheet, cells, chunk_size=200): # [✅ 제안 11 반영] 청크 사이즈 조정
+def chunked_update(worksheet, cells, chunk_size=200):
     for i in range(0, len(cells), chunk_size):
         worksheet.update_cells(cells[i:i + chunk_size])
         time.sleep(0.5)
@@ -105,11 +104,9 @@ def parse_date_safe(date_str):
     if not date_str: return datetime.date(2015, 1, 1)
     try:
         clean_str = str(date_str).replace(" ", "").strip().rstrip('.').replace('.', '-').replace('/', '-')
-        # [✅ 제안 8 반영] YY-MM-DD 형식 커버 (예: 26-05-10)
         if len(clean_str) == 8 and clean_str.count('-') == 2:
             parts = clean_str.split('-')
             if len(parts[0]) == 2: clean_str = f"20{parts[0]}-{parts[1]}-{parts[2]}"
-        
         if len(clean_str) == 8 and clean_str.count('-') == 0: return datetime.datetime.strptime(clean_str, "%Y%m%d").date()
         return datetime.datetime.strptime(clean_str, "%Y-%m-%d").date()
     except: return datetime.date(2015, 1, 1)
@@ -249,7 +246,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 (View/Edit 분리) ---
+# --- 모달 팝업용 수정 함수 (View/Edit 분리 유지) ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -626,7 +623,7 @@ with tabs[4]:
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     with col_slider:
-        img_slider_val = st.slider("🖼️ 사진 크기 조절 (모바일 화면 좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+        img_slider_val = st.slider("🖼️ 사진 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -652,7 +649,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                  # [✅ 제안 1,3 반영] 동영상은 슬라이더 값에 비례하여 16:9 반응형으로 완벽히 동작
+                    # [✅ 최강의 결론] 모든 껍데기 박스 완전 철거!
+                    # iframe 자체에 aspect-ratio:16/9 를 직접 주입하여 모바일 렌더링 충돌/검은화면 원천 봉쇄.
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -663,25 +661,12 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # 슬라이더 값에 1.778(16:9)을 곱해 최대 너비 계산
                             calc_width = int(img_slider_val * 1.778)
-                            
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                # [✅ 핵심 최신기술] padding-bottom: 56.25% (16:9) 핵 적용. 모바일 WebView 충돌 원천 차단.
-                                gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: 100%; max-width: {calc_width}px;">
-                                    <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
-                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe>
-                                    </div>
-                                </div>'''
+                                gallery_html += f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>'
                             else:
-                                gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: 100%; max-width: {calc_width}px;">
-                                    <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
-                                        <video src="{clean_url}" controls style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"></video>
-                                    </div>
-                                </div>'''
+                                gallery_html += f'<video src="{clean_url}" controls style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"></video>'
                         else:
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
@@ -739,17 +724,11 @@ with tabs[4]:
                                     calc_width = int(img_slider_val * 1.778)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f'''
-                                        <div style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; justify-content: center; align-items: center;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: 100%; height: 100%; border: none;" allow="autoplay; fullscreen" playsinline></iframe>
-                                        </div>''', unsafe_allow_html=True)
+                                        st.markdown(f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;" allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>', unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f'''
-                                        <div style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; justify-content: center; align-items: center;">
-                                            <video src="{clean_url}" controls style="width: 100%; height: 100%; object-fit: contain;"></video>
-                                        </div>''', unsafe_allow_html=True)
+                                        st.markdown(f'<video src="{clean_url}" controls style="width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;"></video>', unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
@@ -783,7 +762,7 @@ with tabs[4]:
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
-                                ws_act.add_cols(15)
+                                ws.add_cols(15)
                                 chunked_update(ws_act, h_cells)
                                 
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
