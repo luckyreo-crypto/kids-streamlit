@@ -34,7 +34,7 @@ st.markdown("""
         display: flex; flex-wrap: wrap !important; gap: 5px; justify-content: flex-start;
     }
     div[data-baseweb="tab"] {
-        flex: 0 0 calc(25% - 5px) !important; /* 4개씩 강제 배치 */
+        flex: 0 0 calc(25% - 5px) !important; 
         justify-content: center; padding: 8px 2px !important; margin: 0 !important;
         background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;
     }
@@ -234,7 +234,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 ---
+# --- [✅ 개선] 모달 팝업: 보기(View) & 수정(Edit) 완벽 분리 ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -243,13 +243,21 @@ def edit_student_dialog(target_dict):
     if edit_key not in st.session_state:
         st.session_state[edit_key] = False
         
+    def set_edit_true():
+        st.session_state[edit_key] = True
+        
+    def set_edit_false():
+        st.session_state[edit_key] = False
+        
     if not st.session_state[edit_key]:
-        # View 모드
+        # ==========================================
+        # [모드 1] 단순 정보 확인 모드 (View)
+        # ==========================================
         st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 등록 정보입니다.")
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
         if clean_p_url and str(clean_p_url).startswith('http'): 
-            col_i.image(clean_p_url, use_container_width=True)
+            col_i.markdown(f'<img src="{clean_p_url}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
         else:
             col_i.info("등록된 사진이 없습니다.")
             
@@ -260,6 +268,7 @@ def edit_student_dialog(target_dict):
         c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
         c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
         
+        # 보안 모드 적용
         if st.session_state.get('privacy_mode', True):
             p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
             p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
@@ -276,18 +285,18 @@ def edit_student_dialog(target_dict):
         st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
         st.divider()
-        if st.button("✏️ 정보 수정하기", use_container_width=True):
-            st.session_state[edit_key] = True
-            st.rerun()
+        st.button("✏️ 정보 수정하기", use_container_width=True, on_click=set_edit_true)
             
     else:
-        # Edit 모드
+        # ==========================================
+        # [모드 2] 정보 수정 모드 (Edit)
+        # ==========================================
         st.warning("⚠️ 현재 정보를 수정 중입니다.")
         with st.form("modal_edit_form"):
             col_i, col_f = st.columns([1, 2])
             clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
             if clean_p_url and str(clean_p_url).startswith('http'): 
-                col_i.image(clean_p_url, use_container_width=True)
+                col_i.markdown(f'<img src="{clean_p_url}" style="width:100%; border-radius:8px;">', unsafe_allow_html=True)
             
             c1, c2 = col_f.columns(2)
             e_name = c1.text_input("이름", value=safe_str(target_dict.get('이름','')))
@@ -343,9 +352,7 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5)
                     fetch_sheet_data.clear(); st.rerun()
                     
-        if st.button("❌ 수정 취소", use_container_width=True):
-            st.session_state[edit_key] = False
-            st.rerun()
+        st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
 # --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반편성", "📋 교적부", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
@@ -633,8 +640,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 핵심] 동영상 짤림 완벽 방지: 200px 강제가 아닌 폭 기반의 16:9 비율 컨테이너만 지정하여 순수하게 출력
-                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">'
+                    # [✅ 핵심 해결] 동영상 짤림 완전 방지 16:9 비율 유지 (padding-bottom Hack 적용)
+                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                         is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -644,11 +651,21 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
+                            # 슬라이더로 조절한 높이를 바탕으로 너비를 16:9 래퍼로 씌움
+                            calc_width = int(img_slider_val * 1.778)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<div style="flex: 0 0 auto; width: 350px; max-width: 100%;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe></div>'
+                                gallery_html += f'''
+                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%;">
+                                    <div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
+                                    </div>
+                                </div>'''
                             else:
-                                gallery_html += f'<div style="flex: 0 0 auto; width: 350px; max-width: 100%;"><video src="{clean_url}" controls style="width:100%; height:200px; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); object-fit: contain;"></video></div>'
+                                gallery_html += f'''
+                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%;">
+                                    <video src="{clean_url}" controls style="width: 100%; height: auto; border-radius: 8px; background-color: #000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: block;"></video>
+                                </div>'''
                         else:
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
@@ -704,11 +721,13 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f"""
-                                        <div style="width: 350px; max-width: 100%; margin-bottom: 10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="200" style="border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen"></iframe>
-                                        </div>
-                                        """, unsafe_allow_html=True)
+                                        calc_width = int(img_slider_val * 1.778)
+                                        st.markdown(f'''
+                                        <div style="width: {calc_width}px; max-width: 100%; margin-bottom: 10px;">
+                                            <div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
+                                                <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
+                                            </div>
+                                        </div>''', unsafe_allow_html=True)
                                     else:
                                         st.video(clean_url)
                                 else:
