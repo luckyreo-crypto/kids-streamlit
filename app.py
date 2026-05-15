@@ -12,7 +12,7 @@ import time
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
-st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
+st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True) # 맨 위로 올라가기 기준점
 
 # 모바일 '뒤로 가기' 누를 시 비번창으로 튕기는 현상 완벽 차단
 components.html(
@@ -39,7 +39,7 @@ st.markdown("""
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
-    .media-link img:hover { transform: scale(1.01); filter: brightness(0.95); cursor: zoom-in; }
+    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
     /* 탭 메뉴 영구 고정 (Sticky Header) */
@@ -71,7 +71,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
-    /* 라디오 버튼 1줄 스와이프 고정 */
+    /* 라디오 버튼 1줄 및 스크롤 처리 */
     div[role="radiogroup"] { 
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; gap: 5px !important; padding-bottom: 5px;
         -webkit-overflow-scrolling: touch;
@@ -100,6 +100,8 @@ st.markdown("""
         background-color: rgba(3, 102, 214, 1);
         transform: translateY(-3px);
     }
+    
+    /* 요약 아코디언 스타일 */
     .streamlit-expanderHeader { font-weight: bold; color: #0366d6; }
     </style>
     """, unsafe_allow_html=True)
@@ -708,7 +710,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 완벽 개선] 동영상/사진 폭 화면 100% 반영 & 정공법 iframe으로 복귀 (최소 사이즈 방어막 추가)
+                    # [✅ v65 최종 적용] 영상은 100% 꽉 채우고 유튜브 비율(높이 315) 고정
                     gallery_html = '<div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -721,27 +723,26 @@ with tabs[4]:
                             
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                fallback_url = f"https://drive.google.com/file/d/{f_id}/view"
                                 gallery_html += f'''
-                                <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                     <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            width="100%" height="400" 
-                                            style="border: none; min-height: 400px; min-width: 300px; display: block;" 
+                                            width="100%" height="315" 
+                                            style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" 
                                             allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen>
                                     </iframe>
-                                    <div style="text-align: right; padding: 5px 10px; background-color: #111;">
-                                        <a href="{fallback_url}" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 영상이 안 보일 땐 여기를 눌러 원본 열기</a>
+                                    <div style="text-align: right; padding-top: 5px;">
+                                        <a href="https://drive.google.com/file/d/{f_id}/view" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 원본 열기</a>
                                     </div>
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                     <video src="{clean_url}" controls playsinline preload="metadata" 
-                                           style="width: 100%; height: 400px; min-height: 400px; display: block; object-fit: contain;">
+                                           style="width: 100%; height: 315px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                     </video>
                                 </div>'''
                         else:
-                            # 사진도 가로폭 화면 꽉 차게 100% 지정 (빈 공간 최소화)
+                            # 사진도 가로폭 화면 꽉 차게 100% 지정
                             gallery_html += f'''
                             <div style="width: 100%; margin-bottom: 5px;">
                                 <a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;">
@@ -800,26 +801,22 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
-                                    # 수정 모드에도 동일한 100% 너비, 400px 높이, 예비링크 적용
+                                    # 수정 탭도 유튜브 사이즈로 고정
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        fallback_url = f"https://drive.google.com/file/d/{f_id}/view"
                                         st.markdown(f'''
-                                        <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                        <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                             <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                                    width="100%" height="400" 
-                                                    style="border: none; min-height: 400px; min-width: 300px; display: block;" 
+                                                    width="100%" height="315" 
+                                                    style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" 
                                                     allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen>
                                             </iframe>
-                                            <div style="text-align: right; padding: 5px 10px; background-color: #111;">
-                                                <a href="{fallback_url}" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 원본 열기</a>
-                                            </div>
                                         </div>''', unsafe_allow_html=True)
                                     else:
                                         st.markdown(f'''
-                                        <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                        <div style="width: 100%; max-width: 560px; margin-bottom: 10px;">
                                             <video src="{clean_url}" controls playsinline preload="metadata" 
-                                                   style="width: 100%; height: 400px; min-height: 400px; display: block; object-fit: contain;">
+                                                   style="width: 100%; height: 315px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
                                             </video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
