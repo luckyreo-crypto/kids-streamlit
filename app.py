@@ -23,24 +23,32 @@ st.markdown("""
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
+    /* 팝업 보기 가능한 이미지 마우스오버 효과 */
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     
+    /* 새로고침 버튼 소형화 커스텀 */
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
+    /* [✅ 개선] 모바일 탭 메뉴 글자수 단축 및 한줄/두줄 자동 최적화 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: wrap !important; gap: 5px; justify-content: flex-start;
     }
     div[data-baseweb="tab"] {
-        flex: 0 0 calc(25% - 5px) !important; 
-        justify-content: center; padding: 8px 2px !important; margin: 0 !important;
-        background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;
+        justify-content: center; padding: 8px 4px !important; margin: 0 !important;
+        background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee; flex: 1 1 auto;
     }
     div[data-baseweb="tab"][aria-selected="true"] {
         background-color: #0366d6 !important; color: white !important; border: 1px solid #0366d6;
     }
     div[data-baseweb="tab"] p { font-size: 0.85rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    div[role="radiogroup"] { flex-wrap: nowrap !important; overflow-x: auto; gap: 0.2rem !important; }
+    /* [✅ 개선] 라디오 버튼 강제 2줄(2x2 배열) 처리 */
+    div[role="radiogroup"] { 
+        display: flex; flex-wrap: wrap !important; gap: 8px !important; 
+    }
+    div[role="radiogroup"] > label { 
+        flex: 0 0 calc(50% - 8px) !important; margin: 0 !important; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -346,7 +354,8 @@ def edit_student_dialog(target_dict):
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
 # --- 5. 화면(탭) 구성 ---
-tabs = st.tabs(["🏫 반편성", "📋 교적부", "🎂 생일표", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
+# [✅ 탭 이름 단축 (반, 생일)]
+tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
 
 # ==========================================
 # [탭 0] 반편성
@@ -454,7 +463,9 @@ with tabs[1]:
     other_ch_count = len(df[df[status_col] == '타교회'])
     inact_count = len(df[df[status_col] == '비활성'])
     total_inact = mv_count + gr_count + other_ch_count + inact_count
+    active_sum_calc = len(df) - total_inact
     
+    # [✅ UI 개선] 부제목 옆 초소형 새로고침 버튼 배치
     col_dash1, col_dash2 = st.columns([8.5, 1.5])
     with col_dash1:
         st.markdown("##### 👥 전체 인원 현황 (Live)")
@@ -465,29 +476,35 @@ with tabs[1]:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
-    active_sum_calc = len(df) - total_inact
+    # [✅ 툴팁 상세화] 마우스 오버 시 정확한 세부 계산 내역 노출
+    tt_st = f"일반 {st_count}명, 새친구 {new_count}명"
+    tt_tc = f"선생님 {tc_count}명, 교역자 {ps_count}명"
+    tt_inact = f"이사 {mv_count}명, 졸업 {gr_count}명, 타교회 {other_ch_count}명, 단순비활성 {inact_count}명"
+    tt_total = f"유년부({st_count+new_count}) + 사역자({tc_count+ps_count}) = {active_sum_calc}명"
+    
     html_dashboard = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; background-color:#f1f8ff; border-radius:10px; border: 1px solid #cce5ff; overflow: hidden;">
-        <div style="text-align: center; flex: 1; padding: 0 5px;" title="일반학생과 새친구를 합친 숫자입니다.">
-            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_st}">
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
         </div>
-        <div style="text-align: center; flex: 1; padding: 0 5px;" title="선생님, 목사님, 전도사님을 합친 숫자입니다.">
-            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_tc}">
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
         </div>
-        <div style="text-align: center; flex: 1; padding: 0 5px;" title="이사, 졸업, 타교회, 비활성 인원을 모두 합친 숫자입니다.">
-            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_inact}">
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
         </div>
-        <div style="text-align: center; flex: 1; padding: 0 5px;" title="전체 등록된 명단에서 비활성 인원을 뺀 실제 활동 인원입니다.">
-            <div style="font-size: clamp(0.8rem, 2vw, 1.3rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
-            <div style="font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
+        <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_total}">
+            <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
+            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
         </div>
     </div>
     """
     st.markdown(html_dashboard, unsafe_allow_html=True)
     
+    # 개인정보 보호 모드
     if 'privacy_mode' not in st.session_state:
         st.session_state['privacy_mode'] = True
     
@@ -605,7 +622,7 @@ with tabs[4]:
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     with col_slider:
-        img_slider_val = st.slider("🖼️ 사진 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+        img_slider_val = st.slider("🖼️ 미디어 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -631,8 +648,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 최강 해결책] 동영상은 100% 분리, 무조건 16:9 반응형으로 짤림 방어. 사진만 슬라이더 적용!
-                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
+                    # [✅ 초심플 완벽 해결] 동영상 비율을 슬라이더 높이와 16:9 aspect-ratio로 단순 연동. 절대 안짤림!
+                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                         is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -642,15 +659,13 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # 동영상은 슬라이더를 무시하고 항상 안전한 너비와 16:9 비율 유지 (플레이버튼 정중앙 유지)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<div style="flex: 1 1 300px; max-width: 100%;"><div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe></div></div>'
+                                gallery_html += f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width:100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#000;" allow="autoplay; fullscreen"></iframe>'
                             else:
-                                gallery_html += f'<div style="flex: 1 1 300px; max-width: 100%;"><div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"><video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit: contain;"></video></div></div>'
+                                gallery_html += f'<video src="{clean_url}" controls style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width:100%; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video>'
                         else:
-                            # 사진은 슬라이더 값 적용 & 팝업 링크
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            gallery_html += f'<a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -704,14 +719,9 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f"""
-                                        <div style="width: 100%; margin-bottom: 10px;">
-                                            <div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
-                                                <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
-                                            </div>
-                                        </div>""", unsafe_allow_html=True)
+                                        st.markdown(f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width: 100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#000; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>', unsafe_allow_html=True)
                                     else:
-                                        st.video(clean_url)
+                                        st.markdown(f'<video src="{clean_url}" controls style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width: 100%; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px;"></video>', unsafe_allow_html=True)
                                 else:
                                     st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
                                 
