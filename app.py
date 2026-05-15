@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components  # [✅ 추가] 자바스크립트 주입용 컴포넌트
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -11,6 +12,20 @@ import time
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V0.9", page_icon="🌱", layout="wide")
+
+# [✅ 핵심 개선 2] 모바일 '뒤로 가기' 누를 시 비번창으로 튕기는 현상(앱 이탈) 완벽 차단
+components.html(
+    """
+    <script>
+    const parentWindow = window.parent || window;
+    parentWindow.history.pushState(null, "", parentWindow.location.href);
+    parentWindow.onpopstate = function() {
+        parentWindow.history.pushState(null, "", parentWindow.location.href);
+    };
+    </script>
+    """,
+    height=0, width=0
+)
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
@@ -27,10 +42,18 @@ st.markdown("""
     
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 모바일 탭 메뉴 앱스타일 좌우 스크롤 적용 */
+    /* [✅ 핵심 개선 1] 메인 메뉴 스크롤 무시하고 상단에 영구 고정 (Sticky Header) */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
-        -webkit-overflow-scrolling: touch; padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch; padding-bottom: 8px;
+        
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 2.8rem !important; /* Streamlit 기본 헤더 밑에 딱 붙임 */
+        z-index: 9999 !important; /* 가장 위에 노출 */
+        background-color: white !important; /* 스크롤 시 뒤에 글씨 비침 방지 */
+        border-bottom: 2px solid #eef2f6;
+        margin-bottom: 15px;
     }
     div[data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
     div[data-baseweb="tab"] {
@@ -41,7 +64,7 @@ st.markdown("""
     div[data-baseweb="tab"][aria-selected="true"] {
         background-color: #0366d6 !important; color: white !important; border: 1px solid #0366d6;
     }
-    div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; }
+    div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
     /* 라디오 버튼 강제 2줄(2x2 배열) 처리 */
     div[role="radiogroup"] { display: flex; flex-wrap: wrap !important; gap: 8px !important; }
@@ -246,7 +269,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 (View/Edit 분리 및 생년월일 보호 추가) ---
+# --- 모달 팝업용 수정 함수 (View/Edit 분리 유지) ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -275,7 +298,6 @@ def edit_student_dialog(target_dict):
         c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
         c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
         
-        # [✅ 개선] 프라이버시 모드 적용 시 연락처/부모/주소뿐만 아니라 "생년월일"도 강력 블라인드 처리
         if st.session_state.get('privacy_mode', True):
             p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
             p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
@@ -532,14 +554,12 @@ with tabs[1]:
     st.divider()
     
     manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"], horizontal=True)
-    # [✅ 데이터프레임 노출 컬럼에 '생년월일' 추가하여 마스킹 효과 확인 가능토록 설정]
     req_cols = ['학생ID', '학년(담임)', '이름', '생년월일', '학교상태', '등록일', '변동일', '학교', '부모(아빠/엄마)', '연락처', '주소', '비고']
     available_cols = [c for c in req_cols if c in df.columns]
     
     if manage_mode == "👀 전체보기":
         df_display = df[available_cols].copy()
         if st.session_state['privacy_mode']:
-            # [✅ 생년월일 보호 추가]
             for c_priv in ['생년월일', '부모(아빠/엄마)', '연락처', '주소']:
                 if c_priv in df_display.columns:
                     df_display[c_priv] = df_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
@@ -618,7 +638,6 @@ with tabs[3]:
     news = df[df[status_col] == '새친구'].copy()
     if not news.empty: 
         news_display = news[available_cols].copy()
-        # [✅ 새친구 탭에도 완벽한 데이터 블라인드 마스킹 적용]
         if st.session_state.get('privacy_mode', True):
             for c_priv in ['생년월일', '부모(아빠/엄마)', '연락처', '주소']:
                 if c_priv in news_display.columns:
@@ -637,7 +656,7 @@ with tabs[4]:
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     with col_slider:
-        img_slider_val = st.slider("🖼️ 사진 크기 조절 (모바일 화면 좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+        img_slider_val = st.slider("🖼️ 사진 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -673,7 +692,6 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            # [✅ PM님이 찾아내신 완벽한 400px 안정성 코드 유지]
                             if file_id_match:
                                 f_id = file_id_match.group(1)
                                 gallery_html += f'''
@@ -693,7 +711,6 @@ with tabs[4]:
                                     </video>
                                 </div>'''
                         else:
-                            # [✅ 이미지 지연로딩(lazy) 및 max-width 완벽 적용]
                             gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
@@ -799,7 +816,7 @@ with tabs[4]:
                             try:
                                 chunked_update(ws_act, h_cells)
                             except Exception:
-                                ws_act.add_cols(15)
+                                ws.add_cols(15)
                                 chunked_update(ws_act, h_cells)
                                 
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
