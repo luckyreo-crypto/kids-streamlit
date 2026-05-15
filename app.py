@@ -71,7 +71,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
-    /* 라디오 버튼 2줄 고정 */
+    /* 라디오 버튼 1줄 스와이프 고정 */
     div[role="radiogroup"] { 
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; gap: 5px !important; padding-bottom: 5px;
         -webkit-overflow-scrolling: touch;
@@ -299,7 +299,7 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 모달 팝업용 수정 함수 (View/Edit 분리 유지) ---
+# --- 모달 팝업용 수정 함수 ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -708,7 +708,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 최강 솔루션] 사진 및 동영상 너비 100% 꽉채움 및 HTML5 네이티브 플레이어(직접추출) 우회 적용
+                    # [✅ 완벽 개선] 동영상/사진 폭 화면 100% 반영 & 정공법 iframe으로 복귀 (최소 사이즈 방어막 추가)
                     gallery_html = '<div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -721,26 +721,27 @@ with tabs[4]:
                             
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                direct_vid_url = f"https://drive.google.com/uc?export=download&id={f_id}"
                                 fallback_url = f"https://drive.google.com/file/d/{f_id}/view"
                                 gallery_html += f'''
-                                <div style="width: 100%; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <video src="{direct_vid_url}" controls playsinline preload="metadata" 
-                                           style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
-                                    </video>
-                                    <div style="text-align: right; padding: 5px; background-color: #111;">
-                                        <a href="{fallback_url}" target="_blank" style="color: #999; font-size: 0.75rem; text-decoration: none;">⚙️ 재생 오류 시 원본 링크 열기</a>
+                                <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
+                                            width="100%" height="400" 
+                                            style="border: none; min-height: 400px; min-width: 300px; display: block;" 
+                                            allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen>
+                                    </iframe>
+                                    <div style="text-align: right; padding: 5px 10px; background-color: #111;">
+                                        <a href="{fallback_url}" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 영상이 안 보일 땐 여기를 눌러 원본 열기</a>
                                     </div>
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                                     <video src="{clean_url}" controls playsinline preload="metadata" 
-                                           style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
+                                           style="width: 100%; height: 400px; min-height: 400px; display: block; object-fit: contain;">
                                     </video>
                                 </div>'''
                         else:
-                            # 사진도 가로폭 화면 꽉 차게 100% 지정
+                            # 사진도 가로폭 화면 꽉 차게 100% 지정 (빈 공간 최소화)
                             gallery_html += f'''
                             <div style="width: 100%; margin-bottom: 5px;">
                                 <a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;">
@@ -799,24 +800,26 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
+                                    # 수정 모드에도 동일한 100% 너비, 400px 높이, 예비링크 적용
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        direct_vid_url = f"https://drive.google.com/uc?export=download&id={f_id}"
                                         fallback_url = f"https://drive.google.com/file/d/{f_id}/view"
                                         st.markdown(f'''
                                         <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                            <video src="{direct_vid_url}" controls playsinline preload="metadata" 
-                                                   style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
-                                            </video>
-                                            <div style="text-align: right; padding: 5px; background-color: #111;">
-                                                <a href="{fallback_url}" target="_blank" style="color: #999; font-size: 0.75rem; text-decoration: none;">⚙️ 원본 링크 열기</a>
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
+                                                    width="100%" height="400" 
+                                                    style="border: none; min-height: 400px; min-width: 300px; display: block;" 
+                                                    allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen>
+                                            </iframe>
+                                            <div style="text-align: right; padding: 5px 10px; background-color: #111;">
+                                                <a href="{fallback_url}" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 원본 열기</a>
                                             </div>
                                         </div>''', unsafe_allow_html=True)
                                     else:
                                         st.markdown(f'''
                                         <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                                             <video src="{clean_url}" controls playsinline preload="metadata" 
-                                                   style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
+                                                   style="width: 100%; height: 400px; min-height: 400px; display: block; object-fit: contain;">
                                             </video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
