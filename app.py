@@ -652,7 +652,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 제안 1,3 반영] 동영상은 슬라이더 값에 비례하여 16:9 반응형으로 완벽히 동작
+                  # [✅ 제안 1,3 반영] 동영상은 슬라이더 값에 비례하여 16:9 반응형으로 완벽히 동작
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -663,20 +663,27 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
+                            # 슬라이더 값에 1.778(16:9)을 곱해 최대 너비 계산
                             calc_width = int(img_slider_val * 1.778)
+                            
                             if file_id_match:
                                 f_id = file_id_match.group(1)
+                                # [✅ 핵심 최신기술] padding-bottom: 56.25% (16:9) 핵 적용. 모바일 WebView 충돌 원천 차단.
                                 gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; justify-content: center; align-items: center;">
-                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: 100%; height: 100%; border: none;" allow="autoplay; fullscreen" playsinline></iframe>
+                                <div style="flex: 0 0 auto; width: 100%; max-width: {calc_width}px;">
+                                    <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                        <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe>
+                                    </div>
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px; display: flex; justify-content: center; align-items: center;">
-                                    <video src="{clean_url}" controls style="width: 100%; height: 100%; object-fit: contain;"></video>
+                                <div style="flex: 0 0 auto; width: 100%; max-width: {calc_width}px;">
+                                    <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                        <video src="{clean_url}" controls style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"></video>
+                                    </div>
                                 </div>'''
                         else:
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
