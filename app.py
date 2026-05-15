@@ -708,7 +708,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 개선 1, 2 반영] 이미지/영상 너비 100% (화면 꽉 채움 적용)
+                    # [✅ 최강 솔루션] 사진 및 동영상 너비 100% 꽉채움 및 HTML5 네이티브 플레이어(직접추출) 우회 적용
                     gallery_html = '<div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -721,24 +721,28 @@ with tabs[4]:
                             
                             if file_id_match:
                                 f_id = file_id_match.group(1)
+                                direct_vid_url = f"https://drive.google.com/uc?export=download&id={f_id}"
+                                fallback_url = f"https://drive.google.com/file/d/{f_id}/view"
                                 gallery_html += f'''
-                                <div style="width: 100%; margin-bottom: 10px;">
-                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                            style="width: 100%; height: 400px; border: none; border-radius: 8px; background-color: black;" 
-                                            allow="autoplay; fullscreen">
-                                    </iframe>
+                                <div style="width: 100%; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <video src="{direct_vid_url}" controls playsinline preload="metadata" 
+                                           style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
+                                    </video>
+                                    <div style="text-align: right; padding: 5px; background-color: #111;">
+                                        <a href="{fallback_url}" target="_blank" style="color: #999; font-size: 0.75rem; text-decoration: none;">⚙️ 재생 오류 시 원본 링크 열기</a>
+                                    </div>
                                 </div>'''
                             else:
                                 gallery_html += f'''
-                                <div style="width: 100%; margin-bottom: 10px;">
-                                    <video src="{clean_url}" controls 
-                                           style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                <div style="width: 100%; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <video src="{clean_url}" controls playsinline preload="metadata" 
+                                           style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
                                     </video>
                                 </div>'''
                         else:
-                            # 사진도 가로폭 화면 꽉 차게 100% 지정 (세로 길이는 이미지 비율에 맞춰 자연스럽게 늘어남)
+                            # 사진도 가로폭 화면 꽉 차게 100% 지정
                             gallery_html += f'''
-                            <div style="width: 100%; margin-bottom: 10px;">
+                            <div style="width: 100%; margin-bottom: 5px;">
                                 <a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;">
                                     <img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block;">
                                 </a>
@@ -795,21 +799,24 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
-                                    # 수정 탭도 100% 꽉 채우기 적용
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
+                                        direct_vid_url = f"https://drive.google.com/uc?export=download&id={f_id}"
+                                        fallback_url = f"https://drive.google.com/file/d/{f_id}/view"
                                         st.markdown(f'''
-                                        <div style="width: 100%; margin-bottom: 10px;">
-                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
-                                                    style="width: 100%; height: 400px; border: none; border-radius: 8px; background-color: black;" 
-                                                    allow="autoplay; fullscreen">
-                                            </iframe>
+                                        <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                            <video src="{direct_vid_url}" controls playsinline preload="metadata" 
+                                                   style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
+                                            </video>
+                                            <div style="text-align: right; padding: 5px; background-color: #111;">
+                                                <a href="{fallback_url}" target="_blank" style="color: #999; font-size: 0.75rem; text-decoration: none;">⚙️ 원본 링크 열기</a>
+                                            </div>
                                         </div>''', unsafe_allow_html=True)
                                     else:
                                         st.markdown(f'''
-                                        <div style="width: 100%; margin-bottom: 10px;">
-                                            <video src="{clean_url}" controls 
-                                                   style="width: 100%; height: 400px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                        <div style="width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                            <video src="{clean_url}" controls playsinline preload="metadata" 
+                                                   style="width: 100%; height: auto; max-height: 600px; display: block; object-fit: contain;">
                                             </video>
                                         </div>''', unsafe_allow_html=True)
                                 else:
