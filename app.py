@@ -29,20 +29,21 @@ st.markdown("""
     /* 새로고침 버튼 소형화 커스텀 */
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* [✅ 개선] 모바일 탭 메뉴 글자수 단축 및 한줄/두줄 자동 최적화 */
+    /* 모바일 탭 메뉴 무조건 4개씩(25%) 배치 & 선택된 탭 파란색 하이라이트 */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: wrap !important; gap: 5px; justify-content: flex-start;
     }
     div[data-baseweb="tab"] {
-        justify-content: center; padding: 8px 4px !important; margin: 0 !important;
-        background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee; flex: 1 1 auto;
+        flex: 0 0 calc(25% - 5px) !important; 
+        justify-content: center; padding: 8px 2px !important; margin: 0 !important;
+        background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;
     }
     div[data-baseweb="tab"][aria-selected="true"] {
         background-color: #0366d6 !important; color: white !important; border: 1px solid #0366d6;
     }
     div[data-baseweb="tab"] p { font-size: 0.85rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    /* [✅ 개선] 라디오 버튼 강제 2줄(2x2 배열) 처리 */
+    /* [✅ 완벽 개선] 라디오 버튼 강제 2줄(2x2 배열) 처리 */
     div[role="radiogroup"] { 
         display: flex; flex-wrap: wrap !important; gap: 8px !important; 
     }
@@ -354,7 +355,7 @@ def edit_student_dialog(target_dict):
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
 # --- 5. 화면(탭) 구성 ---
-# [✅ 탭 이름 단축 (반, 생일)]
+# [✅ 탭 이름 단축 최적화]
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계"])
 
 # ==========================================
@@ -463,9 +464,7 @@ with tabs[1]:
     other_ch_count = len(df[df[status_col] == '타교회'])
     inact_count = len(df[df[status_col] == '비활성'])
     total_inact = mv_count + gr_count + other_ch_count + inact_count
-    active_sum_calc = len(df) - total_inact
     
-    # [✅ UI 개선] 부제목 옆 초소형 새로고침 버튼 배치
     col_dash1, col_dash2 = st.columns([8.5, 1.5])
     with col_dash1:
         st.markdown("##### 👥 전체 인원 현황 (Live)")
@@ -476,7 +475,8 @@ with tabs[1]:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # [✅ 툴팁 상세화] 마우스 오버 시 정확한 세부 계산 내역 노출
+    # [✅ 완벽 개선] 툴팁 상세 내역 추가 및 폰트 대형화 유지
+    active_sum_calc = len(df) - total_inact
     tt_st = f"일반 {st_count}명, 새친구 {new_count}명"
     tt_tc = f"선생님 {tc_count}명, 교역자 {ps_count}명"
     tt_inact = f"이사 {mv_count}명, 졸업 {gr_count}명, 타교회 {other_ch_count}명, 단순비활성 {inact_count}명"
@@ -504,7 +504,6 @@ with tabs[1]:
     """
     st.markdown(html_dashboard, unsafe_allow_html=True)
     
-    # 개인정보 보호 모드
     if 'privacy_mode' not in st.session_state:
         st.session_state['privacy_mode'] = True
     
@@ -648,8 +647,8 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 초심플 완벽 해결] 동영상 비율을 슬라이더 높이와 16:9 aspect-ratio로 단순 연동. 절대 안짤림!
-                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">'
+                    # [✅ 최강 해결책 적용] 동영상 짤림 절대 불가! 16:9 비율 유지 (min-width 설정으로 구글 버튼 보호)
+                    gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                         is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
@@ -659,13 +658,24 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
+                            # 슬라이더 값에 따라 폭이 16:9 로 자동 계산됨 (최소 너비 280px 보장)
+                            min_vid_w = 280 
+                            calc_width = max(int(img_slider_val * 1.778), min_vid_w)
+                            
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width:100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#000;" allow="autoplay; fullscreen"></iframe>'
+                                gallery_html += f'''
+                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
+                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
+                                </div>'''
                             else:
-                                gallery_html += f'<video src="{clean_url}" controls style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width:100%; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></video>'
+                                gallery_html += f'''
+                                <div style="flex: 0 0 auto; width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;">
+                                    <video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit: contain;"></video>
+                                </div>'''
                         else:
-                            gallery_html += f'<a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a>'
+                            # 사진 팝업 링크
+                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -702,6 +712,7 @@ with tabs[4]:
                 new_files = [None] * 15
                 delete_flags = [False] * 15
                 
+                # 수정 화면은 2열(모바일 대응)
                 for i in range(0, 15, 2):
                     p_cols = st.columns(2)
                     for j in range(2):
@@ -717,11 +728,21 @@ with tabs[4]:
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url)
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
+                                    
+                                    min_vid_w = 280
+                                    calc_width = max(int(img_slider_val * 1.778), min_vid_w)
+                                    
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width: 100%; border:none; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#000; margin-bottom:10px;" allow="autoplay; fullscreen"></iframe>', unsafe_allow_html=True)
+                                        st.markdown(f'''
+                                        <div style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen"></iframe>
+                                        </div>''', unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f'<video src="{clean_url}" controls style="height:{img_slider_val}px; aspect-ratio: 16/9; max-width: 100%; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px;"></video>', unsafe_allow_html=True)
+                                        st.markdown(f'''
+                                        <div style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16/9; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                            <video src="{clean_url}" controls style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit: contain;"></video>
+                                        </div>''', unsafe_allow_html=True)
                                 else:
                                     st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
                                 
