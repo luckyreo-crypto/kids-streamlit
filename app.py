@@ -24,10 +24,9 @@ st.markdown("""
     div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
-    
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 모바일 탭 메뉴 앱스타일 좌우 스크롤 적용 */
+    /* 모바일 탭 메뉴 가로 스크롤 (1줄 고정) */
     div[data-baseweb="tab-list"] {
         display: flex; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; gap: 5px;
         -webkit-overflow-scrolling: touch; padding-bottom: 5px;
@@ -43,7 +42,7 @@ st.markdown("""
     }
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; }
     
-    /* 라디오 버튼 강제 2줄(2x2 배열) 처리 */
+    /* 라디오 버튼 2줄(2x2) 고정 */
     div[role="radiogroup"] { display: flex; flex-wrap: wrap !important; gap: 8px !important; }
     div[role="radiogroup"] > label { flex: 0 0 calc(50% - 8px) !important; margin: 0 !important; }
     </style>
@@ -623,7 +622,7 @@ with tabs[4]:
     with col_radio:
         e_mode = st.radio("작업", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
     with col_slider:
-        img_slider_val = st.slider("🖼️ 사진 크기 조절 (좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
+        img_slider_val = st.slider("🖼️ 사진 크기 조절 (모바일 화면 좌우 드래그)", min_value=80, max_value=600, value=st.session_state.get('img_slider', 200), step=10, key='img_slider', label_visibility="collapsed")
     st.divider()
     
     def format_event(row_id):
@@ -649,8 +648,6 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 최강의 결론] 모든 껍데기 박스 완전 철거!
-                    # iframe 자체에 aspect-ratio:16/9 를 직접 주입하여 모바일 렌더링 충돌/검은화면 원천 봉쇄.
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -661,14 +658,50 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            calc_width = int(img_slider_val * 1.778)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>'
+                                # =====================================================================
+                                # [동영상 렌더링 핵심 소스 상세 설명]
+                                # 여기부터가 PM님께서 직접 확인/수정하실 수 있는 구글 드라이브 iframe 영역입니다.
+                                #
+                                # 1. <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                #    - 영상을 감싸는 가장 바깥쪽 상자입니다.
+                                #    - width: 100%: 모바일 등 화면이 좁아지면 가로폭에 꽉 차게 자동으로 줄어듭니다.
+                                #    - max-width: 400px: PC 화면에서 영상이 무식하게 커지는 것을 막아주는 최대 한계선입니다.
+                                #
+                                # 2. <iframe src="..." width="100%" height="250" ...>
+                                #    - 구글 드라이브 플레이어를 불러옵니다.
+                                #    - width="100%": 부모 div 상자의 너비를 그대로 따라갑니다.
+                                #    - height="250": [가장 중요한 부분!] 세로 길이를 250픽셀로 고정했습니다.
+                                #      모바일이나 안드로이드 웹뷰에서 세로 높이가 너무 짧으면(예: 150px 이하) 
+                                #      구글 플레이어 내부의 재생버튼/진행바 컨트롤러가 갈 곳을 잃어 화면을 뚫고 나가거나 검은 화면으로 에러가 납니다.
+                                #      이를 방지하기 위해 최소한의 안전 높이(250)를 확보한 것입니다.
+                                #
+                                # 3. 왜 이전 기술들(position:absolute, aspect-ratio)을 다 버렸는가?
+                                #    - 해당 CSS 기술들은 '영상' 자체에는 반응형으로 잘 작동하지만,
+                                #      구글이 만든 '웹 플레이어(iframe)' 통째로 씌우게 되면 내부 레이어와 Z-index 충돌이 발생해
+                                #      모바일에서 썸네일을 검은색으로 덮어버리는 치명적 버그가 발생했기 때문입니다.
+                                #    - 따라서 가장 클래식하고 원초적이며 절대 에러가 나지 않는 방식으로 돌아왔습니다.
+                                # =====================================================================
+                                gallery_html += f'''
+                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
+                                            width="100%" 
+                                            height="250" 
+                                            style="border: none; border-radius: 8px; background-color: black;" 
+                                            allow="autoplay; fullscreen">
+                                    </iframe>
+                                </div>'''
                             else:
-                                gallery_html += f'<video src="{clean_url}" controls style="width: {calc_width}px; max-width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000;"></video>'
+                                gallery_html += f'''
+                                <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                    <video src="{clean_url}" controls 
+                                           style="width: 100%; height: 250px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                    </video>
+                                </div>'''
                         else:
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
+                            # 사진은 슬라이더 값(img_slider_val)에 따라 크기가 자유롭게 변합니다.
+                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -721,14 +754,26 @@ with tabs[4]:
                                     if not file_id_match:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     
-                                    calc_width = int(img_slider_val * 1.778)
+                                    # 수정 모드에서도 동일하게 안전한 구글 iframe 소스 적용
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        st.markdown(f'<iframe src="https://drive.google.com/file/d/{f_id}/preview" style="width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;" allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>', unsafe_allow_html=True)
+                                        st.markdown(f'''
+                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" 
+                                                    width="100%" height="250" 
+                                                    style="border: none; border-radius: 8px; background-color: black;" 
+                                                    allow="autoplay; fullscreen">
+                                            </iframe>
+                                        </div>''', unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f'<video src="{clean_url}" controls style="width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;"></video>', unsafe_allow_html=True)
+                                        st.markdown(f'''
+                                        <div style="width: 100%; max-width: 400px; margin-bottom: 10px;">
+                                            <video src="{clean_url}" controls 
+                                                   style="width: 100%; height: 250px; object-fit: contain; border-radius: 8px; background-color: black; display: block;">
+                                            </video>
+                                        </div>''', unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
