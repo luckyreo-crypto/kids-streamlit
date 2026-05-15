@@ -641,7 +641,7 @@ with tabs[4]:
                 if valid_urls:
                     st.markdown("---")
                     
-                    # [✅ 초심플 & 완벽 동영상 분리 로직] 래퍼 없이 직접 iframe에 속성 주입! 모바일 브라우저 충돌 차단
+                    # [✅ 최강 방어막 결계] 사진과 영상 100% 분리. 동영상은 CSS 래퍼를 찢고 가장 원초적인 하드코딩 속성으로 주입! 절대 안 짤림!
                     gallery_html = '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
@@ -652,14 +652,21 @@ with tabs[4]:
                             if not file_id_match:
                                 file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             
-                            calc_width = int(img_slider_val * 1.778)
+                            # 영상은 슬라이더를 완전히 무시하고 오직 320x180 (16:9) 고정. 모바일 렌더링 충돌 원천 차단.
                             if file_id_match:
                                 f_id = file_id_match.group(1)
-                                gallery_html += f'<div style="flex: 0 0 auto; width: 100%; max-width: {calc_width}px;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="{img_slider_val}" frameborder="0" style="border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#000; display:block;" allow="autoplay; fullscreen" playsinline></iframe></div>'
+                                gallery_html += f'''
+                                <div style="flex: 0 0 auto; width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                    <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="320" height="180" frameborder="0" scrolling="no" style="border:none; display:block;" allow="autoplay; fullscreen" playsinline></iframe>
+                                </div>'''
                             else:
-                                gallery_html += f'<div style="flex: 0 0 auto; width: 100%; max-width: {calc_width}px;"><video src="{clean_url}" controls style="width: 100%; height: {img_slider_val}px; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; object-fit: contain;"></video></div>'
+                                gallery_html += f'''
+                                <div style="flex: 0 0 auto; width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                    <video src="{clean_url}" controls width="320" height="180" style="object-fit: contain; display:block;"></video>
+                                </div>'''
                         else:
-                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s; display:block;"></a></div>'
+                            # 사진은 슬라이더 정상 작동 및 팝업 확대
+                            gallery_html += f'<div style="flex: 0 0 auto;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" class="media-link"><img src="{clean_url}" style="height:{img_slider_val}px; width:auto; max-width:90vw; object-fit:contain; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#f8f9fa; transition: transform 0.2s;"></a></div>'
                     
                     gallery_html += '</div>'
                     st.markdown(gallery_html, unsafe_allow_html=True)
@@ -713,13 +720,17 @@ with tabs[4]:
                                         file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
-                                        calc_width = int(img_slider_val * 1.778)
-                                        st.markdown(f'<div style="width: 100%; max-width: {calc_width}px; margin-bottom: 10px;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="{img_slider_val}" frameborder="0" style="border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); background-color:#000; display:block;" allow="autoplay; fullscreen" playsinline></iframe></div>', unsafe_allow_html=True)
+                                        st.markdown(f'''
+                                        <div style="width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                            <iframe src="https://drive.google.com/file/d/{f_id}/preview" width="320" height="180" frameborder="0" scrolling="no" style="border:none; display:block;" allow="autoplay; fullscreen" playsinline></iframe>
+                                        </div>''', unsafe_allow_html=True)
                                     else:
-                                        calc_width = int(img_slider_val * 1.778)
-                                        st.markdown(f'<div style="width: 100%; max-width: {calc_width}px; margin-bottom: 10px;"><video src="{clean_url}" controls style="width: 100%; height: {img_slider_val}px; border-radius:8px; background-color:#000; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; object-fit: contain;"></video></div>', unsafe_allow_html=True)
+                                        st.markdown(f'''
+                                        <div style="width: 320px; height: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #000; margin-bottom: 10px;">
+                                            <video src="{clean_url}" controls width="320" height="180" style="object-fit: contain; display:block;"></video>
+                                        </div>''', unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" loading="lazy" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s; display:block;"></a>', unsafe_allow_html=True)
+                                    st.markdown(f'<a href="{clean_url}" target="_blank" class="media-link"><img src="{clean_url}" style="height:{img_slider_val}px; width:auto; max-width:100%; object-fit:contain; border-radius:8px; background-color:#f8f9fa; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:10px; transition: transform 0.2s;"></a>', unsafe_allow_html=True)
                                 
                                 delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                 new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
