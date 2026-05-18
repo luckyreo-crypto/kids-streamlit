@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.3", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.4", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -201,6 +201,7 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except: 
         ws_s = sh.add_worksheet("주차별통계", 200, 15)
+        # 요청하신 정확한 순서의 헤더 적용
         ws_s.append_row(["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"])
         
     try: ws_r = sh.worksheet("영수증")
@@ -355,7 +356,7 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 (비용집행관리 / 회비관리 이름 변경 반영) ---
+# --- 5. 화면(탭) 구성 (메뉴명 변경 반영) ---
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 회비관리"])
 
 # ==========================================
@@ -706,7 +707,7 @@ with tabs[4]:
                             h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_act)]
                             for mh in missing_act: act_sh_headers.append(mh)
                             try: chunked_update(ws_act, h_cells)
-                            except: ws.add_cols(15); chunked_update(ws_act, h_cells)
+                            except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
                         
                         update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
                         for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
@@ -740,7 +741,7 @@ with tabs[4]:
                         h_cells = [gspread.Cell(1, start_col + idx_h, mh) for idx_h, mh in enumerate(missing_act)]
                         for mh in missing_act: act_sh_headers.append(mh)
                         try: chunked_update(ws_act, h_cells)
-                        except: ws.add_cols(15); chunked_update(ws_act, h_cells)
+                        except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
                     
                     h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
                     new_row = [""] * len(act_sh_headers)
@@ -755,7 +756,7 @@ with tabs[4]:
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 5] 출석 (동적 매핑 저장 적용)
+# [탭 5] 출석 (동적 매핑 저장 & 예외처리 강화 적용)
 # ==========================================
 with tabs[5]:
     st.subheader("📅 주간 출석 현황")
@@ -764,7 +765,7 @@ with tabs[5]:
     with c1: 
         sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, datetime.date.today().isocalendar()[1] - 1)), format_func=lambda x: week_display_map.get(x, x))
         if sel_w_raw == "✏️ 직접 입력 (새 날짜)": target_date = st.date_input("새로운 날짜 선택", datetime.date.today()); sel_w = target_date.strftime("%Y-%m-%d")
-        else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
+        else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + timedelta(days=(w_num-1)*7) if 'timedelta' in globals() else start_date + datetime.timedelta(days=(w_num-1)*7)
     with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
     
     show_inactive = st.checkbox("👀 강제 전체명단 표시")
@@ -782,7 +783,6 @@ with tabs[5]:
             try: saved_guest = int(match.iloc[0].get('추가', match.iloc[0].get('새친구/추가예배', 0)))
             except: pass
             saved_event = str(match.iloc[0].get('행사명', ''))
-            # 시트의 비고 컬럼을 안전하게 읽어옴
             saved_note = str(match.iloc[0].get('비고', match.iloc[0].get('내용(비고)', match.iloc[0].get('추가입력(비고)', ''))))
 
     st.markdown("#### 📊 현재 체크 현황")
@@ -829,7 +829,7 @@ with tabs[5]:
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
                         if v:
                             if is_teacher_person: final_t_p += 1
-                            elif not is_pastor_person: final_s_p += 1 
+                            elif not is_pastor_person: final_s_p += 1 # 전도사/목사님 제외 처리
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
                 save_s_p = 0 if is_skip else final_s_p
@@ -837,22 +837,26 @@ with tabs[5]:
                 valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
                 valid_enrollment_df['role'] = valid_enrollment_df.apply(get_role, axis=1)
                 student_count, teacher_count = len(valid_enrollment_df[valid_enrollment_df['role'] == 'student']), len(valid_enrollment_df[valid_enrollment_df['role'] == 'teacher'])
+                
+                # 계산식 확인 (유년부 합계 = 출석 + 추가, 총합 = 유년부 합계 + 교사출석)
                 kids_total = save_s_p + guest_in
                 grand_total = kids_total + save_t_p
                 
-                # 구글 시트 헤더를 확인하고, 없으면 생성 (동적 컬럼 매핑)
+                # 통계 시트 헤더 강제 보정 및 API Error 예외 처리
                 stat_headers = ws_stat.row_values(1)
                 req_headers = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
                 
-                for req_h in req_headers:
-                    if req_h not in stat_headers:
-                        stat_headers.append(req_h)
-                        ws_stat.update_cell(1, len(stat_headers), req_h)
+                missing_stat_headers = [h for h in req_headers if h not in stat_headers]
+                if missing_stat_headers:
+                    start_col = len(stat_headers) + 1
+                    h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_stat_headers)]
+                    for mh in missing_stat_headers: stat_headers.append(mh)
+                    try: chunked_update(ws_stat, h_cells)
+                    except: ws_stat.add_cols(10); chunked_update(ws_stat, h_cells)
                 
                 h_map = {str(h).strip(): idx for idx, h in enumerate(stat_headers)}
                 new_row = [""] * len(stat_headers)
                 
-                # 사용자가 시트 컬럼 순서를 섞어도 정확한 위치에 삽입됩니다.
                 if "주차" in h_map: new_row[h_map["주차"]] = sel_w
                 if "행사명" in h_map: new_row[h_map["행사명"]] = event_text
                 if "유년부 재적" in h_map: new_row[h_map["유년부 재적"]] = student_count
@@ -882,7 +886,7 @@ with tabs[6]:
     st.subheader("📊 통계")
     col_stat, col_cumul = st.columns([2, 1])
     with col_stat: 
-        st.write("📅 **주차별 통계 (요청하신 순서 적용)**")
+        st.write("📅 **주차별 통계 (요청 순서 적용)**")
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
@@ -924,7 +928,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리 
+# [탭 7] 총무 전용 - 비용집행관리 (메뉴명 변경 반영)
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -935,7 +939,7 @@ with tabs[7]:
                 st.session_state['chongmu_auth'] = True; st.rerun()
             else: st.error("비밀번호 불일치")
     else:
-        st.subheader("🧾 비용집행관리 (영수증)")
+        st.subheader("🧾 비용집행관리")
         
         with st.expander("➕ 새 비용집행 내역 등록하기"):
             with st.form("new_receipt_form"):
@@ -1002,7 +1006,7 @@ with tabs[7]:
                     </style>
                 </head>
                 <body>
-                    <h1>비용집행(영수증) 내역 보고서</h1>
+                    <h1>비용집행 내역 보고서</h1>
                     <div class="summary">
                         조회 기간: {s_date} ~ {e_date} <br>
                         기간 내 총합계: {int(total_filtered_cost):,}원
@@ -1040,13 +1044,13 @@ with tabs[7]:
         else: st.info("등록된 집행 내역이 없습니다.")
 
 # ==========================================
-# [탭 8] 총무 전용 - 회비관리
+# [탭 8] 총무 전용 - 회비관리 (메뉴명 변경 반영)
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
-        st.subheader("💰 회비관리 (출납부)")
+        st.subheader("💰 회비관리")
         
         total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
         total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
