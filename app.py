@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.5", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.6", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -234,9 +234,16 @@ def get_all_data():
         df_a = pd.DataFrame(vals_a[1:], columns=vals_a[0]) if len(vals_a) > 1 else pd.DataFrame()
         df_a['sheet_row'] = range(2, len(df_a) + 2)
         df_s = pd.DataFrame(vals_s[1:], columns=vals_s[0]) if len(vals_s) > 1 else pd.DataFrame()
+        
+        # CRUD를 위해 재무 데이터 프레임에도 sheet_row 추가
         df_r = pd.DataFrame(vals_r[1:], columns=vals_r[0]) if len(vals_r) > 1 else pd.DataFrame()
+        if not df_r.empty: df_r['sheet_row'] = range(2, len(df_r) + 2)
+        
         df_in = pd.DataFrame(vals_in[1:], columns=vals_in[0]) if len(vals_in) > 1 else pd.DataFrame()
+        if not df_in.empty: df_in['sheet_row'] = range(2, len(df_in) + 2)
+            
         df_out = pd.DataFrame(vals_out[1:], columns=vals_out[0]) if len(vals_out) > 1 else pd.DataFrame()
+        if not df_out.empty: df_out['sheet_row'] = range(2, len(df_out) + 2)
         
         return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s, ws_r, df_r, ws_in, df_in, ws_out, df_out
     except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame()
@@ -249,6 +256,16 @@ if df is None or df.empty:
 
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
+
+if '이름' in df.columns:
+    valid_names_df = df[df['이름'].astype(str).str.strip() != '']
+    dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
+    if len(dup_names) > 0:
+        dup_details = []
+        for n in dup_names:
+            rows = valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()
+            dup_details.append(f"[{n}: 구글시트 {rows}행]")
+        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다!\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
@@ -745,7 +762,7 @@ with tabs[4]:
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 5] 출석 (동적 정밀 매핑 저장 및 에러 완벽 해결)
+# [탭 5] 출석 (동적 정밀 매핑 저장 및 에러 완벽 해결 유지)
 # ==========================================
 with tabs[5]:
     st.subheader("📅 주간 출석 현황")
@@ -835,7 +852,6 @@ with tabs[5]:
                 
                 req_headers_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
                 
-                # 에러 방지: 시트에 없는 열이 있다면 넉넉하게 추가부터 진행
                 missing_headers = [h for h in req_headers_order if norm_text(h) not in h_map]
                 if missing_headers:
                     try: ws_stat.add_cols(len(missing_headers) + 5)
@@ -879,7 +895,7 @@ with tabs[5]:
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 통계 (중복 열 에러 완벽 해결 및 지정 순서 고정)
+# [탭 6] 통계 (중복 열 에러 완벽 해결 및 지정 순서 고정 유지)
 # ==========================================
 with tabs[6]:
     st.subheader("📊 통계")
@@ -892,16 +908,10 @@ with tabs[6]:
             df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
             
             rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고', '내용(비고)': '행사명'}
-            
-            # [해결 핵심]
-            # 1. 딕셔너리에 따라 먼저 이름 변경
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
-            # 2. 모든 열 이름의 앞뒤 공백 제거 (시트에 "비고 " 등으로 들어가 있던 것을 "비고"로 통일)
             df_stat_renamed.columns = [str(c).strip() for c in df_stat_renamed.columns]
-            # 3. 공백 제거 후 발생할 수 있는 '완벽히 똑같은 이름의 중복 열'을 제거 (첫번째 열만 남김)
             df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
             
-            # [순서 고정] 요청하신 리스트 순서 100% 매칭 강제 정렬
             preferred_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
             actual_order = [c for c in preferred_order if c in df_stat_renamed.columns]
             for c in df_stat_renamed.columns:
@@ -932,7 +942,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리
+# [탭 7] 총무 전용 - 비용집행관리 (★ 5대 개선사항 완벽 반영)
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -945,7 +955,69 @@ with tabs[7]:
     else:
         st.subheader("🧾 비용집행관리")
         
-        with st.expander("➕ 새 비용집행 내역 등록하기"):
+        # 1. 탭 상단 스마트 대시보드
+        if not df_r.empty:
+            df_r_calc = df_r.copy()
+            df_r_calc['날짜_dt'] = pd.to_datetime(df_r_calc['날짜'], errors='coerce')
+            curr_month = datetime.date.today().replace(day=1)
+            this_month_df = df_r_calc[df_r_calc['날짜_dt'].dt.date >= curr_month]
+            monthly_cost = pd.to_numeric(this_month_df['비용'], errors='coerce').sum()
+            total_cost = pd.to_numeric(df_r_calc['비용'], errors='coerce').sum()
+            
+            mc1, mc2 = st.columns(2)
+            mc1.metric(f"이번 달 ({curr_month.month}월) 집행액", f"{int(monthly_cost):,}원")
+            mc2.metric("전체 누적 집행액", f"{int(total_cost):,}원")
+        st.divider()
+
+        # 2. 강력한 모드 선택 (조회/등록/수정/삭제)
+        mode_r = st.radio("메뉴 선택", ["👀 조회 및 출력", "➕ 신규 등록", "📝 내역 수정", "🚨 내역 삭제"], horizontal=True)
+        
+        if mode_r == "👀 조회 및 출력":
+            if not df_r.empty:
+                # 필터 검색 영역
+                col_f1, col_f2 = st.columns(2)
+                min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
+                min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
+                max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
+                
+                date_range = col_f1.date_input("조회 기간 선택", [min_date, max_date])
+                keyword = col_f2.text_input("검색어 (상호명 또는 내용)")
+                
+                # 필터링 적용
+                if len(date_range) == 2: s_date, e_date = date_range
+                else: s_date, e_date = min_date, max_date
+                
+                df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
+                if keyword:
+                    df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
+                
+                if not df_r_filtered.empty:
+                    display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
+                    st.dataframe(df_r_filtered[display_cols], use_container_width=True, hide_index=True)
+                    
+                    # 엑셀 다운로드 (CSV)
+                    st.download_button(
+                        label="📊 현재 내역 엑셀(CSV) 다운로드",
+                        data=df_r_filtered[display_cols].to_csv(index=False).encode('utf-8-sig'),
+                        file_name=f"비용집행내역_{s_date}_{e_date}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+                    st.markdown("---")
+                    st.markdown("##### 📸 영수증 갤러리 뷰 (앱 내 즉시 확인)")
+                    for _, row in df_r_filtered.iterrows():
+                        img_url = str(row.get('영수증사진',''))
+                        if img_url and str(img_url).startswith('http'):
+                            clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
+                            with st.expander(f"🧾 [No.{row.get('번호','')}] {row.get('날짜','')} - {row.get('구매처','')} ({row.get('비용','')}원)"):
+                                st.image(clean_url, use_container_width=True)
+                else:
+                    st.warning("조건에 맞는 내역이 없습니다.")
+            else:
+                st.info("등록된 비용 집행 내역이 없습니다.")
+                
+        elif mode_r == "➕ 신규 등록":
             with st.form("new_receipt_form"):
                 rc_date = st.date_input("날짜", datetime.date.today()).strftime("%Y-%m-%d")
                 rc_vendor = st.text_input("구매처 (상호명)")
@@ -959,135 +1031,162 @@ with tabs[7]:
                         p_url = upload_photo(rc_photo, f"영수증_{rc_vendor}") if rc_photo else ""
                         new_num = len(df_r) + 1 if not df_r.empty else 1
                         ws_r.append_row([new_num, rc_date, rc_vendor, rc_detail, rc_cost, rc_memo, p_url])
-                        st.success("등록되었습니다!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
+                        st.success("등록되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
-        st.markdown("---")
-        st.markdown("##### 🔎 기간별 조회 및 PDF 인쇄")
-        
-        df_r_filtered = pd.DataFrame()
-        if not df_r.empty:
-            df_r_calc = df_r.copy()
-            df_r_calc['날짜_dt'] = pd.to_datetime(df_r_calc['날짜'], errors='coerce')
-            min_date = df_r_calc['날짜_dt'].min().date() if pd.notnull(df_r_calc['날짜_dt'].min()) else datetime.date.today()
-            max_date = df_r_calc['날짜_dt'].max().date() if pd.notnull(df_r_calc['날짜_dt'].max()) else datetime.date.today()
-            
-            date_range = st.date_input("조회 기간 선택", [min_date, max_date])
-            if len(date_range) == 2:
-                s_date, e_date = date_range
-                df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
-            else:
-                df_r_filtered = df_r_calc.copy()
-                s_date, e_date = min_date, max_date
-                
-            if not df_r_filtered.empty:
-                total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum()
-                st.metric("기간 내 총 사용액", f"{int(total_filtered_cost):,}원")
-                
-                display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고', '영수증사진']
-                st.dataframe(df_r_filtered[display_cols], use_container_width=True, hide_index=True, column_config={
-                    "비용": st.column_config.NumberColumn("비용", format="%d원"),
-                    "영수증사진": st.column_config.LinkColumn("사진 링크")
-                })
-                
-                html_content = f"""
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <title>비용집행 보고서</title>
-                    <style>
-                        body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }}
-                        h1 {{ text-align: center; color: #0366d6; }}
-                        table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; }}
-                        th, td {{ border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }}
-                        th {{ background-color: #f1f8ff; }}
-                        .receipt-box {{ margin-bottom: 20px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; }}
-                        .receipt-box img {{ max-width: 100%; max-height: 400px; display: block; margin: 10px auto; object-fit: contain; }}
-                        .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; }}
-                        @media print {{ body {{ margin: 0; }} }}
-                    </style>
-                </head>
-                <body>
-                    <h1>비용집행 내역 보고서</h1>
-                    <div class="summary">
-                        조회 기간: {s_date} ~ {e_date} <br>
-                        기간 내 총합계: {int(total_filtered_cost):,}원
-                    </div>
-                    <table>
-                        <thead>
-                            <tr><th>번호</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
-                        </thead>
-                        <tbody>
-                """
-                for _, row in df_r_filtered.iterrows():
-                    html_content += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('구매처','')}</td><td>{row.get('내용','')}</td><td>{row.get('비용','')}</td><td>{row.get('비고','')}</td></tr>"
-                html_content += "</tbody></table><hr><h2>📝 첨부 영수증 사본</h2>"
-                
-                for _, row in df_r_filtered.iterrows():
-                    img_url = str(row.get('영수증사진',''))
-                    if img_url and str(img_url).startswith('http'):
-                        clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
-                        html_content += f"""
-                        <div class="receipt-box">
-                            <strong>[No.{row.get('번호','')}] {row.get('날짜','')} - {row.get('구매처','')} ({row.get('비용','')}원)</strong>
-                            <img src="{clean_url}" alt="영수증 이미지">
-                        </div>
-                        """
-                html_content += "</body></html>"
-                
-                st.download_button(
-                    label="📄 인쇄용 보고서 다운로드 (HTML) -> 브라우저에서 열고 PDF 저장",
-                    data=html_content.encode("utf-8"),
-                    file_name=f"비용집행보고서_{s_date}_{e_date}.html",
-                    mime="text/html",
-                    use_container_width=True
-                )
-        else: st.info("등록된 집행 내역이 없습니다.")
+        elif mode_r == "📝 내역 수정" and not df_r.empty:
+            options = ["내역 선택"] + df_r.apply(lambda r: f"No.{r.get('번호','')} | {r.get('날짜','')} | {r.get('구매처','')} | {r.get('비용','')}원", axis=1).tolist()
+            sel_idx = st.selectbox("수정할 내역", range(len(options)), format_func=lambda x: options[x])
+            if sel_idx > 0:
+                target = df_r.iloc[sel_idx - 1]
+                with st.form("edit_receipt_form"):
+                    e_date = st.date_input("날짜", parse_date_safe(target.get('날짜',''))).strftime("%Y-%m-%d")
+                    e_vendor = st.text_input("구매처 (상호명)", value=target.get('구매처',''))
+                    e_detail = st.text_input("내용 (품목)", value=target.get('내용',''))
+                    try: e_c_val = int(target.get('비용', 0))
+                    except: e_c_val = 0
+                    e_cost = st.number_input("비용 (원)", value=e_c_val, step=1000)
+                    e_memo = st.text_input("비고", value=target.get('비고',''))
+                    e_photo = st.file_uploader("영수증 사진 변경 (새로 올리면 기존 사진 대체)", type=['png', 'jpg', 'jpeg'])
+                    
+                    if st.form_submit_button("수정 저장", type="primary"):
+                        with st.spinner("저장 중..."):
+                            p_url = upload_photo(e_photo, f"영수증_{e_vendor}") if e_photo else target.get('영수증사진','')
+                            r_idx = int(target['sheet_row'])
+                            
+                            cells = [
+                                gspread.Cell(r_idx, 2, e_date),
+                                gspread.Cell(r_idx, 3, e_vendor),
+                                gspread.Cell(r_idx, 4, e_detail),
+                                gspread.Cell(r_idx, 5, str(e_cost)),
+                                gspread.Cell(r_idx, 6, e_memo),
+                                gspread.Cell(r_idx, 7, p_url)
+                            ]
+                            chunked_update(ws_r, cells)
+                            st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+
+        elif mode_r == "🚨 내역 삭제" and not df_r.empty:
+            options = ["내역 선택"] + df_r.apply(lambda r: f"No.{r.get('번호','')} | {r.get('날짜','')} | {r.get('구매처','')} | {r.get('비용','')}원", axis=1).tolist()
+            sel_idx = st.selectbox("삭제할 내역", range(len(options)), format_func=lambda x: options[x])
+            if st.button("🚨 삭제 실행") and sel_idx > 0:
+                target = df_r.iloc[sel_idx - 1]
+                ws_r.delete_rows(int(target['sheet_row']))
+                st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 8] 총무 전용 - 회비관리
+# [탭 8] 총무 전용 - 회비관리 (★ 5대 개선사항 완벽 반영)
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
-        st.subheader("💰 회비관리")
+        st.subheader("💰 회비관리 장부")
         
+        # 1. 스마트 대시보드
         total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
         total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
         balance = total_in - total_out
         
         col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("총 입금액", f"{int(total_in):,}원")
-        col_m2.metric("총 지출액", f"{int(total_out):,}원")
-        col_m3.metric("현재 잔액", f"{int(balance):,}원")
+        col_m1.metric("🟢 누적 수입액", f"{int(total_in):,}원")
+        col_m2.metric("🔴 누적 지출액", f"{int(total_out):,}원")
+        col_m3.metric("💲 현재 총 잔액", f"{int(balance):,}원")
         st.divider()
         
-        tab_in, tab_out = st.tabs(["📥 입금 내역", "📤 지출 내역"])
-        with tab_in:
-            with st.form("new_income_form"):
-                col_i1, col_i2 = st.columns(2)
-                in_date = col_i1.date_input("입금 일자", datetime.date.today()).strftime("%Y-%m-%d")
-                in_name = col_i2.text_input("입금자명")
-                in_amount = col_i1.number_input("입금액 (원)", min_value=0, step=1000)
-                in_memo = col_i2.text_input("비고")
-                if st.form_submit_button("입금 내역 추가", type="primary"):
-                    new_num = len(df_in) + 1 if not df_in.empty else 1
-                    ws_in.append_row([new_num, in_date, in_name, in_amount, in_memo])
-                    st.success("입금 등록 완료!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
-            if not df_in.empty: st.dataframe(df_in, use_container_width=True, hide_index=True)
-            
-        with tab_out:
-            with st.form("new_expense_form"):
-                col_o1, col_o2 = st.columns(2)
-                out_date = col_o1.date_input("지출 일자", datetime.date.today()).strftime("%Y-%m-%d")
-                out_detail = col_o2.text_input("내용")
-                out_amount = col_o1.number_input("지출액 (원)", min_value=0, step=1000)
-                out_memo = col_o2.text_input("비고")
-                out_photo = st.file_uploader("지출 증빙(영수증) 업로드", type=['png', 'jpg', 'jpeg'])
-                if st.form_submit_button("지출 내역 추가", type="primary"):
-                    with st.spinner("업로드 중..."):
-                        p_url = upload_photo(out_photo, f"지출_{out_detail}") if out_photo else ""
-                        new_num = len(df_out) + 1 if not df_out.empty else 1
-                        ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url])
-                        st.success("지출 등록 완료!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
-            if not df_out.empty: st.dataframe(df_out, use_container_width=True, hide_index=True, column_config={"영수증사진": st.column_config.LinkColumn("증빙 링크")})
+        # 2. CRUD 탭 분리
+        mode_l = st.radio("메뉴 선택", ["👀 전체 장부 조회", "➕ 내역 등록(입금/지출)", "📝 내역 수정", "🚨 내역 삭제"], horizontal=True)
+        
+        if mode_l == "👀 전체 장부 조회":
+            col_l1, col_l2 = st.columns(2)
+            with col_l1:
+                st.markdown("##### 📥 수입 (입금 내역)")
+                if not df_in.empty: 
+                    st.dataframe(df_in[['날짜', '입금자명', '입금액', '비고']], use_container_width=True, hide_index=True)
+                    st.download_button("📥 수입내역 엑셀 다운로드", data=df_in.to_csv(index=False).encode('utf-8-sig'), file_name="회비_수입내역.csv", mime="text/csv", use_container_width=True)
+                else: st.info("수입 내역이 없습니다.")
+            with col_l2:
+                st.markdown("##### 📤 지출 (집행 내역)")
+                if not df_out.empty: 
+                    st.dataframe(df_out[['날짜', '내용', '지출액', '비고']], use_container_width=True, hide_index=True)
+                    st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
+                else: st.info("지출 내역이 없습니다.")
+
+        elif mode_l == "➕ 내역 등록(입금/지출)":
+            tab_in, tab_out = st.tabs(["📥 회비 입금 등록", "📤 회비 지출 등록"])
+            with tab_in:
+                with st.form("new_income_form"):
+                    col_i1, col_i2 = st.columns(2)
+                    in_date = col_i1.date_input("입금 일자", datetime.date.today()).strftime("%Y-%m-%d")
+                    in_name = col_i2.text_input("입금자명")
+                    in_amount = col_i1.number_input("입금액 (원)", min_value=0, step=1000)
+                    in_memo = col_i2.text_input("비고")
+                    if st.form_submit_button("입금 내역 추가", type="primary"):
+                        new_num = len(df_in) + 1 if not df_in.empty else 1
+                        ws_in.append_row([new_num, in_date, in_name, in_amount, in_memo])
+                        st.success("입금 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+            with tab_out:
+                with st.form("new_expense_form"):
+                    col_o1, col_o2 = st.columns(2)
+                    out_date = col_o1.date_input("지출 일자", datetime.date.today()).strftime("%Y-%m-%d")
+                    out_detail = col_o2.text_input("내용")
+                    out_amount = col_o1.number_input("지출액 (원)", min_value=0, step=1000)
+                    out_memo = col_o2.text_input("비고")
+                    out_photo = st.file_uploader("지출 증빙(영수증) 업로드", type=['png', 'jpg', 'jpeg'])
+                    if st.form_submit_button("지출 내역 추가", type="primary"):
+                        with st.spinner("업로드 중..."):
+                            p_url = upload_photo(out_photo, f"회비지출_{out_detail}") if out_photo else ""
+                            new_num = len(df_out) + 1 if not df_out.empty else 1
+                            ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url])
+                            st.success("지출 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+        
+        elif mode_l == "📝 내역 수정":
+            e_type = st.radio("수정할 장부", ["입금 장부", "지출 장부"], horizontal=True)
+            if e_type == "입금 장부" and not df_in.empty:
+                opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {r.get('입금액','')}원", axis=1).tolist()
+                idx = st.selectbox("수정할 입금 내역", range(len(opts)), format_func=lambda x: opts[x])
+                if idx > 0:
+                    t = df_in.iloc[idx - 1]
+                    with st.form("edit_in_form"):
+                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d")
+                        e_n = st.text_input("입금자명", value=t.get('입금자명',''))
+                        try: ev = int(t.get('입금액',0))
+                        except: ev = 0
+                        e_a = st.number_input("입금액", value=ev, step=1000)
+                        e_m = st.text_input("비고", value=t.get('비고',''))
+                        if st.form_submit_button("수정 저장", type="primary"):
+                            r_idx = int(t['sheet_row'])
+                            chunked_update(ws_in, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_n), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m)])
+                            st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+            elif e_type == "지출 장부" and not df_out.empty:
+                opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {r.get('지출액','')}원", axis=1).tolist()
+                idx = st.selectbox("수정할 지출 내역", range(len(opts)), format_func=lambda x: opts[x])
+                if idx > 0:
+                    t = df_out.iloc[idx - 1]
+                    with st.form("edit_out_form"):
+                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d")
+                        e_c = st.text_input("내용", value=t.get('내용',''))
+                        try: ev = int(t.get('지출액',0))
+                        except: ev = 0
+                        e_a = st.number_input("지출액", value=ev, step=1000)
+                        e_m = st.text_input("비고", value=t.get('비고',''))
+                        e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg'])
+                        if st.form_submit_button("수정 저장", type="primary"):
+                            with st.spinner("업로드 중..."):
+                                p_url = upload_photo(e_p, f"회비지출_{e_c}") if e_p else t.get('영수증사진','')
+                                r_idx = int(t['sheet_row'])
+                                chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)])
+                                st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+
+        elif mode_l == "🚨 내역 삭제":
+            d_type = st.radio("삭제할 장부", ["입금 장부", "지출 장부"], horizontal=True)
+            if d_type == "입금 장부" and not df_in.empty:
+                opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {r.get('입금액','')}원", axis=1).tolist()
+                idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x])
+                if st.button("🚨 입금 삭제 실행") and idx > 0:
+                    ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row']))
+                    st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+            elif d_type == "지출 장부" and not df_out.empty:
+                opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {r.get('지출액','')}원", axis=1).tolist()
+                idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x])
+                if st.button("🚨 지출 삭제 실행") and idx > 0:
+                    ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row']))
+                    st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
