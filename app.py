@@ -11,6 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
+# 외부에 노출되는 버전 V1.0으로 통일
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
@@ -84,7 +85,7 @@ if not st.session_state["authenticated"]:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.container(border=True):
-            st.markdown("<h2 style='text-align: center; color: #0366d6;'>🌱 26년 슈팅스타 통합관리</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; color: #0366d6;'>🌱 26년 슈팅스타 통합관리 V1.0</h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; color: gray; margin-bottom: 20px;'>안전한 시스템 접근을 위해 관리자 비밀번호를 입력해주세요.</p>", unsafe_allow_html=True)
             pwd = st.text_input("비밀번호 (특수문자 포함)", type="password", placeholder="비밀번호 입력", label_visibility="collapsed")
             if st.button("🚀 시스템 로그인", use_container_width=True, type="primary"):
@@ -303,10 +304,11 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 다이얼로그 모달: 주보 보기 ---
-@st.dialog("📖 주보 보기")
+# --- 다이얼로그 모달: 주보 보기 (2배 줌) ---
+# width="large" 속성을 적용하여 모달 크기 대폭 확장
+@st.dialog("📖 주보 보기", width="large")
 def view_bulletin_dialog(w_str, d_str, row_data):
-    st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h4>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h3>", unsafe_allow_html=True)
     memo = str(row_data.get('비고', '')).strip()
     if memo:
         st.info(f"📝 비고: {memo}")
@@ -317,24 +319,27 @@ def view_bulletin_dialog(w_str, d_str, row_data):
     t1, t2 = st.tabs(["앞면 (1쪽)", "뒷면 (2쪽)"])
     with t1:
         if img1 and "http" in img1:
-            st.image(img1.replace("&vid=1", "").replace("?vid=1", ""), use_container_width=True)
+            clean_url = img1.replace("&vid=1", "").replace("?vid=1", "")
+            # 커스텀 HTML 마크업으로 가로 100% 꽉 채우기 (2배 확대 효과)
+            st.markdown(f"<img src='{clean_url}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else:
             st.write("등록된 앞면 이미지가 없습니다.")
     with t2:
         if img2 and "http" in img2:
-            st.image(img2.replace("&vid=1", "").replace("?vid=1", ""), use_container_width=True)
+            clean_url = img2.replace("&vid=1", "").replace("?vid=1", "")
+            st.markdown(f"<img src='{clean_url}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else:
             st.write("등록된 뒷면 이미지가 없습니다.")
 
 # --- 다이얼로그 모달: 주보 관리 ---
 @st.dialog("📝 주보 등록/수정 관리")
 def manage_bulletin_dialog(w_str, d_str):
-    st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h4>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보 설정</h4>", unsafe_allow_html=True)
     existing_data = df_b[df_b['주차'] == w_str] if not df_b.empty else pd.DataFrame()
     
     with st.form(f"bulletin_form_{w_str}"):
         memo = st.text_input("📝 비고 (예: 신년감사예배, 야외예배 등)", value=existing_data.iloc[0].get('비고', '') if not existing_data.empty else "")
-        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다. 기존에 업로드된 주보가 있다면 아래에 미리보기가 표시됩니다.")
+        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다.")
         img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg'])
         img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg'])
         
@@ -657,7 +662,7 @@ with tabs[1]:
                     st.success("✅ 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 2] 생일표
+# [탭 2] 생일표 (★ 오토스크롤 스니펫 추가)
 # ==========================================
 with tabs[2]:
     st.subheader("🎂 월별 생일 명단")
@@ -673,11 +678,14 @@ with tabs[2]:
                 b_map[m].append({"name": r['이름'], "class": r.get(class_col,''), "day": d, "role": r['role']})
             except: pass
             
+    curr_month = datetime.date.today().month
     for row_idx in range(4):
         cols = st.columns(3)
         for col_idx in range(3):
             m = row_idx * 3 + col_idx + 1
             with cols[col_idx]:
+                if m == curr_month:
+                    st.markdown('<div id="current-month-anchor" style="position:relative; top:-80px;"></div>', unsafe_allow_html=True)
                 with st.container(border=True):
                     st.markdown(f"<h4 style='color:#0366d6; margin-bottom:0px;'>📅 {m}월</h4>", unsafe_allow_html=True); st.divider()
                     month_data = b_map[m]
@@ -689,6 +697,22 @@ with tabs[2]:
                             st.markdown(f"<div style='display:flex; justify-content:space-between; margin-bottom:5px;'>{n_disp} <span style='font-size:0.8rem; color:gray;'>({p['class']})</span><strong style='color:#e65100;'>{p['day']}일</strong></div>", unsafe_allow_html=True)
                     else:
                         st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
+                        
+    # 생일 탭 오토스크롤 옵저버
+    components.html("""
+        <script>
+        let scrollDoneMonth = false;
+        setInterval(() => {
+            const el = window.parent.document.getElementById('current-month-anchor');
+            if (el && el.offsetParent !== null && !scrollDoneMonth) {
+                el.scrollIntoView({behavior: 'smooth', block: 'center'});
+                scrollDoneMonth = true;
+            } else if (el && el.offsetParent === null) {
+                scrollDoneMonth = false;
+            }
+        }, 500);
+        </script>
+    """, height=0, width=0)
 
 # ==========================================
 # [탭 3] 기도순서
@@ -789,7 +813,7 @@ with tabs[3]:
             time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 4] 신규 메뉴 - 주보 관리 (★ 보기/관리 모드 완벽 분리 구현)
+# [탭 4] 신규 메뉴 - 주보 (★ 중앙 오토포커스 스크롤 적용)
 # ==========================================
 with tabs[4]:
     st.subheader("📝 주보 관리 및 조회")
@@ -802,6 +826,14 @@ with tabs[4]:
         
     st.divider()
     
+    today_date = datetime.date.today()
+    curr_week_idx = 1
+    for i in range(1, 53):
+        w_date = start_date + datetime.timedelta(days=(i-1)*7)
+        if w_date <= today_date < w_date + datetime.timedelta(days=7):
+            curr_week_idx = i
+            break
+            
     b_cols = st.columns(4)
     for i in range(1, 53):
         w_str = f"{i}주"
@@ -819,6 +851,9 @@ with tabs[4]:
         btn_label = f"✅ {w_str} ({d_str})" if is_bulletin_exist else f"⬜ {w_str} ({d_str})"
         
         with b_cols[(i-1) % 4]:
+            if i == curr_week_idx:
+                st.markdown('<div id="current-week-anchor" style="position:relative; top:-80px;"></div>', unsafe_allow_html=True)
+                
             if st.button(btn_label, key=f"btn_bulletin_{i}", use_container_width=True, type=btn_type):
                 if b_mode == "👀 주보 보기":
                     if is_bulletin_exist:
@@ -827,6 +862,22 @@ with tabs[4]:
                         st.warning(f"⚠️ {w_str} ({d_str}) 주보는 아직 등록되지 않았습니다. [⚙️ 주보 등록/수정] 탭에서 먼저 올려주세요.")
                 else:
                     manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
+
+    # 주보 탭 오토스크롤 옵저버
+    components.html("""
+        <script>
+        let scrollDoneWeek = false;
+        setInterval(() => {
+            const el = window.parent.document.getElementById('current-week-anchor');
+            if (el && el.offsetParent !== null && !scrollDoneWeek) {
+                el.scrollIntoView({behavior: 'smooth', block: 'center'});
+                scrollDoneWeek = true;
+            } else if (el && el.offsetParent === null) {
+                scrollDoneWeek = false;
+            }
+        }, 500);
+        </script>
+    """, height=0, width=0)
 
 # ==========================================
 # [탭 5] 새친구
@@ -877,8 +928,7 @@ with tabs[6]:
                     gallery_html = '<div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">'
                     for media_url in valid_urls:
                         clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
-                        is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
-                        if is_vid:
+                        if 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
                             file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url) or re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                             if file_id_match:
                                 f_id = file_id_match.group(1)
@@ -933,8 +983,7 @@ with tabs[6]:
                             media_url = old_urls[idx]
                             if media_url and str(media_url).startswith('http'):
                                 clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
-                                is_vid = 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv'])
-                                if is_vid:
+                                if 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
                                     file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url) or re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                     if file_id_match:
                                         f_id = file_id_match.group(1)
