@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.0", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.1", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -370,8 +370,8 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 ---
-tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 회비관리"])
+# --- 5. 화면(탭) 구성 (★ 회비관리 명칭 -> 교사 회비 사용내역 개정 변경 적용) ---
+tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"])
 
 # ==========================================
 # [탭 0] 반편성
@@ -502,7 +502,7 @@ with tabs[1]:
     st.markdown(html_dashboard, unsafe_allow_html=True)
     
     with st.container(border=True):
-        st.markdown("##### 🔐 개인정보 열람 보안 설정")
+        st.markdown("##### 🔐 개인정보 보호 설정")
         if st.session_state['privacy_mode']:
             st.markdown("현재 생년월일, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
             c_p1, c_p2 = st.columns([3, 1])
@@ -775,7 +775,7 @@ with tabs[4]:
                     if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
                     if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
                     if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
-                    for k in range(1, 16):
+                    for k (1, 16):
                         if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
                     ws_act.append_row(new_row)
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
@@ -981,7 +981,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리 (UI 개선 #10 적용 및 영수증 2/3 뷰포트 확대)
+# [탭 7] 총무 전용 - 비용집행관리 (★ V2.0 요구사항 레이아웃 고도화)
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -1022,14 +1022,14 @@ with tabs[7]:
         if mode_r == "👀 조회 및 출력":
             if not df_r.empty:
                 with st.container(border=True):
-                    # UI 개선: 조회기간 필터와 총합계를 한눈에 나란히 배치
+                    # ★ UI 개선: 조회기간 바로 옆(우측)에 합계 금액이 나란히 오도록 배치 구성
                     col_f1, col_f2, col_f3 = st.columns([2, 2, 1.5])
                     min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
                     min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
                     max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
                     
                     date_range = col_f1.date_input("조회 기간 선택", [min_date, max_date])
-                    keyword = col_f2.text_input("검색어 (상호명 또는 내용)", placeholder="검색어를 입력하세요")
+                    keyword = col_f2.text_input("검색어 (구매처 또는 내용)", placeholder="검색어를 입력하세요")
                     
                     if len(date_range) == 2: s_date, e_date = date_range
                     else: s_date, e_date = min_date, max_date
@@ -1040,16 +1040,19 @@ with tabs[7]:
                     
                     total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum() if not df_r_filtered.empty else 0
                     
-                    # 조회기간 총합계를 필터 바로 옆에 직관적 배치
-                    col_f3.metric("선택된 기간 총 집행액", f"{int(total_filtered_cost):,}원")
+                    # ★ 조회기간 필터 우측 옆칸에 실시간 총 집행 합계금액 위젯 연동
+                    col_f3.metric("📅 선택 기간 총 집행액", f"{int(total_filtered_cost):,}원")
                 
                 if not df_r_filtered.empty:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
                     display_df = df_r_filtered[display_cols].copy()
-                    # 콤마 포함한 회계 금액 포맷팅으로 문자열 변환
-                    display_df['비용'] = display_df['비용'].apply(lambda x: f"{parse_int_safe(x):,}원")
                     
-                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    # ★ 비용 입력 회계처리(우측정렬 및 수치 포맷팅 유지 연동)
+                    display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
+                    
+                    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config={
+                        "비용": st.column_config.NumberColumn("비용", format="%d원")
+                    })
                     
                     st.download_button(
                         label="📊 현재 조회 내역 엑셀(CSV) 다운로드",
@@ -1061,29 +1064,35 @@ with tabs[7]:
                     
                     st.info("💡 아래 버튼을 눌러 인쇄용 문서를 다운로드한 후 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 진행하세요.")
                     
-                    # 영수증 이미지를 2/3 사이즈로 확대 적용한 HTML 스키마
+                    # ★ PDF 인쇄명칭 변경 & 정렬 세분화 CSS & 1부터 시작하는 순번 재배치
                     html_content = f"""
                     <html>
                     <head>
                         <meta charset="utf-8">
-                        <title>비용집행 보고서</title>
+                        <title>슈팅스타 유년부 집행내역(요약본)</title>
                         <style>
                             body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }}
                             h1, h2 {{ text-align: center; color: #0366d6; }}
                             table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }}
                             tr {{ page-break-inside: avoid; page-break-after: auto; }}
-                            th, td {{ border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }}
-                            th {{ background-color: #f1f8ff; }}
+                            th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }}
+                            td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }}
+                            
+                            /* 지정 항목 정렬 CSS 스키마 설계 */
+                            .align-center {{ text-align: center; }}
+                            .align-right {{ text-align: right; }}
+                            .align-left {{ text-align: left; }}
+                            
                             .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }}
                             .receipt-section {{ page-break-before: always; }}
                             .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }}
-                            /* 영수증 이미지 사이즈 2/3 화면 할당 (최대 높이 850px) */
-                            .receipt-box img {{ width: 70%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
+                            /* 영수증 화면 크기 2/3로 최적화 고해상도 확대 */
+                            .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
                             @media print {{ body {{ margin: 0; }} }}
                         </style>
                     </head>
                     <body>
-                        <h1>비용집행 장부 보고서 (요약본)</h1>
+                        <h1>슈팅스타 유년부 집행내역(요약본)</h1>
                         <div class="summary">
                             조회 기간: {s_date} ~ {e_date} &nbsp;&nbsp;|&nbsp;&nbsp; 기간 내 총합계금액: {int(total_filtered_cost):,}원
                         </div>
@@ -1095,18 +1104,26 @@ with tabs[7]:
                             </thead>
                             <tbody>
                     """
-                    for _, row in df_r_filtered.iterrows():
-                        html_content += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('구매처','')}</td><td>{row.get('내용','')}</td><td>{parse_int_safe(row.get('비용', 0)):,}</td><td>{row.get('비고','')}</td></tr>"
+                    # ★ 인쇄 시 번호와 영수증 순번이 항상 1부터 순차 정렬 매핑 시작
+                    for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
+                        html_content += f"""<tr>
+                            <td class="align-center">{idx}</td>
+                            <td class="align-center">{row.get('날짜','')}</td>
+                            <td class="align-center">{row.get('구매처','')}</td>
+                            <td class="align-left">{row.get('내용','')}</td>
+                            <td class="align-right">{parse_int_safe(row.get('비용', 0)):,}</td>
+                            <td class="align-left">{row.get('비고','')}</td>
+                        </tr>"""
                     html_content += "</tbody></table>"
                     
                     html_content += "<div class='receipt-section'><h2>📸 지출 증빙 영수증 사본 첨부 (순차 정렬)</h2>"
-                    for _, row in df_r_filtered.iterrows():
+                    for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
                         img_url = str(row.get('영수증사진',''))
                         if img_url and str(img_url).startswith('http'):
                             clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
                             html_content += f"""
                             <div class="receipt-box">
-                                <strong>[순번 No.{row.get('번호','')}] {row.get('날짜','')} - {row.get('구매처','')} ({parse_int_safe(row.get('비용', 0)):,}원)</strong>
+                                <strong>[순번 No.{idx}] {row.get('날짜','')} - {row.get('구매처','')} ({parse_int_safe(row.get('비용', 0)):,}원)</strong>
                                 <br><small>지출내역: {row.get('내용','')} | 비고: {row.get('비고','')}</small>
                                 <img src="{clean_url}" alt="영수증 사본">
                             </div>
@@ -1179,19 +1196,19 @@ with tabs[7]:
                 st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 8] 총무 전용 - 회비관리 (UI 개선 #11 적용 및 영수증 2/3 뷰포트 확대)
+# [탭 8] 총무 전용 - 교사 회비 사용내역 (★ 장부제목 공식 수정 개정 반영)
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
-        st.subheader("💰 회비관리 장부")
+        st.subheader("💰 교사 회비 사용내역")
+        
+        total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
+        total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
+        balance = total_in - total_out
         
         with st.container(border=True):
-            total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
-            total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
-            balance = total_in - total_out
-            
             col_m1, col_m2, col_m3 = st.columns(3)
             col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원")
             col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원")
@@ -1205,46 +1222,61 @@ with tabs[8]:
             with col_l1:
                 st.markdown("##### 📥 수입 (입금 내역)")
                 if not df_in.empty: 
-                    # 금액에 천 단위 콤마 씌워서 출력
-                    disp_in = df_in[['날짜', '입금자명', '입금액', '비고']].copy()
-                    disp_in['입금액'] = disp_in['입금액'].apply(lambda x: f"{parse_int_safe(x):,}원")
-                    st.dataframe(disp_in, use_container_width=True, hide_index=True)
+                    disp_in = df_in[['번호', '날짜', '입금자명', '입금액', '비고']].copy()
+                    
+                    # ★ 수입 입금액 회계처리 (우측정렬 연동)
+                    disp_in['입금액'] = pd.to_numeric(disp_in['입금액'], errors='coerce').fillna(0).astype(int)
+                    
+                    st.dataframe(disp_in, use_container_width=True, hide_index=True, column_config={
+                        "입금액": st.column_config.NumberColumn("입금액", format="%d원")
+                    })
                     st.download_button("📥 수입내역 엑셀 다운로드", data=df_in.to_csv(index=False).encode('utf-8-sig'), file_name="회비_수입내역.csv", mime="text/csv", use_container_width=True)
                 else: st.info("수입 내역이 없습니다.")
             with col_l2:
                 st.markdown("##### 📤 지출 (집행 내역)")
                 if not df_out.empty: 
-                    # 금액에 천 단위 콤마 씌워서 출력
-                    disp_out = df_out[['날짜', '내용', '지출액', '비고']].copy()
-                    disp_out['지출액'] = disp_out['지출액'].apply(lambda x: f"{parse_int_safe(x):,}원")
-                    st.dataframe(disp_out, use_container_width=True, hide_index=True)
+                    disp_out = df_out[['번호', '날짜', '내용', '지출액', '비고']].copy()
+                    
+                    # ★ 지출액 회계처리 (우측정렬 연동)
+                    disp_out['지출액'] = pd.to_numeric(disp_out['지출액'], errors='coerce').fillna(0).astype(int)
+                    
+                    st.dataframe(disp_out, use_container_width=True, hide_index=True, column_config={
+                        "지출액": st.column_config.NumberColumn("지출액", format="%d원")
+                    })
                     st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
                 else: st.info("지출 내역이 없습니다.")
             
             st.markdown("---")
-            st.markdown("##### 📄 회비관리 전체 보고서 출력 (인쇄/PDF 저장)")
+            st.markdown("##### 📄 회비장부 보고서 출력 (인쇄/PDF 저장)")
             
+            # ★ PDF 타이틀 개정명칭 반영 및 정렬 2/3 사이즈 확대 스키마 적용
             html_ledger = f"""
             <html>
             <head>
                 <meta charset="utf-8">
-                <title>회비 관리 보고서</title>
+                <title>교사 회비 사용내역 보고서</title>
                 <style>
                     body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }}
                     h1, h2 {{ text-align: center; color: #0366d6; }}
                     .summary-box {{ padding: 15px; background-color: #f1f8ff; border: 1px solid #cce5ff; border-radius: 8px; margin-bottom: 25px; font-size: 15px; font-weight: bold; text-align: center; }}
                     table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }}
                     tr {{ page-break-inside: avoid; page-break-after: auto; }}
-                    th, td {{ border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 13px; }}
-                    th {{ background-color: #f1f8ff; }}
+                    th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }}
+                    td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }}
+                    
+                    /* 정렬 가이드 설계 */
+                    .align-center {{ text-align: center; }}
+                    .align-right {{ text-align: right; }}
+                    .align-left {{ text-align: left; }}
+                    
                     .receipt-section {{ page-break-before: always; }}
                     .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }}
-                    /* 영수증 이미지 사이즈 2/3 화면 할당 */
-                    .receipt-box img {{ width: 70%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
+                    /* 영수증 크기 2/3 비율로 웅장하게 확대 */
+                    .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
                 </style>
             </head>
             <body>
-                <h1>교회 회비 결산 결재 보고서</h1>
+                <h1>교사 회비 사용내역 보고서</h1>
                 <div class="summary-box">
                     보고서 출력일: {datetime.date.today().strftime('%Y-%m-%d')} &nbsp;&nbsp;|&nbsp;&nbsp; 🟢 누적 수입: {int(total_in):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 🔴 누적 지출: {int(total_out):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 💲 현재 잔액: {int(balance):,}원
                 </div>
@@ -1257,10 +1289,17 @@ with tabs[8]:
                     <tbody>
             """
             if not df_in.empty:
-                for _, row in df_in.iterrows():
-                    html_ledger += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('입금자명','')}</td><td>{parse_int_safe(row.get('입금액', 0)):,}</td><td>{row.get('비고','')}</td></tr>"
+                # ★ 필터링 후 인쇄 시 1부터 재정렬되어 순차 부여되는 카운터 로직
+                for idx, (_, row) in enumerate(df_in.iterrows(), start=1):
+                    html_ledger += f"""<tr>
+                        <td class="align-center">{idx}</td>
+                        <td class="align-center">{row.get('날짜','')}</td>
+                        <td class="align-center">{row.get('입금자명','')}</td>
+                        <td class="align-right">{parse_int_safe(row.get('입금액', 0)):,}</td>
+                        <td class="align-left">{row.get('비고','')}</td>
+                    </tr>"""
             else:
-                html_ledger += "<tr><td colspan='5'>입금 내역이 존재하지 않습니다.</td></tr>"
+                html_ledger += "<tr><td colspan='5' class='align-center'>입금 내역이 존재하지 않습니다.</td></tr>"
                 
             html_ledger += """
                     </tbody>
@@ -1274,10 +1313,17 @@ with tabs[8]:
                     <tbody>
             """
             if not df_out.empty:
-                for _, row in df_out.iterrows():
-                    html_ledger += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('내용','')}</td><td>{parse_int_safe(row.get('지출액', 0)):,}</td><td>{row.get('비고','')}</td></tr>"
+                # ★ 필터링 후 인쇄 시 1부터 재정렬되어 순차 부여되는 카운터 로직
+                for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
+                    html_ledger += f"""<tr>
+                        <td class="align-center">{idx}</td>
+                        <td class="align-center">{row.get('날짜','')}</td>
+                        <td class="align-left">{row.get('내용','')}</td>
+                        <td class="align-right">{parse_int_safe(row.get('지출액', 0)):,}</td>
+                        <td class="align-left">{row.get('비고','')}</td>
+                    </tr>"""
             else:
-                html_ledger += "<tr><td colspan='5'>지출 내역이 존재하지 않습니다.</td></tr>"
+                html_ledger += "<tr><td colspan='5' class='align-center'>지출 내역이 존재하지 않습니다.</td></tr>"
                 
             html_ledger += """
                     </tbody>
@@ -1287,13 +1333,14 @@ with tabs[8]:
                     <h2>📸 3. 회비 지출 증빙 영수증 사본 목록</h2>
             """
             if not df_out.empty:
-                for _, row in df_out.iterrows():
+                # ★ 영수증 순번도 1부터 순차 리셋 매핑 시작
+                for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
                     img_url = str(row.get('영수증사진',''))
                     if img_url and img_url.startswith('http'):
                         clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
                         html_ledger += f"""
                         <div class="receipt-box">
-                            <strong>[지출 No.{row.get('번호','').strip()}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong>
+                            <strong>[순번 No.{idx}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong>
                             <br><small>비고 내역: {row.get('비고','')}</small>
                             <img src="{clean_url}" alt="회비 영수증">
                         </div>
