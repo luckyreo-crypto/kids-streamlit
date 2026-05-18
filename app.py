@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.4", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.5", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -249,16 +249,6 @@ if df is None or df.empty:
 
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
-
-if '이름' in df.columns:
-    valid_names_df = df[df['이름'].astype(str).str.strip() != '']
-    dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
-    if len(dup_names) > 0:
-        dup_details = []
-        for n in dup_names:
-            rows = valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()
-            dup_details.append(f"[{n}: 구글시트 {rows}행]")
-        st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다!\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
@@ -824,7 +814,7 @@ with tabs[5]:
                         if not row_data.empty and v:
                             role = row_data.iloc[0]['role']
                             if role == 'student': final_s_p += 1
-                            elif role == 'teacher': final_t_p += 1 # 명확한 역할 판별로 전도사 카운트 제외 완벽 적용
+                            elif role == 'teacher': final_t_p += 1 
                     for r, v in new_att.items():
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
                     if cells_to_update: chunked_update(ws, cells_to_update)
@@ -835,22 +825,31 @@ with tabs[5]:
                 valid_enrollment_df['role'] = valid_enrollment_df.apply(get_role, axis=1)
                 student_count, teacher_count = len(valid_enrollment_df[valid_enrollment_df['role'] == 'student']), len(valid_enrollment_df[valid_enrollment_df['role'] == 'teacher'])
                 
-                # 유년부 출석 + 추가 = 유년부 합계
                 kids_total = save_s_p + guest_in
-                # 유년부 합계 + 교사출석 = 총합 (전도사 제외)
                 grand_total = kids_total + save_t_p
                 
-                # 구글 시트 실제 1행의 항목 리스트 획득
-                stat_headers = [h.strip() for h in ws_stat.row_values(1)]
+                stat_headers = [str(h).strip() for h in ws_stat.row_values(1)]
                 
-                # [해결] 공백과 타이핑 미세 차이로 항목 오인식을 차단하는 공백제거 노멀라이징 함수 생성
                 def norm_text(t): return re.sub(r'\s+', '', str(t))
                 h_map = {norm_text(h): idx for idx, h in enumerate(stat_headers)}
                 
-                # 사용자가 수동 정렬해 둔 시트의 전체 열 개수만큼 구조 유지 보장
-                new_row = [""] * len(stat_headers)
+                req_headers_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
                 
-                # 지시하신 원래 순서 매핑 테이블 정의 (시트 순서가 바뀌어도 해당 이름에 정확히 배정)
+                # 에러 방지: 시트에 없는 열이 있다면 넉넉하게 추가부터 진행
+                missing_headers = [h for h in req_headers_order if norm_text(h) not in h_map]
+                if missing_headers:
+                    try: ws_stat.add_cols(len(missing_headers) + 5)
+                    except: pass
+                    
+                    start_col = len(stat_headers) + 1
+                    h_cells = []
+                    for i, mh in enumerate(missing_headers):
+                        stat_headers.append(mh)
+                        h_map[norm_text(mh)] = len(stat_headers) - 1
+                        h_cells.append(gspread.Cell(1, start_col + i, mh))
+                    chunked_update(ws_stat, h_cells)
+                
+                new_row = [""] * len(stat_headers)
                 val_map = {
                     norm_text("주차"): sel_w,
                     norm_text("행사명"): event_text,
@@ -872,15 +871,15 @@ with tabs[5]:
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
                 if not match_stat.empty: 
                     row_idx = match_stat.index[0] + 2
-                    end_letter = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
-                    ws_stat.update(f"A{row_idx}:{end_letter}{row_idx}", [new_row])
+                    end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
+                    ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
                 else: 
                     ws_stat.append_row(new_row)
                 
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 통계 (요청하신 순서 완벽 고정 적용)
+# [탭 6] 통계 (중복 열 에러 완벽 해결 및 지정 순서 고정)
 # ==========================================
 with tabs[6]:
     st.subheader("📊 통계")
@@ -893,8 +892,14 @@ with tabs[6]:
             df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
             
             rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고', '내용(비고)': '행사명'}
-            df_stat_renamed = df_stat_calc.rename(columns=rename_dict).loc[:, ~df_stat_calc.rename(columns=rename_dict).columns.duplicated()]
-            df_stat_renamed.columns = [c.strip() for c in df_stat_renamed.columns]
+            
+            # [해결 핵심]
+            # 1. 딕셔너리에 따라 먼저 이름 변경
+            df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
+            # 2. 모든 열 이름의 앞뒤 공백 제거 (시트에 "비고 " 등으로 들어가 있던 것을 "비고"로 통일)
+            df_stat_renamed.columns = [str(c).strip() for c in df_stat_renamed.columns]
+            # 3. 공백 제거 후 발생할 수 있는 '완벽히 똑같은 이름의 중복 열'을 제거 (첫번째 열만 남김)
+            df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
             
             # [순서 고정] 요청하신 리스트 순서 100% 매칭 강제 정렬
             preferred_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
