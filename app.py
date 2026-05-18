@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.3", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -237,7 +237,6 @@ def get_worksheets():
         ]
         ws_p.append_rows(sample_prayers)
         
-    # 신규 탭: 주보관리 시트 동적 생성
     try: ws_b = sh.worksheet("주보관리")
     except: ws_b = sh.add_worksheet("주보관리", 60, 10); ws_b.append_row(["주차", "날짜", "주보이미지1", "주보이미지2", "비고", "업데이트일시"])
 
@@ -304,6 +303,29 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
+# --- 다이얼로그 모달: 주보 보기 ---
+@st.dialog("📖 주보 보기")
+def view_bulletin_dialog(w_str, d_str, row_data):
+    st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h4>", unsafe_allow_html=True)
+    memo = str(row_data.get('비고', '')).strip()
+    if memo:
+        st.info(f"📝 비고: {memo}")
+        
+    img1 = str(row_data.get('주보이미지1', ''))
+    img2 = str(row_data.get('주보이미지2', ''))
+    
+    t1, t2 = st.tabs(["앞면 (1쪽)", "뒷면 (2쪽)"])
+    with t1:
+        if img1 and "http" in img1:
+            st.image(img1.replace("&vid=1", "").replace("?vid=1", ""), use_container_width=True)
+        else:
+            st.write("등록된 앞면 이미지가 없습니다.")
+    with t2:
+        if img2 and "http" in img2:
+            st.image(img2.replace("&vid=1", "").replace("?vid=1", ""), use_container_width=True)
+        else:
+            st.write("등록된 뒷면 이미지가 없습니다.")
+
 # --- 다이얼로그 모달: 주보 관리 ---
 @st.dialog("📝 주보 등록/수정 관리")
 def manage_bulletin_dialog(w_str, d_str):
@@ -316,7 +338,6 @@ def manage_bulletin_dialog(w_str, d_str):
         img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg'])
         img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg'])
         
-        # 기존 이미지 렌더링
         if not existing_data.empty:
             old_img1 = existing_data.iloc[0].get('주보이미지1', '')
             old_img2 = existing_data.iloc[0].get('주보이미지2', '')
@@ -446,7 +467,7 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 (★ 주보 메뉴 추가) ---
+# --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"])
 
 # ==========================================
@@ -670,7 +691,7 @@ with tabs[2]:
                         st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
 
 # ==========================================
-# [탭 3] 신규 메뉴 - 기도순서 (★ 반 매핑 오류 원천 차단 알고리즘)
+# [탭 3] 기도순서
 # ==========================================
 with tabs[3]:
     st.subheader("🙏 예배 기도순서 관리")
@@ -680,16 +701,13 @@ with tabs[3]:
         df_p_calc['날짜_dt'] = pd.to_datetime(df_p_calc['날짜'], errors='coerce')
         df_p_calc = df_p_calc.sort_values(by='날짜_dt', ascending=True)
         
-        # ★ 교적부 데이터 공백제거 및 활성인원 최우선 2단계 딥매핑 (매핑 오류 완벽 픽스)
         class_mapping = {}
         if not df.empty and '이름' in df.columns:
-            # 1단계: 재적 중(활성)인 인원을 먼저 딕셔너리에 매핑하여 정확도 100% 보장
             active_df = df[~df[status_col].isin(INACTIVE_STATUS)]
             for _, row_m in active_df.iterrows():
                 clean_name = str(row_m['이름']).replace(" ", "")
                 class_mapping[clean_name] = str(row_m.get(class_col, ''))
             
-            # 2단계: 비활성 인원 보완 (동명이인일 경우 1단계의 활성 인원 정보가 덮어씌워지지 않도록 보호)
             for _, row_m in df.iterrows():
                 clean_name = str(row_m['이름']).replace(" ", "")
                 if clean_name not in class_mapping:
@@ -771,33 +789,44 @@ with tabs[3]:
             time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 4] 신규 메뉴 - 주보 (★ 52주차 그리드 & 등록 여부 녹색 피드백 & 팝업 관리)
+# [탭 4] 신규 메뉴 - 주보 관리 (★ 보기/관리 모드 완벽 분리 구현)
 # ==========================================
 with tabs[4]:
-    st.subheader("📝 주보 관리")
-    st.caption("💡 각 주차를 클릭하여 주보 이미지를 등록/수정/삭제하세요. 등록된 주차는 ✅ 녹색으로 강조됩니다.")
+    st.subheader("📝 주보 관리 및 조회")
     
-    # 52주차 그리드 버튼 UI 생성 (4열 매트릭스 레이아웃)
+    b_mode = st.radio("작업 모드 선택", ["👀 주보 보기", "⚙️ 주보 등록/수정"], horizontal=True)
+    if b_mode == "👀 주보 보기":
+        st.caption("💡 아래에서 ✅ 표시된 주차를 클릭하면 등록된 주보 이미지를 크고 선명하게 볼 수 있습니다.")
+    else:
+        st.caption("💡 각 주차를 클릭하여 주보 이미지를 새롭게 등록하거나 기존 주보를 수정/삭제하세요.")
+        
+    st.divider()
+    
     b_cols = st.columns(4)
     for i in range(1, 53):
         w_str = f"{i}주"
         w_date = start_date + datetime.timedelta(days=(i-1)*7)
         d_str = w_date.strftime("%m/%d")
         
-        # 해당 주차의 주보 등록 여부 확인
         is_bulletin_exist = False
+        match_b = pd.DataFrame()
         if not df_b.empty:
             match_b = df_b[df_b['주차'] == w_str]
             if not match_b.empty and (str(match_b.iloc[0].get('주보이미지1','')).startswith('http') or str(match_b.iloc[0].get('주보이미지2','')).startswith('http')):
                 is_bulletin_exist = True
         
-        # 버튼 디자인: 등록되었으면 Primary(색상 강조) 및 녹색 체크 아이콘
         btn_type = "primary" if is_bulletin_exist else "secondary"
         btn_label = f"✅ {w_str} ({d_str})" if is_bulletin_exist else f"⬜ {w_str} ({d_str})"
         
         with b_cols[(i-1) % 4]:
             if st.button(btn_label, key=f"btn_bulletin_{i}", use_container_width=True, type=btn_type):
-                manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
+                if b_mode == "👀 주보 보기":
+                    if is_bulletin_exist:
+                        view_bulletin_dialog(w_str, d_str, match_b.iloc[0])
+                    else:
+                        st.warning(f"⚠️ {w_str} ({d_str}) 주보는 아직 등록되지 않았습니다. [⚙️ 주보 등록/수정] 탭에서 먼저 올려주세요.")
+                else:
+                    manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
 
 # ==========================================
 # [탭 5] 새친구
@@ -1300,7 +1329,7 @@ with tabs[9]:
                         <h2>📊 지출 내역 요약 일람표</h2>
                         <table>
                             <thead>
-                                <tr><th>번호</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
+                                <tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
                             </thead>
                             <tbody>
                     """
@@ -1531,7 +1560,7 @@ with tabs[10]:
                         clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
                         html_ledger += f"""
                         <div class="receipt-box">
-                            <strong>[순번 No.{idx}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong>
+                            <strong>[지출 No.{idx}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong>
                             <br><small>비고 내역: {row.get('비고','')}</small>
                             <img src="{clean_url}" alt="회비 영수증">
                         </div>
