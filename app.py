@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.2", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.3", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -201,7 +201,6 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except: 
         ws_s = sh.add_worksheet("주차별통계", 200, 15)
-        # 기본 디폴트 헤더 (사용자가 요청한 순서)
         ws_s.append_row(["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"])
         
     try: ws_r = sh.worksheet("영수증")
@@ -356,8 +355,8 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 ---
-tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 영수증", "💰 출납부"])
+# --- 5. 화면(탭) 구성 (비용집행관리 / 회비관리 이름 변경 반영) ---
+tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 회비관리"])
 
 # ==========================================
 # [탭 0] 반편성
@@ -798,7 +797,7 @@ with tabs[5]:
     custom_note = col_ex3.text_input("📝 비고 (통계관리용)", value=saved_note, placeholder="예: 전원 야외 예배 등")
 
     calc_total = guest_in if is_skip else (s_p + t_p + guest_in)
-    st.markdown(f"<div class='total-summary'>✅ 저장 시 총합계 (선생님 포함): {calc_total}명</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='total-summary'>✅ 저장 시 총합계 (전도사 제외, 유년부+교사): {calc_total}명</div>", unsafe_allow_html=True)
 
     with st.form("att_toggle_form"):
         new_att = {}
@@ -925,7 +924,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 영수증 관리 
+# [탭 7] 총무 전용 - 비용집행관리 
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -936,9 +935,9 @@ with tabs[7]:
                 st.session_state['chongmu_auth'] = True; st.rerun()
             else: st.error("비밀번호 불일치")
     else:
-        st.subheader("🧾 간식/활동 영수증 관리")
+        st.subheader("🧾 비용집행관리 (영수증)")
         
-        with st.expander("➕ 새 영수증 등록하기"):
+        with st.expander("➕ 새 비용집행 내역 등록하기"):
             with st.form("new_receipt_form"):
                 rc_date = st.date_input("날짜", datetime.date.today()).strftime("%Y-%m-%d")
                 rc_vendor = st.text_input("구매처 (상호명)")
@@ -989,7 +988,7 @@ with tabs[7]:
                 <html>
                 <head>
                     <meta charset="utf-8">
-                    <title>영수증 보고서</title>
+                    <title>비용집행 보고서</title>
                     <style>
                         body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }}
                         h1 {{ text-align: center; color: #0366d6; }}
@@ -1003,7 +1002,7 @@ with tabs[7]:
                     </style>
                 </head>
                 <body>
-                    <h1>간식/행사 영수증 내역 보고서</h1>
+                    <h1>비용집행(영수증) 내역 보고서</h1>
                     <div class="summary">
                         조회 기간: {s_date} ~ {e_date} <br>
                         기간 내 총합계: {int(total_filtered_cost):,}원
@@ -1032,22 +1031,22 @@ with tabs[7]:
                 html_content += "</body></html>"
                 
                 st.download_button(
-                    label="📄 인쇄용 보고서 다운로드 (HTML)",
+                    label="📄 인쇄용 보고서 다운로드 (HTML) -> 브라우저에서 열고 PDF 저장",
                     data=html_content.encode("utf-8"),
-                    file_name=f"영수증보고서_{s_date}_{e_date}.html",
+                    file_name=f"비용집행보고서_{s_date}_{e_date}.html",
                     mime="text/html",
                     use_container_width=True
                 )
-        else: st.info("등록된 영수증 내역이 없습니다.")
+        else: st.info("등록된 집행 내역이 없습니다.")
 
 # ==========================================
-# [탭 8] 총무 전용 - 금전출납부
+# [탭 8] 총무 전용 - 회비관리
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
-        st.subheader("💰 교회 회비 금전출납부")
+        st.subheader("💰 회비관리 (출납부)")
         
         total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
         total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
