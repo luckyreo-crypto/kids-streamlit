@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.7", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.9", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -81,12 +81,17 @@ if 'privacy_mode' not in st.session_state: st.session_state['privacy_mode'] = Tr
 if 'chongmu_auth' not in st.session_state: st.session_state['chongmu_auth'] = False
 
 if not st.session_state["authenticated"]:
-    st.markdown("## 🔒 26년 슈팅스타 시스템 접근 제어")
-    pwd = st.text_input("슈팅스타 비밀번호8자리(특수문자포함)를 입력하세요", type="password")
-    if st.button("로그인"):
-        if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
-            st.session_state["authenticated"] = True; st.rerun()
-        else: st.error("비밀번호가 일치하지 않습니다.")
+    # UI 개선 #1: 로그인 화면 친절한 안내 및 중앙 정렬 배치
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center; color: #0366d6;'>🌱 26년 슈팅스타 통합관리</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: gray; margin-bottom: 20px;'>안전한 시스템 접근을 위해 관리자 비밀번호를 입력해주세요.</p>", unsafe_allow_html=True)
+            pwd = st.text_input("비밀번호 (특수문자 포함)", type="password", placeholder="비밀번호 입력", label_visibility="collapsed")
+            if st.button("🚀 시스템 로그인", use_container_width=True, type="primary"):
+                if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
+                    st.session_state["authenticated"] = True; st.rerun()
+                else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     st.stop()
 
 if "GOOGLE_PROXY_URL" in st.secrets: GOOGLE_PROXY_URL = st.secrets["GOOGLE_PROXY_URL"]
@@ -98,6 +103,12 @@ start_date = datetime.date(2026, 1, 4)
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
     return str(val).strip()
+
+# 에러 원천 차단: 안전한 정수 변환 함수
+def parse_int_safe(val):
+    if pd.isna(val) or str(val).strip() == '': return 0
+    try: return int(float(str(val).replace(',', '')))
+    except: return 0
 
 def upload_photo(file, name):
     if not file: return ""
@@ -365,11 +376,13 @@ def edit_student_dialog(target_dict):
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 회비관리"])
 
 # ==========================================
-# [탭 0] 반편성
+# [탭 0] 반편성 (UI 개선 #2, #3 적용)
 # ==========================================
 with tabs[0]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
     st.subheader("🏫 반별 명단")
+    st.info("💡 **아이콘 안내** &nbsp;|&nbsp; 👤 일반 &nbsp;&nbsp; 🌱 새친구 &nbsp;&nbsp; 🧑‍🏫 교사 &nbsp;&nbsp; ✝️ 교역자 &nbsp;&nbsp; 🚫 비활성(이사/졸업 등)")
+    
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     
     for i in range(0, len(all_classes), 3):
@@ -419,8 +432,9 @@ with tabs[0]:
                         
                         with st.expander(f"➕ 새친구 추가"):
                             with st.form(f"qa_{i+j}"):
-                                new_n = st.text_input("이름")
-                                if st.form_submit_button("등록") and new_n:
+                                col_n, col_btn = st.columns([3, 1])
+                                new_n = col_n.text_input("이름", placeholder="이름 입력", label_visibility="collapsed")
+                                if col_btn.form_submit_button("등록") and new_n:
                                     new_row = [""] * len(headers)
                                     h_map = {str(h): idx for idx, h in enumerate(headers)}
                                     if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
@@ -432,7 +446,7 @@ with tabs[0]:
                                     ws.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 1] 교적부 통합 관리
+# [탭 1] 교적부 통합 관리 (UI 개선 #4 적용)
 # ==========================================
 with tabs[1]:
     st.subheader("📋 교적부 통합 관리")
@@ -489,18 +503,20 @@ with tabs[1]:
     """
     st.markdown(html_dashboard, unsafe_allow_html=True)
     
-    st.markdown("##### 🔐 개인정보 보호 모드")
-    if st.session_state['privacy_mode']:
-        st.warning("현재 생년월일, 부모, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
-        priv_pwd = st.text_input("열람을 위해 시스템 비밀번호를 입력하세요", type="password", key="priv_pwd_input")
-        if st.button("🔒 블라인드 해제"):
-            if priv_pwd == st.secrets.get("admin_password", ""):
-                st.session_state['privacy_mode'] = False; st.rerun()
-            else: st.error("비밀번호가 일치하지 않습니다.")
-    else:
-        st.success("🔓 개인정보 열람 모드 활성화됨")
-        if st.button("🔒 다시 블라인드 처리하기"):
-            st.session_state['privacy_mode'] = True; st.rerun()
+    with st.container(border=True):
+        st.markdown("##### 🔐 개인정보 열람 보안 설정")
+        if st.session_state['privacy_mode']:
+            st.markdown("현재 생년월일, 연락처, 주소 정보가 **블라인드(마스킹)** 처리되어 있습니다.")
+            c_p1, c_p2 = st.columns([3, 1])
+            priv_pwd = c_p1.text_input("시스템 비밀번호 입력", type="password", key="priv_pwd_input", label_visibility="collapsed", placeholder="비밀번호 입력")
+            if c_p2.button("🔓 블라인드 해제", use_container_width=True):
+                if priv_pwd == st.secrets.get("admin_password", ""):
+                    st.session_state['privacy_mode'] = False; st.rerun()
+                else: st.error("비밀번호가 일치하지 않습니다.")
+        else:
+            st.success("🔓 개인정보 열람 모드가 활성화되었습니다.")
+            if st.button("🔒 다시 블라인드 처리하기"):
+                st.session_state['privacy_mode'] = True; st.rerun()
 
     st.divider()
     manage_mode = st.radio("작업 모드", ["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"], horizontal=True)
@@ -546,7 +562,7 @@ with tabs[1]:
                     st.success("✅ 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 2] 생일표
+# [탭 2] 생일표 (UI 개선 #5 적용)
 # ==========================================
 with tabs[2]:
     st.subheader("🎂 월별 생일 명단")
@@ -569,11 +585,15 @@ with tabs[2]:
             with cols[col_idx]:
                 with st.container(border=True):
                     st.markdown(f"<h4 style='color:#0366d6; margin-bottom:0px;'>📅 {m}월</h4>", unsafe_allow_html=True); st.divider()
-                    for p in sorted(b_map[m], key=lambda x: x["day"]):
-                        if p['role'] == 'pastor': n_disp = f"<span style='color:#2E7D32;'>✝️ <b>{p['name']}</b></span>"
-                        elif p['role'] == 'teacher': n_disp = f"<span style='color:#E91E63;'>🧑‍🏫 <b>{p['name']}</b></span>"
-                        else: n_disp = f"<span>🎈 <b>{p['name']}</b></span>"
-                        st.markdown(f"<div style='display:flex; justify-content:space-between; margin-bottom:5px;'>{n_disp} <span style='font-size:0.8rem; color:gray;'>({p['class']})</span><strong style='color:#e65100;'>{p['day']}일</strong></div>", unsafe_allow_html=True)
+                    month_data = b_map[m]
+                    if month_data:
+                        for p in sorted(month_data, key=lambda x: x["day"]):
+                            if p['role'] == 'pastor': n_disp = f"<span style='color:#2E7D32;'>✝️ <b>{p['name']}</b></span>"
+                            elif p['role'] == 'teacher': n_disp = f"<span style='color:#E91E63;'>🧑‍🏫 <b>{p['name']}</b></span>"
+                            else: n_disp = f"<span>🎈 <b>{p['name']}</b></span>"
+                            st.markdown(f"<div style='display:flex; justify-content:space-between; margin-bottom:5px;'>{n_disp} <span style='font-size:0.8rem; color:gray;'>({p['class']})</span><strong style='color:#e65100;'>{p['day']}일</strong></div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
 
 # ==========================================
 # [탭 3] 새친구
@@ -592,12 +612,14 @@ with tabs[3]:
         st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 4] 행사 기록 관리
+# [탭 4] 행사 기록 관리 (UI 개선 #6 적용)
 # ==========================================
 with tabs[4]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
     st.subheader("⚙️ 행사 기록 관리")
-    e_mode = st.radio("작업 선택", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True, label_visibility="collapsed")
+    
+    with st.container(border=True):
+        e_mode = st.radio("🛠️ 작업 모드 선택", ["📂 보기", "📝 수정", "🚨 삭제", "➕ 등록"], horizontal=True)
     st.divider()
     
     def format_event(row_id):
@@ -761,19 +783,21 @@ with tabs[4]:
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 5] 출석
+# [탭 5] 출석 (UI 개선 #7, #8 적용)
 # ==========================================
 with tabs[5]:
     st.subheader("📅 주간 출석 현황")
     extended_weeks_list = weeks_list + ["✏️ 직접 입력 (새 날짜)"]
-    c1, c2 = st.columns(2)
-    with c1: 
-        sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, datetime.date.today().isocalendar()[1] - 1)), format_func=lambda x: week_display_map.get(x, x))
-        if sel_w_raw == "✏️ 직접 입력 (새 날짜)": target_date = st.date_input("새로운 날짜 선택", datetime.date.today()); sel_w = target_date.strftime("%Y-%m-%d")
-        else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
-    with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
     
-    show_inactive = st.checkbox("👀 강제 전체명단 표시")
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+        with c1: 
+            sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, datetime.date.today().isocalendar()[1] - 1)), format_func=lambda x: week_display_map.get(x, x))
+            if sel_w_raw == "✏️ 직접 입력 (새 날짜)": target_date = st.date_input("새로운 날짜 선택", datetime.date.today()); sel_w = target_date.strftime("%Y-%m-%d")
+            else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
+        with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
+        show_inactive = st.checkbox("👀 강제 전체명단 표시 (이사/졸업 포함)")
+    
     att_df = df.copy() if show_inactive else df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
@@ -790,16 +814,17 @@ with tabs[5]:
             saved_event = str(match.iloc[0].get('행사명', ''))
             saved_note = str(match.iloc[0].get('비고', match.iloc[0].get('내용(비고)', match.iloc[0].get('추가입력(비고)', ''))))
 
-    st.markdown("#### 📊 현재 체크 현황")
+    st.markdown("#### 📊 실시간 체크 현황")
     cs1, cs2, cs3, cs4 = st.columns(4)
     cs1.metric(f"유년부 출석 (재적 {len(ui_s_df)})", f"{s_p}명"); cs2.metric(f"선생님 출석 (재적 {len(ui_t_df)})", f"{t_p}명") 
-    cs3.metric("유년부 합계 (출석+추가)", f"{s_p + saved_guest}명"); guest_in = cs4.number_input("🎉 새친구/추가예배", min_value=0, value=saved_guest)
+    cs3.metric("유년부 합계 (출석+추가)", f"{s_p + saved_guest}명")
     
-    st.markdown("---")
-    col_ex1, col_ex2, col_ex3 = st.columns([1, 2, 2])
-    is_skip = col_ex1.toggle("⚠️ 출석체크 쉼 (행사/예외)")
-    event_text = col_ex2.text_input("📢 행사명", value=saved_event, placeholder="예: 여름성경학교")
-    custom_note = col_ex3.text_input("📝 비고 (통계관리용)", value=saved_note, placeholder="예: 전원 야외 예배 등")
+    with st.expander("🛠️ 추가 설정 (행사명 / 새친구 / 예외결석 입력)", expanded=bool(saved_event or saved_note or saved_guest)):
+        c_e1, c_e2, c_e3 = st.columns([1, 2, 2])
+        guest_in = c_e1.number_input("🎉 새친구/추가", min_value=0, value=saved_guest)
+        event_text = c_e2.text_input("📢 행사명", value=saved_event, placeholder="예: 여름성경학교")
+        custom_note = c_e3.text_input("📝 비고 (통계관리용)", value=saved_note, placeholder="예: 전원 야외 예배 등")
+        is_skip = st.toggle("⚠️ 출석체크 쉼 (명단 전체를 결석 처리)")
 
     calc_total = guest_in if is_skip else (s_p + t_p + guest_in)
     st.markdown(f"<div class='total-summary'>✅ 저장 시 총합계 (전도사 제외, 유년부+교사): {calc_total}명</div>", unsafe_allow_html=True)
@@ -894,13 +919,15 @@ with tabs[5]:
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 통계 (중복 열 에러 해결 및 로우/컬럼 조건부 정밀 하이라이트 적용)
+# [탭 6] 통계
 # ==========================================
 with tabs[6]:
     st.subheader("📊 통계")
     col_stat, col_cumul = st.columns([2, 1])
     with col_stat: 
-        st.write("📅 **주차별 흐름 통계 (하이라이트 가시화)**")
+        st.write("📅 **주차별 흐름 통계 (지정 순서 고정)**")
+        st.caption("💡 **색상 안내:** 🟥 **붉은색 행** = 전체 결석(0명) 행 &nbsp;|&nbsp; 🟦 **푸른색 텍스트** = 핵심 지표(유년부 합계, 총합)")
+        
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
@@ -918,16 +945,12 @@ with tabs[6]:
                 
             df_stat_display = df_stat_renamed[actual_order]
             
-            # [수정] 출석 0명 로우 하이라이트 및 특정 컬럼(유년부 합계, 총합) 동시 하이라이트 함수 정의
             def highlight_stat_cells(row):
                 try: att = int(row['출석'])
                 except: att = -1
-                
-                # 출석 합계가 0인 행 전체 하이라이트 (소프트 레드)
                 if att == 0:
                     return ['background-color: #ffebee; color: #d32f2f; font-weight: bold;' for _ in row.index]
                 
-                # 정상 출석일 경우 '유년부 합계'와 '총합' 컬럼 명확히 하이라이트 (소프트 블루)
                 styles = ['' for _ in row.index]
                 for target_col in ['유년부 합계', '총합']:
                     if target_col in row.index:
@@ -960,16 +983,16 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리 (★ 월별 진행현황 & 요약표 선배치 PDF 인쇄 스키마 추가)
+# [탭 7] 총무 전용 - 비용집행관리 (비밀번호 시크릿 보안 적용)
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
         cpwd = st.text_input("총무 전용 비밀번호를 입력하세요", type="password", key="pwd_receipt")
         if st.button("인증", key="btn_auth_receipt"):
-            if cpwd == "0000": 
+            if cpwd == st.secrets.get("chongmu_password", "admin1234"): 
                 st.session_state['chongmu_auth'] = True; st.rerun()
-            else: st.error("비밀번호 불일치")
+            else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     else:
         st.subheader("🧾 비용집행관리")
         
@@ -985,7 +1008,6 @@ with tabs[7]:
             mc1.metric(f"이번 달 ({curr_month.month}월) 집행액", f"{int(monthly_cost):,}원")
             mc2.metric("전체 누적 집행액", f"{int(total_cost):,}원")
             
-            # [수정] 3. 비용집행관리 월별 진행현황(추이) 시각화 위젯 추가
             st.markdown("---")
             with st.expander("📅 월별 진행 현황 요약 (결산 추이)", expanded=True):
                 df_r_calc['집행월'] = df_r_calc['날짜_dt'].dt.strftime('%Y-%m')
@@ -1001,13 +1023,14 @@ with tabs[7]:
         
         if mode_r == "👀 조회 및 출력":
             if not df_r.empty:
-                col_f1, col_f2 = st.columns(2)
-                min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
-                min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
-                max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
-                
-                date_range = st.date_input("조회 기간 선택", [min_date, max_date])
-                keyword = col_f2.text_input("검색어 (상호명 또는 내용)")
+                with st.container(border=True):
+                    col_f1, col_f2 = st.columns(2)
+                    min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
+                    min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
+                    max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
+                    
+                    date_range = col_f1.date_input("조회 기간 선택", [min_date, max_date])
+                    keyword = col_f2.text_input("검색어 (상호명 또는 내용)", placeholder="검색어를 입력하세요")
                 
                 if len(date_range) == 2: s_date, e_date = date_range
                 else: s_date, e_date = min_date, max_date
@@ -1018,22 +1041,23 @@ with tabs[7]:
                 
                 if not df_r_filtered.empty:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
-                    st.dataframe(df_r_filtered[display_cols], use_container_width=True, hide_index=True)
+                    st.dataframe(df_r_filtered[display_cols], use_container_width=True, hide_index=True, column_config={
+                        "비용": st.column_config.NumberColumn("비용", format="%d원")
+                    })
                     
                     total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum()
                     
-                    # 엑셀 다운로드
                     st.download_button(
-                        label="📊 현재 내역 엑셀(CSV) 다운로드",
+                        label="📊 현재 조회 내역 엑셀(CSV) 다운로드",
                         data=df_r_filtered[display_cols].to_csv(index=False).encode('utf-8-sig'),
                         file_name=f"비용집행내역_{s_date}_{e_date}.csv",
                         mime="text/csv",
                         use_container_width=True
                     )
                     
-                    # [수정] 4. 요약표 선배치 및 영수증 하단 순차 정렬 마크업 고도화 (인쇄/PDF 저장용)
                     st.info("💡 아래 버튼을 눌러 인쇄용 문서를 다운로드한 후 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 진행하세요.")
                     
+                    # 에러 원천 차단: parse_int_safe 함수 활용 HTML 리포트 생성
                     html_content = f"""
                     <html>
                     <head>
@@ -1067,7 +1091,7 @@ with tabs[7]:
                             <tbody>
                     """
                     for _, row in df_r_filtered.iterrows():
-                        html_content += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('구매처','')}</td><td>{row.get('내용','')}</td><td>{int(pd.to_numeric(row.get('비용',0), errors='coerce').fillna(0)):,}</td><td>{row.get('비고','')}</td></tr>"
+                        html_content += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('구매처','')}</td><td>{row.get('내용','')}</td><td>{parse_int_safe(row.get('비용', 0)):,}</td><td>{row.get('비고','')}</td></tr>"
                     html_content += "</tbody></table>"
                     
                     html_content += "<div class='receipt-section'><h2>📸 지출 증빙 영수증 사본 첨부 (순차 정렬)</h2>"
@@ -1077,7 +1101,7 @@ with tabs[7]:
                             clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
                             html_content += f"""
                             <div class="receipt-box">
-                                <strong>[순번 No.{row.get('번호','')}] {row.get('날짜','')} - {row.get('구매처','')} ({int(pd.to_numeric(row.get('비용',0), errors='coerce').fillna(0)):,}원)</strong>
+                                <strong>[순번 No.{row.get('번호','')}] {row.get('날짜','')} - {row.get('구매처','')} ({parse_int_safe(row.get('비용', 0)):,}원)</strong>
                                 <br><small>지출내역: {row.get('내용','')} | 비고: {row.get('비고','')}</small>
                                 <img src="{clean_url}" alt="영수증 사본">
                             </div>
@@ -1085,7 +1109,7 @@ with tabs[7]:
                     html_content += "</div></body></html>"
                     
                     st.download_button(
-                        label="📄 PDF/인쇄용 보고서 다운로드 (HTML -> 열고 Ctrl+P 눌러 PDF 저장)",
+                        label="📄 PDF/인쇄용 보고서 다운로드 (HTML)",
                         data=html_content.encode("utf-8"),
                         file_name=f"비용집행보고서_{s_date}_{e_date}.html",
                         mime="text/html",
@@ -1121,9 +1145,7 @@ with tabs[7]:
                     e_date = st.date_input("날짜", parse_date_safe(target.get('날짜',''))).strftime("%Y-%m-%d")
                     e_vendor = st.text_input("구매처 (상호명)", value=target.get('구매처',''))
                     e_detail = st.text_input("내용 (품목)", value=target.get('내용',''))
-                    try: e_c_val = int(target.get('비용', 0))
-                    except: e_c_val = 0
-                    e_cost = st.number_input("비용 (원)", value=e_c_val, step=1000)
+                    e_cost = st.number_input("비용 (원)", value=parse_int_safe(target.get('비용', 0)), step=1000)
                     e_memo = st.text_input("비고", value=target.get('비고',''))
                     e_photo = st.file_uploader("영수증 사진 변경 (새로 올리면 기존 사진 대체)", type=['png', 'jpg', 'jpeg'])
                     
@@ -1152,22 +1174,28 @@ with tabs[7]:
                 st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 8] 총무 전용 - 회비관리 (★ 요약표 선배치 PDF/인쇄 스키마 추가)
+# [탭 8] 총무 전용 - 회비관리 (비밀번호 시크릿 보안 적용)
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
+        cpwd2 = st.text_input("총무 전용 비밀번호를 입력하세요", type="password", key="pwd_ledger")
+        if st.button("인증", key="btn_auth_ledger"):
+            if cpwd2 == st.secrets.get("chongmu_password", "admin1234"): 
+                st.session_state['chongmu_auth'] = True; st.rerun()
+            else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     else:
         st.subheader("💰 회비관리 장부")
         
-        total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
-        total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
-        balance = total_in - total_out
-        
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("🟢 누적 수입액", f"{int(total_in):,}원")
-        col_m2.metric("🔴 누적 지출액", f"{int(total_out):,}원")
-        col_m3.metric("💲 현재 총 잔액", f"{int(balance):,}원")
+        with st.container(border=True):
+            total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
+            total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
+            balance = total_in - total_out
+            
+            col_m1, col_m2, col_m3 = st.columns(3)
+            col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원")
+            col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원")
+            col_m3.metric("💲 현재 잔액 (총 합계)", f"{int(balance):,}원")
         st.divider()
         
         mode_l = st.radio("메뉴 선택", ["👀 전체 장부 조회", "➕ 내역 등록(입금/지출)", "📝 내역 수정", "🚨 내역 삭제"], horizontal=True)
@@ -1187,10 +1215,10 @@ with tabs[8]:
                     st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
                 else: st.info("지출 내역이 없습니다.")
             
-            # [수정] 4. 회비 관리 통합 장부 PDF 인쇄 스키마 추가 (요약표 선배치 원칙)
             st.markdown("---")
             st.markdown("##### 📄 회비관리 전체 보고서 출력 (인쇄/PDF 저장)")
             
+            # 에러 원천 차단된 parse_int_safe 함수 활용 HTML 리포트 생성
             html_ledger = f"""
             <html>
             <head>
@@ -1224,7 +1252,7 @@ with tabs[8]:
             """
             if not df_in.empty:
                 for _, row in df_in.iterrows():
-                    html_ledger += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('입금자명','')}</td><td>{int(pd.to_numeric(row.get('입금액',0), errors='coerce').fillna(0)):,}</td><td>{row.get('비고','')}</td></tr>"
+                    html_ledger += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('입금자명','')}</td><td>{parse_int_safe(row.get('입금액', 0)):,}</td><td>{row.get('비고','')}</td></tr>"
             else:
                 html_ledger += "<tr><td colspan='5'>입금 내역이 존재하지 않습니다.</td></tr>"
                 
@@ -1241,7 +1269,7 @@ with tabs[8]:
             """
             if not df_out.empty:
                 for _, row in df_out.iterrows():
-                    html_ledger += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('내용','')}</td><td>{int(pd.to_numeric(row.get('지출액',0), errors='coerce').fillna(0)):,}</td><td>{row.get('비고','')}</td></tr>"
+                    html_ledger += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('내용','')}</td><td>{parse_int_safe(row.get('지출액', 0)):,}</td><td>{row.get('비고','')}</td></tr>"
             else:
                 html_ledger += "<tr><td colspan='5'>지출 내역이 존재하지 않습니다.</td></tr>"
                 
@@ -1259,7 +1287,7 @@ with tabs[8]:
                         clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
                         html_ledger += f"""
                         <div class="receipt-box">
-                            <strong>[지출 No.{row.get('번호','').strip()}] {row.get('날짜','')} - {row.get('내용','')} ({int(pd.to_numeric(row.get('지출액',0), errors='coerce').fillna(0)):,}원)</strong>
+                            <strong>[지출 No.{row.get('번호','').strip()}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong>
                             <br><small>비고 내역: {row.get('비고','')}</small>
                             <img src="{clean_url}" alt="회비 영수증">
                         </div>
@@ -1319,9 +1347,7 @@ with tabs[8]:
                     with st.form("edit_in_form"):
                         e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d")
                         e_n = st.text_input("입금자명", value=t.get('입금자명',''))
-                        try: ev = int(t.get('입금액',0))
-                        except: ev = 0
-                        e_a = st.number_input("입금액", value=ev, step=1000)
+                        e_a = st.number_input("입금액", value=parse_int_safe(t.get('입금액', 0)), step=1000)
                         e_m = st.text_input("비고", value=t.get('비고',''))
                         if st.form_submit_button("수정 저장", type="primary"):
                             r_idx = int(t['sheet_row'])
@@ -1335,9 +1361,7 @@ with tabs[8]:
                     with st.form("edit_out_form"):
                         e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d")
                         e_c = st.text_input("내용", value=t.get('내용',''))
-                        try: ev = int(t.get('지출액',0))
-                        except: ev = 0
-                        e_a = st.number_input("지출액", value=ev, step=1000)
+                        e_a = st.number_input("지출액", value=parse_int_safe(t.get('지출액', 0)), step=1000)
                         e_m = st.text_input("비고", value=t.get('비고',''))
                         e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg'])
                         if st.form_submit_button("수정 저장", type="primary"):
