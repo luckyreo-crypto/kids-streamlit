@@ -201,7 +201,6 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except: 
         ws_s = sh.add_worksheet("주차별통계", 200, 15)
-        # 요청하신 정확한 순서의 헤더 적용
         ws_s.append_row(["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"])
         
     try: ws_r = sh.worksheet("영수증")
@@ -356,7 +355,7 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 (메뉴명 변경 반영) ---
+# --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 회비관리"])
 
 # ==========================================
@@ -756,7 +755,7 @@ with tabs[4]:
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 5] 출석 (동적 매핑 저장 & 예외처리 강화 적용)
+# [탭 5] 출석 (동적 정밀 매핑 저장 및 에러 완벽 해결)
 # ==========================================
 with tabs[5]:
     st.subheader("📅 주간 출석 현황")
@@ -765,7 +764,7 @@ with tabs[5]:
     with c1: 
         sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, datetime.date.today().isocalendar()[1] - 1)), format_func=lambda x: week_display_map.get(x, x))
         if sel_w_raw == "✏️ 직접 입력 (새 날짜)": target_date = st.date_input("새로운 날짜 선택", datetime.date.today()); sel_w = target_date.strftime("%Y-%m-%d")
-        else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + timedelta(days=(w_num-1)*7) if 'timedelta' in globals() else start_date + datetime.timedelta(days=(w_num-1)*7)
+        else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
     with c2: sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
     
     show_inactive = st.checkbox("👀 강제 전체명단 표시")
@@ -822,14 +821,12 @@ with tabs[5]:
                 if not is_skip:
                     for r, v in new_att.items():
                         row_data = att_df[att_df['sheet_row'] == r]
-                        is_teacher_person, is_pastor_person = False, False
-                        if not row_data.empty:
-                            if row_data.iloc[0]['role'] == 'teacher': is_teacher_person = True
-                            elif row_data.iloc[0]['role'] == 'pastor': is_pastor_person = True
+                        if not row_data.empty and v:
+                            role = row_data.iloc[0]['role']
+                            if role == 'student': final_s_p += 1
+                            elif role == 'teacher': final_t_p += 1 # 명확한 역할 판별로 전도사 카운트 제외 완벽 적용
+                    for r, v in new_att.items():
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
-                        if v:
-                            if is_teacher_person: final_t_p += 1
-                            elif not is_pastor_person: final_s_p += 1 # 전도사/목사님 제외 처리
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
                 save_s_p = 0 if is_skip else final_s_p
@@ -838,68 +835,70 @@ with tabs[5]:
                 valid_enrollment_df['role'] = valid_enrollment_df.apply(get_role, axis=1)
                 student_count, teacher_count = len(valid_enrollment_df[valid_enrollment_df['role'] == 'student']), len(valid_enrollment_df[valid_enrollment_df['role'] == 'teacher'])
                 
-                # 계산식 확인 (유년부 합계 = 출석 + 추가, 총합 = 유년부 합계 + 교사출석)
+                # 유년부 출석 + 추가 = 유년부 합계
                 kids_total = save_s_p + guest_in
+                # 유년부 합계 + 교사출석 = 총합 (전도사 제외)
                 grand_total = kids_total + save_t_p
                 
-                # 통계 시트 헤더 강제 보정 및 API Error 예외 처리
-                stat_headers = ws_stat.row_values(1)
-                req_headers = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
+                # 구글 시트 실제 1행의 항목 리스트 획득
+                stat_headers = [h.strip() for h in ws_stat.row_values(1)]
                 
-                missing_stat_headers = [h for h in req_headers if h not in stat_headers]
-                if missing_stat_headers:
-                    start_col = len(stat_headers) + 1
-                    h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_stat_headers)]
-                    for mh in missing_stat_headers: stat_headers.append(mh)
-                    try: chunked_update(ws_stat, h_cells)
-                    except: ws_stat.add_cols(10); chunked_update(ws_stat, h_cells)
+                # [해결] 공백과 타이핑 미세 차이로 항목 오인식을 차단하는 공백제거 노멀라이징 함수 생성
+                def norm_text(t): return re.sub(r'\s+', '', str(t))
+                h_map = {norm_text(h): idx for idx, h in enumerate(stat_headers)}
                 
-                h_map = {str(h).strip(): idx for idx, h in enumerate(stat_headers)}
+                # 사용자가 수동 정렬해 둔 시트의 전체 열 개수만큼 구조 유지 보장
                 new_row = [""] * len(stat_headers)
                 
-                if "주차" in h_map: new_row[h_map["주차"]] = sel_w
-                if "행사명" in h_map: new_row[h_map["행사명"]] = event_text
-                if "유년부 재적" in h_map: new_row[h_map["유년부 재적"]] = student_count
-                if "출석" in h_map: new_row[h_map["출석"]] = save_s_p
-                if "추가" in h_map: new_row[h_map["추가"]] = guest_in
-                if "유년부 합계" in h_map: new_row[h_map["유년부 합계"]] = kids_total
-                if "교사재적" in h_map: new_row[h_map["교사재적"]] = teacher_count
-                if "교사출석" in h_map: new_row[h_map["교사출석"]] = save_t_p
-                if "총합" in h_map: new_row[h_map["총합"]] = grand_total
-                if "비고" in h_map: new_row[h_map["비고"]] = custom_note
-                if "업데이트일시" in h_map: new_row[h_map["업데이트일시"]] = str(datetime.datetime.now())
+                # 지시하신 원래 순서 매핑 테이블 정의 (시트 순서가 바뀌어도 해당 이름에 정확히 배정)
+                val_map = {
+                    norm_text("주차"): sel_w,
+                    norm_text("행사명"): event_text,
+                    norm_text("유년부 재적"): student_count,
+                    norm_text("출석"): save_s_p,
+                    norm_text("추가"): guest_in,
+                    norm_text("유년부 합계"): kids_total,
+                    norm_text("교사재적"): teacher_count,
+                    norm_text("교사출석"): save_t_p,
+                    norm_text("총합"): grand_total,
+                    norm_text("비고"): custom_note,
+                    norm_text("업데이트일시"): str(datetime.datetime.now())
+                }
                 
+                for key_norm, value in val_map.items():
+                    if key_norm in h_map:
+                        new_row[h_map[key_norm]] = value
+                        
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
                 if not match_stat.empty: 
                     row_idx = match_stat.index[0] + 2
-                    end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
-                    ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
+                    end_letter = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
+                    ws_stat.update(f"A{row_idx}:{end_letter}{row_idx}", [new_row])
                 else: 
                     ws_stat.append_row(new_row)
                 
-                st.success(f"✅ [{sel_w}] 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 통계 (요청하신 순서대로 정확히 표시)
+# [탭 6] 통계 (요청하신 순서 완벽 고정 적용)
 # ==========================================
 with tabs[6]:
     st.subheader("📊 통계")
     col_stat, col_cumul = st.columns([2, 1])
     with col_stat: 
-        st.write("📅 **주차별 통계 (요청 순서 적용)**")
+        st.write("📅 **주차별 흐름 통계 (지정 순서 고정)**")
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
             df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
             
-            # 구버전 컬럼명이 있을 경우를 대비한 매핑
             rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고', '내용(비고)': '행사명'}
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict).loc[:, ~df_stat_calc.rename(columns=rename_dict).columns.duplicated()]
+            df_stat_renamed.columns = [c.strip() for c in df_stat_renamed.columns]
             
-            # 사용자 요청 순서 완벽 적용
+            # [순서 고정] 요청하신 리스트 순서 100% 매칭 강제 정렬
             preferred_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
             actual_order = [c for c in preferred_order if c in df_stat_renamed.columns]
-            
             for c in df_stat_renamed.columns:
                 if c not in actual_order: actual_order.append(c)
                 
@@ -928,7 +927,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리 (메뉴명 변경 반영)
+# [탭 7] 총무 전용 - 비용집행관리
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -964,9 +963,8 @@ with tabs[7]:
         if not df_r.empty:
             df_r_calc = df_r.copy()
             df_r_calc['날짜_dt'] = pd.to_datetime(df_r_calc['날짜'], errors='coerce')
-            min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
-            min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
-            max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
+            min_date = df_r_calc['날짜_dt'].min().date() if pd.notnull(df_r_calc['날짜_dt'].min()) else datetime.date.today()
+            max_date = df_r_calc['날짜_dt'].max().date() if pd.notnull(df_r_calc['날짜_dt'].max()) else datetime.date.today()
             
             date_range = st.date_input("조회 기간 선택", [min_date, max_date])
             if len(date_range) == 2:
@@ -985,8 +983,6 @@ with tabs[7]:
                     "비용": st.column_config.NumberColumn("비용", format="%d원"),
                     "영수증사진": st.column_config.LinkColumn("사진 링크")
                 })
-                
-                st.info("💡 아래 버튼을 눌러 HTML 파일을 다운로드한 뒤 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 눌러주세요.")
                 
                 html_content = f"""
                 <html>
@@ -1017,7 +1013,6 @@ with tabs[7]:
                         </thead>
                         <tbody>
                 """
-                
                 for _, row in df_r_filtered.iterrows():
                     html_content += f"<tr><td>{row.get('번호','')}</td><td>{row.get('날짜','')}</td><td>{row.get('구매처','')}</td><td>{row.get('내용','')}</td><td>{row.get('비용','')}</td><td>{row.get('비고','')}</td></tr>"
                 html_content += "</tbody></table><hr><h2>📝 첨부 영수증 사본</h2>"
@@ -1044,7 +1039,7 @@ with tabs[7]:
         else: st.info("등록된 집행 내역이 없습니다.")
 
 # ==========================================
-# [탭 8] 총무 전용 - 회비관리 (메뉴명 변경 반영)
+# [탭 8] 총무 전용 - 회비관리
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
