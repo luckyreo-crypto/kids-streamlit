@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.1", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.2", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -201,7 +201,8 @@ def get_worksheets():
     try: ws_s = sh.worksheet("주차별통계")
     except: 
         ws_s = sh.add_worksheet("주차별통계", 200, 15)
-        ws_s.append_row(["주차", "내용(비고)", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시", "추가입력(비고)"])
+        # 기본 디폴트 헤더 (사용자가 요청한 순서)
+        ws_s.append_row(["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"])
         
     try: ws_r = sh.worksheet("영수증")
     except: ws_r = sh.add_worksheet("영수증", 500, 10); ws_r.append_row(["번호", "날짜", "구매처", "내용", "비용", "비고", "영수증사진"])
@@ -755,7 +756,7 @@ with tabs[4]:
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 5] 출석 (원복 & 비고란을 가장 우측으로 분리 추가)
+# [탭 5] 출석 (동적 매핑 저장 적용)
 # ==========================================
 with tabs[5]:
     st.subheader("📅 주간 출석 현황")
@@ -775,13 +776,15 @@ with tabs[5]:
     ui_s_df, ui_t_df = att_df[att_df['role'] == 'student'], att_df[att_df['role'] == 'teacher']
     s_p, t_p = len(ui_s_df[ui_s_df[sel_w].astype(str).str.strip() == "1"]), len(ui_t_df[ui_t_df[sel_w].astype(str).str.strip() == "1"])
     
-    saved_guest = 0; saved_note = ""
+    saved_guest = 0; saved_note = ""; saved_event = ""
     if not df_stat.empty and '주차' in df_stat.columns:
         match = df_stat[df_stat['주차'] == sel_w]
         if not match.empty: 
             try: saved_guest = int(match.iloc[0].get('추가', match.iloc[0].get('새친구/추가예배', 0)))
             except: pass
-            saved_note = str(match.iloc[0].get('추가입력(비고)', match.iloc[0].get('비고', '')))
+            saved_event = str(match.iloc[0].get('행사명', ''))
+            # 시트의 비고 컬럼을 안전하게 읽어옴
+            saved_note = str(match.iloc[0].get('비고', match.iloc[0].get('내용(비고)', match.iloc[0].get('추가입력(비고)', ''))))
 
     st.markdown("#### 📊 현재 체크 현황")
     cs1, cs2, cs3, cs4 = st.columns(4)
@@ -789,10 +792,10 @@ with tabs[5]:
     cs3.metric("유년부 합계 (출석+추가)", f"{s_p + saved_guest}명"); guest_in = cs4.number_input("🎉 새친구/추가예배", min_value=0, value=saved_guest)
     
     st.markdown("---")
-    
-    col_ex1, col_ex2 = st.columns([1, 3])
+    col_ex1, col_ex2, col_ex3 = st.columns([1, 2, 2])
     is_skip = col_ex1.toggle("⚠️ 출석체크 쉼 (행사/예외)")
-    custom_note = col_ex2.text_input("📝 비고 (통계관리용)", value=saved_note, placeholder="예: 전원 야외 예배, 특이사항 등")
+    event_text = col_ex2.text_input("📢 행사명", value=saved_event, placeholder="예: 여름성경학교")
+    custom_note = col_ex3.text_input("📝 비고 (통계관리용)", value=saved_note, placeholder="예: 전원 야외 예배 등")
 
     calc_total = guest_in if is_skip else (s_p + t_p + guest_in)
     st.markdown(f"<div class='total-summary'>✅ 저장 시 총합계 (선생님 포함): {calc_total}명</div>", unsafe_allow_html=True)
@@ -838,41 +841,64 @@ with tabs[5]:
                 kids_total = save_s_p + guest_in
                 grand_total = kids_total + save_t_p
                 
+                # 구글 시트 헤더를 확인하고, 없으면 생성 (동적 컬럼 매핑)
                 stat_headers = ws_stat.row_values(1)
-                if "추가입력(비고)" not in stat_headers: ws_stat.update_cell(1, len(stat_headers) + 1, "추가입력(비고)")
+                req_headers = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
                 
-                stat_data = [
-                    sel_w, "", student_count, save_s_p, guest_in, 
-                    kids_total, teacher_count, save_t_p, grand_total, 
-                    str(datetime.datetime.now()), custom_note
-                ]
+                for req_h in req_headers:
+                    if req_h not in stat_headers:
+                        stat_headers.append(req_h)
+                        ws_stat.update_cell(1, len(stat_headers), req_h)
+                
+                h_map = {str(h).strip(): idx for idx, h in enumerate(stat_headers)}
+                new_row = [""] * len(stat_headers)
+                
+                # 사용자가 시트 컬럼 순서를 섞어도 정확한 위치에 삽입됩니다.
+                if "주차" in h_map: new_row[h_map["주차"]] = sel_w
+                if "행사명" in h_map: new_row[h_map["행사명"]] = event_text
+                if "유년부 재적" in h_map: new_row[h_map["유년부 재적"]] = student_count
+                if "출석" in h_map: new_row[h_map["출석"]] = save_s_p
+                if "추가" in h_map: new_row[h_map["추가"]] = guest_in
+                if "유년부 합계" in h_map: new_row[h_map["유년부 합계"]] = kids_total
+                if "교사재적" in h_map: new_row[h_map["교사재적"]] = teacher_count
+                if "교사출석" in h_map: new_row[h_map["교사출석"]] = save_t_p
+                if "총합" in h_map: new_row[h_map["총합"]] = grand_total
+                if "비고" in h_map: new_row[h_map["비고"]] = custom_note
+                if "업데이트일시" in h_map: new_row[h_map["업데이트일시"]] = str(datetime.datetime.now())
                 
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
-                if not match_stat.empty: ws_stat.update(f"A{match_stat.index[0]+2}:K{match_stat.index[0]+2}", [stat_data])
-                else: ws_stat.append_row(stat_data)
+                if not match_stat.empty: 
+                    row_idx = match_stat.index[0] + 2
+                    end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
+                    ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
+                else: 
+                    ws_stat.append_row(new_row)
                 
                 st.success(f"✅ [{sel_w}] 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 통계 (DB 구조 원복 반영)
+# [탭 6] 통계 (요청하신 순서대로 정확히 표시)
 # ==========================================
 with tabs[6]:
     st.subheader("📊 통계")
     col_stat, col_cumul = st.columns([2, 1])
     with col_stat: 
-        st.write("📅 **주차별 통계**")
+        st.write("📅 **주차별 통계 (요청하신 순서 적용)**")
         if not df_stat.empty:
             df_stat_calc = df_stat.copy()
             df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
             df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
             
-            rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고'}
+            # 구버전 컬럼명이 있을 경우를 대비한 매핑
+            rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고', '내용(비고)': '행사명'}
             df_stat_renamed = df_stat_calc.rename(columns=rename_dict).loc[:, ~df_stat_calc.rename(columns=rename_dict).columns.duplicated()]
             
-            preferred_order = ["주차", "비고", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "업데이트일시"]
+            # 사용자 요청 순서 완벽 적용
+            preferred_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
             actual_order = [c for c in preferred_order if c in df_stat_renamed.columns]
+            
             for c in df_stat_renamed.columns:
-                if c not in actual_order and c != '내용(비고)': actual_order.append(c)
+                if c not in actual_order: actual_order.append(c)
                 
             df_stat_display = df_stat_renamed[actual_order]
             st.dataframe(df_stat_display, use_container_width=True, hide_index=True)
@@ -882,10 +908,24 @@ with tabs[6]:
         report_df = df[~df[status_col].isin(INACTIVE_STATUS)].copy()
         week_cols = [c for c in report_df.columns if c.endswith('주')]
         report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
+        
+        student_report = report_df[report_df.apply(get_role, axis=1) == 'student']
+        student_report = student_report[student_report['출석수'] > 0]
+        if not student_report.empty:
+            unique_scores = sorted(student_report['출석수'].unique(), reverse=True)[:3]
+            if unique_scores:
+                st.markdown("<div style='background-color:#f1f8ff; padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid #cce5ff;'><h5 style='color:#0366d6; margin-top:0;'>🏆 누적 출석 TOP 3</h5>", unsafe_allow_html=True)
+                medals = ["🥇", "🥈", "🥉"]
+                for i, score in enumerate(unique_scores):
+                    group = student_report[student_report['출석수'] == score]
+                    names = ", ".join([f"{row['이름']}" for _, row in group.iterrows()])
+                    st.markdown(f"**{medals[i]} {score}회** : {names}")
+                st.markdown("</div>", unsafe_allow_html=True)
+                
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 영수증 관리 (기간 조회 & 인쇄/PDF 기능 추가)
+# [탭 7] 총무 전용 - 영수증 관리 
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -992,7 +1032,7 @@ with tabs[7]:
                 html_content += "</body></html>"
                 
                 st.download_button(
-                    label="📄 인쇄용 보고서 다운로드 (HTML) -> 브라우저에서 열고 PDF 저장",
+                    label="📄 인쇄용 보고서 다운로드 (HTML)",
                     data=html_content.encode("utf-8"),
                     file_name=f"영수증보고서_{s_date}_{e_date}.html",
                     mime="text/html",
