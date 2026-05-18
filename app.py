@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.9", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.0", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -81,7 +81,6 @@ if 'privacy_mode' not in st.session_state: st.session_state['privacy_mode'] = Tr
 if 'chongmu_auth' not in st.session_state: st.session_state['chongmu_auth'] = False
 
 if not st.session_state["authenticated"]:
-    # UI 개선 #1: 로그인 화면 친절한 안내 및 중앙 정렬 배치
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.container(border=True):
@@ -104,7 +103,6 @@ def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
     return str(val).strip()
 
-# 에러 원천 차단: 안전한 정수 변환 함수
 def parse_int_safe(val):
     if pd.isna(val) or str(val).strip() == '': return 0
     try: return int(float(str(val).replace(',', '')))
@@ -376,7 +374,7 @@ def edit_student_dialog(target_dict):
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 회비관리"])
 
 # ==========================================
-# [탭 0] 반편성 (UI 개선 #2, #3 적용)
+# [탭 0] 반편성
 # ==========================================
 with tabs[0]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
@@ -446,7 +444,7 @@ with tabs[0]:
                                     ws.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 1] 교적부 통합 관리 (UI 개선 #4 적용)
+# [탭 1] 교적부 통합 관리
 # ==========================================
 with tabs[1]:
     st.subheader("📋 교적부 통합 관리")
@@ -562,7 +560,7 @@ with tabs[1]:
                     st.success("✅ 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 2] 생일표 (UI 개선 #5 적용)
+# [탭 2] 생일표
 # ==========================================
 with tabs[2]:
     st.subheader("🎂 월별 생일 명단")
@@ -612,7 +610,7 @@ with tabs[3]:
         st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 4] 행사 기록 관리 (UI 개선 #6 적용)
+# [탭 4] 행사 기록 관리
 # ==========================================
 with tabs[4]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
@@ -783,7 +781,7 @@ with tabs[4]:
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 5] 출석 (UI 개선 #7, #8 적용)
+# [탭 5] 출석
 # ==========================================
 with tabs[5]:
     st.subheader("📅 주간 출석 현황")
@@ -983,7 +981,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리 (비밀번호 시크릿 보안 적용)
+# [탭 7] 총무 전용 - 비용집행관리 (UI 개선 #10 적용 및 영수증 2/3 뷰포트 확대)
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -1024,28 +1022,34 @@ with tabs[7]:
         if mode_r == "👀 조회 및 출력":
             if not df_r.empty:
                 with st.container(border=True):
-                    col_f1, col_f2 = st.columns(2)
+                    # UI 개선: 조회기간 필터와 총합계를 한눈에 나란히 배치
+                    col_f1, col_f2, col_f3 = st.columns([2, 2, 1.5])
                     min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
                     min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
                     max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
                     
                     date_range = col_f1.date_input("조회 기간 선택", [min_date, max_date])
                     keyword = col_f2.text_input("검색어 (상호명 또는 내용)", placeholder="검색어를 입력하세요")
-                
-                if len(date_range) == 2: s_date, e_date = date_range
-                else: s_date, e_date = min_date, max_date
-                
-                df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
-                if keyword:
-                    df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
+                    
+                    if len(date_range) == 2: s_date, e_date = date_range
+                    else: s_date, e_date = min_date, max_date
+                    
+                    df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
+                    if keyword:
+                        df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
+                    
+                    total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum() if not df_r_filtered.empty else 0
+                    
+                    # 조회기간 총합계를 필터 바로 옆에 직관적 배치
+                    col_f3.metric("선택된 기간 총 집행액", f"{int(total_filtered_cost):,}원")
                 
                 if not df_r_filtered.empty:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
-                    st.dataframe(df_r_filtered[display_cols], use_container_width=True, hide_index=True, column_config={
-                        "비용": st.column_config.NumberColumn("비용", format="%d원")
-                    })
+                    display_df = df_r_filtered[display_cols].copy()
+                    # 콤마 포함한 회계 금액 포맷팅으로 문자열 변환
+                    display_df['비용'] = display_df['비용'].apply(lambda x: f"{parse_int_safe(x):,}원")
                     
-                    total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum()
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
                     
                     st.download_button(
                         label="📊 현재 조회 내역 엑셀(CSV) 다운로드",
@@ -1057,7 +1061,7 @@ with tabs[7]:
                     
                     st.info("💡 아래 버튼을 눌러 인쇄용 문서를 다운로드한 후 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 진행하세요.")
                     
-                    # 에러 원천 차단: parse_int_safe 함수 활용 HTML 리포트 생성
+                    # 영수증 이미지를 2/3 사이즈로 확대 적용한 HTML 스키마
                     html_content = f"""
                     <html>
                     <head>
@@ -1072,8 +1076,9 @@ with tabs[7]:
                             th {{ background-color: #f1f8ff; }}
                             .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }}
                             .receipt-section {{ page-break-before: always; }}
-                            .receipt-box {{ margin-bottom: 20px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; }}
-                            .receipt-box img {{ max-width: 100%; max-height: 420px; display: block; margin: 10px auto; object-fit: contain; }}
+                            .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }}
+                            /* 영수증 이미지 사이즈 2/3 화면 할당 (최대 높이 850px) */
+                            .receipt-box img {{ width: 70%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
                             @media print {{ body {{ margin: 0; }} }}
                         </style>
                     </head>
@@ -1137,7 +1142,7 @@ with tabs[7]:
                         st.success("등록되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
         elif mode_r == "📝 내역 수정" and not df_r.empty:
-            options = ["내역 선택"] + df_r.apply(lambda r: f"No.{r.get('번호','')} | {r.get('날짜','')} | {r.get('구매처','')} | {r.get('비용','')}원", axis=1).tolist()
+            options = ["내역 선택"] + df_r.apply(lambda r: f"No.{r.get('번호','')} | {r.get('날짜','')} | {r.get('구매처','')} | {parse_int_safe(r.get('비용', 0)):,}원", axis=1).tolist()
             sel_idx = st.selectbox("수정할 내역", range(len(options)), format_func=lambda x: options[x])
             if sel_idx > 0:
                 target = df_r.iloc[sel_idx - 1]
@@ -1166,7 +1171,7 @@ with tabs[7]:
                             st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
         elif mode_r == "🚨 내역 삭제" and not df_r.empty:
-            options = ["내역 선택"] + df_r.apply(lambda r: f"No.{r.get('번호','')} | {r.get('날짜','')} | {r.get('구매처','')} | {r.get('비용','')}원", axis=1).tolist()
+            options = ["내역 선택"] + df_r.apply(lambda r: f"No.{r.get('번호','')} | {r.get('날짜','')} | {r.get('구매처','')} | {parse_int_safe(r.get('비용', 0)):,}원", axis=1).tolist()
             sel_idx = st.selectbox("삭제할 내역", range(len(options)), format_func=lambda x: options[x])
             if st.button("🚨 삭제 실행") and sel_idx > 0:
                 target = df_r.iloc[sel_idx - 1]
@@ -1174,16 +1179,11 @@ with tabs[7]:
                 st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 8] 총무 전용 - 회비관리 (비밀번호 시크릿 보안 적용)
+# [탭 8] 총무 전용 - 회비관리 (UI 개선 #11 적용 및 영수증 2/3 뷰포트 확대)
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
-        cpwd2 = st.text_input("총무 전용 비밀번호를 입력하세요", type="password", key="pwd_ledger")
-        if st.button("인증", key="btn_auth_ledger"):
-            if cpwd2 == st.secrets.get("chongmu_password", "admin1234"): 
-                st.session_state['chongmu_auth'] = True; st.rerun()
-            else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     else:
         st.subheader("💰 회비관리 장부")
         
@@ -1205,20 +1205,25 @@ with tabs[8]:
             with col_l1:
                 st.markdown("##### 📥 수입 (입금 내역)")
                 if not df_in.empty: 
-                    st.dataframe(df_in[['날짜', '입금자명', '입금액', '비고']], use_container_width=True, hide_index=True)
+                    # 금액에 천 단위 콤마 씌워서 출력
+                    disp_in = df_in[['날짜', '입금자명', '입금액', '비고']].copy()
+                    disp_in['입금액'] = disp_in['입금액'].apply(lambda x: f"{parse_int_safe(x):,}원")
+                    st.dataframe(disp_in, use_container_width=True, hide_index=True)
                     st.download_button("📥 수입내역 엑셀 다운로드", data=df_in.to_csv(index=False).encode('utf-8-sig'), file_name="회비_수입내역.csv", mime="text/csv", use_container_width=True)
                 else: st.info("수입 내역이 없습니다.")
             with col_l2:
                 st.markdown("##### 📤 지출 (집행 내역)")
                 if not df_out.empty: 
-                    st.dataframe(df_out[['날짜', '내용', '지출액', '비고']], use_container_width=True, hide_index=True)
+                    # 금액에 천 단위 콤마 씌워서 출력
+                    disp_out = df_out[['날짜', '내용', '지출액', '비고']].copy()
+                    disp_out['지출액'] = disp_out['지출액'].apply(lambda x: f"{parse_int_safe(x):,}원")
+                    st.dataframe(disp_out, use_container_width=True, hide_index=True)
                     st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
                 else: st.info("지출 내역이 없습니다.")
             
             st.markdown("---")
             st.markdown("##### 📄 회비관리 전체 보고서 출력 (인쇄/PDF 저장)")
             
-            # 에러 원천 차단된 parse_int_safe 함수 활용 HTML 리포트 생성
             html_ledger = f"""
             <html>
             <head>
@@ -1233,8 +1238,9 @@ with tabs[8]:
                     th, td {{ border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 13px; }}
                     th {{ background-color: #f1f8ff; }}
                     .receipt-section {{ page-break-before: always; }}
-                    .receipt-box {{ margin-bottom: 20px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; }}
-                    .receipt-box img {{ max-width: 100%; max-height: 400px; display: block; margin: 10px auto; object-fit: contain; }}
+                    .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }}
+                    /* 영수증 이미지 사이즈 2/3 화면 할당 */
+                    .receipt-box img {{ width: 70%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
                 </style>
             </head>
             <body>
@@ -1340,7 +1346,7 @@ with tabs[8]:
         elif mode_l == "📝 내역 수정":
             e_type = st.radio("수정할 장부", ["입금 장부", "지출 장부"], horizontal=True)
             if e_type == "입금 장부" and not df_in.empty:
-                opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {r.get('입금액','')}원", axis=1).tolist()
+                opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {parse_int_safe(r.get('입금액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("수정할 입금 내역", range(len(opts)), format_func=lambda x: opts[x])
                 if idx > 0:
                     t = df_in.iloc[idx - 1]
@@ -1354,7 +1360,7 @@ with tabs[8]:
                             chunked_update(ws_in, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_n), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m)])
                             st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
             elif e_type == "지출 장부" and not df_out.empty:
-                opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {r.get('지출액','')}원", axis=1).tolist()
+                opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("수정할 지출 내역", range(len(opts)), format_func=lambda x: opts[x])
                 if idx > 0:
                     t = df_out.iloc[idx - 1]
@@ -1374,13 +1380,13 @@ with tabs[8]:
         elif mode_l == "🚨 내역 삭제":
             d_type = st.radio("삭제할 장부", ["입금 장부", "지출 장부"], horizontal=True)
             if d_type == "입금 장부" and not df_in.empty:
-                opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {r.get('입금액','')}원", axis=1).tolist()
+                opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {parse_int_safe(r.get('입금액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x])
                 if st.button("🚨 입금 삭제 실행") and idx > 0:
                     ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row']))
                     st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
             elif d_type == "지출 장부" and not df_out.empty:
-                opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {r.get('지출액','')}원", axis=1).tolist()
+                opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x])
                 if st.button("🚨 지출 삭제 실행") and idx > 0:
                     ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row']))
