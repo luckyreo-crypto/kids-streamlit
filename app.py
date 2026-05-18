@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.1", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.2", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -370,7 +370,7 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 (★ 회비관리 명칭 -> 교사 회비 사용내역 개정 변경 적용) ---
+# --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"])
 
 # ==========================================
@@ -775,7 +775,7 @@ with tabs[4]:
                     if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
                     if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
                     if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
-                    for k (1, 16):
+                    for k in range(1, 16):
                         if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
                     ws_act.append_row(new_row)
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
@@ -981,7 +981,7 @@ with tabs[6]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 7] 총무 전용 - 비용집행관리 (★ V2.0 요구사항 레이아웃 고도화)
+# [탭 7] 총무 전용 - 비용집행관리
 # ==========================================
 with tabs[7]:
     if not st.session_state['chongmu_auth']:
@@ -1022,7 +1022,6 @@ with tabs[7]:
         if mode_r == "👀 조회 및 출력":
             if not df_r.empty:
                 with st.container(border=True):
-                    # ★ UI 개선: 조회기간 바로 옆(우측)에 합계 금액이 나란히 오도록 배치 구성
                     col_f1, col_f2, col_f3 = st.columns([2, 2, 1.5])
                     min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
                     min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
@@ -1040,14 +1039,12 @@ with tabs[7]:
                     
                     total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum() if not df_r_filtered.empty else 0
                     
-                    # ★ 조회기간 필터 우측 옆칸에 실시간 총 집행 합계금액 위젯 연동
                     col_f3.metric("📅 선택 기간 총 집행액", f"{int(total_filtered_cost):,}원")
                 
                 if not df_r_filtered.empty:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
                     display_df = df_r_filtered[display_cols].copy()
                     
-                    # ★ 비용 입력 회계처리(우측정렬 및 수치 포맷팅 유지 연동)
                     display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
                     
                     st.dataframe(display_df, use_container_width=True, hide_index=True, column_config={
@@ -1064,7 +1061,6 @@ with tabs[7]:
                     
                     st.info("💡 아래 버튼을 눌러 인쇄용 문서를 다운로드한 후 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 진행하세요.")
                     
-                    # ★ PDF 인쇄명칭 변경 & 정렬 세분화 CSS & 1부터 시작하는 순번 재배치
                     html_content = f"""
                     <html>
                     <head>
@@ -1078,7 +1074,6 @@ with tabs[7]:
                             th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }}
                             td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }}
                             
-                            /* 지정 항목 정렬 CSS 스키마 설계 */
                             .align-center {{ text-align: center; }}
                             .align-right {{ text-align: right; }}
                             .align-left {{ text-align: left; }}
@@ -1086,7 +1081,6 @@ with tabs[7]:
                             .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }}
                             .receipt-section {{ page-break-before: always; }}
                             .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }}
-                            /* 영수증 화면 크기 2/3로 최적화 고해상도 확대 */
                             .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
                             @media print {{ body {{ margin: 0; }} }}
                         </style>
@@ -1100,11 +1094,10 @@ with tabs[7]:
                         <h2>📊 지출 내역 요약 일람표</h2>
                         <table>
                             <thead>
-                                <tr><th>번호</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
+                                <tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
                             </thead>
                             <tbody>
                     """
-                    # ★ 인쇄 시 번호와 영수증 순번이 항상 1부터 순차 정렬 매핑 시작
                     for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
                         html_content += f"""<tr>
                             <td class="align-center">{idx}</td>
@@ -1133,7 +1126,7 @@ with tabs[7]:
                     st.download_button(
                         label="📄 PDF/인쇄용 보고서 다운로드 (HTML)",
                         data=html_content.encode("utf-8"),
-                        file_name=f"비용집행보고서_{s_date}_{e_date}.html",
+                        file_name=f"슈팅스타_집행내역_{s_date}_{e_date}.html",
                         mime="text/html",
                         use_container_width=True
                     )
@@ -1196,19 +1189,19 @@ with tabs[7]:
                 st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 8] 총무 전용 - 교사 회비 사용내역 (★ 장부제목 공식 수정 개정 반영)
+# [탭 8] 총무 전용 - 교사 회비 사용내역
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
-        st.subheader("💰 교사 회비 사용내역")
-        
-        total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
-        total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
-        balance = total_in - total_out
+        st.subheader("💰 교사 회비 사용내역 장부")
         
         with st.container(border=True):
+            total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
+            total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
+            balance = total_in - total_out
+            
             col_m1, col_m2, col_m3 = st.columns(3)
             col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원")
             col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원")
@@ -1224,7 +1217,6 @@ with tabs[8]:
                 if not df_in.empty: 
                     disp_in = df_in[['번호', '날짜', '입금자명', '입금액', '비고']].copy()
                     
-                    # ★ 수입 입금액 회계처리 (우측정렬 연동)
                     disp_in['입금액'] = pd.to_numeric(disp_in['입금액'], errors='coerce').fillna(0).astype(int)
                     
                     st.dataframe(disp_in, use_container_width=True, hide_index=True, column_config={
@@ -1237,7 +1229,6 @@ with tabs[8]:
                 if not df_out.empty: 
                     disp_out = df_out[['번호', '날짜', '내용', '지출액', '비고']].copy()
                     
-                    # ★ 지출액 회계처리 (우측정렬 연동)
                     disp_out['지출액'] = pd.to_numeric(disp_out['지출액'], errors='coerce').fillna(0).astype(int)
                     
                     st.dataframe(disp_out, use_container_width=True, hide_index=True, column_config={
@@ -1249,7 +1240,6 @@ with tabs[8]:
             st.markdown("---")
             st.markdown("##### 📄 회비장부 보고서 출력 (인쇄/PDF 저장)")
             
-            # ★ PDF 타이틀 개정명칭 반영 및 정렬 2/3 사이즈 확대 스키마 적용
             html_ledger = f"""
             <html>
             <head>
@@ -1264,14 +1254,12 @@ with tabs[8]:
                     th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }}
                     td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }}
                     
-                    /* 정렬 가이드 설계 */
                     .align-center {{ text-align: center; }}
                     .align-right {{ text-align: right; }}
                     .align-left {{ text-align: left; }}
                     
                     .receipt-section {{ page-break-before: always; }}
                     .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }}
-                    /* 영수증 크기 2/3 비율로 웅장하게 확대 */
                     .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
                 </style>
             </head>
@@ -1284,12 +1272,11 @@ with tabs[8]:
                 <h2>📥 1. 회비 입금 내역 요약표</h2>
                 <table>
                     <thead>
-                        <tr><th>번호</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr>
+                        <tr><th>순번</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr>
                     </thead>
                     <tbody>
             """
             if not df_in.empty:
-                # ★ 필터링 후 인쇄 시 1부터 재정렬되어 순차 부여되는 카운터 로직
                 for idx, (_, row) in enumerate(df_in.iterrows(), start=1):
                     html_ledger += f"""<tr>
                         <td class="align-center">{idx}</td>
@@ -1308,12 +1295,11 @@ with tabs[8]:
                 <h2>📤 2. 회비 지출 내역 요약표</h2>
                 <table>
                     <thead>
-                        <tr><th>번호</th><th>날짜</th><th>내용</th><th>지출액(원)</th><th>비고</th></tr>
+                        <tr><th>순번</th><th>날짜</th><th>내용</th><th>지출액(원)</th><th>비고</th></tr>
                     </thead>
                     <tbody>
             """
             if not df_out.empty:
-                # ★ 필터링 후 인쇄 시 1부터 재정렬되어 순차 부여되는 카운터 로직
                 for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
                     html_ledger += f"""<tr>
                         <td class="align-center">{idx}</td>
@@ -1333,7 +1319,6 @@ with tabs[8]:
                     <h2>📸 3. 회비 지출 증빙 영수증 사본 목록</h2>
             """
             if not df_out.empty:
-                # ★ 영수증 순번도 1부터 순차 리셋 매핑 시작
                 for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
                     img_url = str(row.get('영수증사진',''))
                     if img_url and img_url.startswith('http'):
@@ -1357,7 +1342,7 @@ with tabs[8]:
             st.download_button(
                 label="📄 회비장부 전체 PDF 인쇄용 다운로드 (HTML 형식)",
                 data=html_ledger.encode("utf-8"),
-                file_name=f"회비결산보고서_{datetime.date.today()}.html",
+                file_name=f"교사회비사용내역_{datetime.date.today()}.html",
                 mime="text/html",
                 use_container_width=True
             )
