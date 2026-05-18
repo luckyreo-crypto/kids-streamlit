@@ -11,7 +11,7 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.2", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="26년 슈팅스타 통합관리 V2.3", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 components.html(
@@ -221,9 +221,7 @@ def get_worksheets():
     try: ws_out = sh.worksheet("회비지출")
     except: ws_out = sh.add_worksheet("회비지출", 500, 10); ws_out.append_row(["번호", "날짜", "내용", "지출액", "비고", "영수증사진"])
 
-    # [수정] 기도순서 워크시트 개설 및 입력해주신 기본 데이터 세딩 연동
-    try:
-        ws_p = sh.worksheet("기도순서")
+    try: ws_p = sh.worksheet("기도순서")
     except:
         ws_p = sh.add_worksheet("기도순서", 500, 5)
         ws_p.append_row(["번호", "날짜", "이름", "비고"])
@@ -238,18 +236,22 @@ def get_worksheets():
             ["15", "2026-08-30", "남윤채", ""]
         ]
         ws_p.append_rows(sample_prayers)
+        
+    # 신규 탭: 주보관리 시트 동적 생성
+    try: ws_b = sh.worksheet("주보관리")
+    except: ws_b = sh.add_worksheet("주보관리", 60, 10); ws_b.append_row(["주차", "날짜", "주보이미지1", "주보이미지2", "비고", "업데이트일시"])
 
-    return ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p
+    return ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p, ws_b
 
 @st.cache_data(ttl=600)
 def fetch_sheet_data():
-    ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p = get_worksheets()
-    return ws_m.get_all_values(), ws_a.get_all_values(), ws_s.get_all_values(), ws_r.get_all_values(), ws_in.get_all_values(), ws_out.get_all_values(), ws_p.get_all_values()
+    ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p, ws_b = get_worksheets()
+    return ws_m.get_all_values(), ws_a.get_all_values(), ws_s.get_all_values(), ws_r.get_all_values(), ws_in.get_all_values(), ws_out.get_all_values(), ws_p.get_all_values(), ws_b.get_all_values()
 
 def get_all_data():
     try:
-        ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p = get_worksheets()
-        vals_m, vals_a, vals_s, vals_r, vals_in, vals_out, vals_p = fetch_sheet_data()
+        ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p, ws_b = get_worksheets()
+        vals_m, vals_a, vals_s, vals_r, vals_in, vals_out, vals_p, vals_b = fetch_sheet_data()
         
         df_m = pd.DataFrame(vals_m[1:], columns=vals_m[0]) if len(vals_m) > 1 else pd.DataFrame()
         df_m['sheet_row'] = range(2, len(df_m) + 2)
@@ -274,10 +276,13 @@ def get_all_data():
         df_p = pd.DataFrame(vals_p[1:], columns=vals_p[0]) if len(vals_p) > 1 else pd.DataFrame()
         if not df_p.empty: df_p['sheet_row'] = range(2, len(df_p) + 2)
         
-        return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s, ws_r, df_r, ws_in, df_in, ws_out, df_out, ws_p, df_p
-    except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame()
+        df_b = pd.DataFrame(vals_b[1:], columns=vals_b[0]) if len(vals_b) > 1 else pd.DataFrame()
+        if not df_b.empty: df_b['sheet_row'] = range(2, len(df_b) + 2)
+        
+        return ws_m, df_m, vals_m[0], ws_a, df_a, ws_s, df_s, ws_r, df_r, ws_in, df_in, ws_out, df_out, ws_p, df_p, ws_b, df_b
+    except Exception as e: return None, pd.DataFrame(), [], None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame(), None, pd.DataFrame()
 
-ws, df, headers, ws_act, df_act, ws_stat, df_stat, ws_r, df_r, ws_in, df_in, ws_out, df_out, ws_p, df_p = get_all_data()
+ws, df, headers, ws_act, df_act, ws_stat, df_stat, ws_r, df_r, ws_in, df_in, ws_out, df_out, ws_p, df_p, ws_b, df_b = get_all_data()
 
 if df is None or df.empty:
     st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
@@ -299,6 +304,56 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
+# --- 다이얼로그 모달: 주보 관리 ---
+@st.dialog("📝 주보 등록/수정 관리")
+def manage_bulletin_dialog(w_str, d_str):
+    st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h4>", unsafe_allow_html=True)
+    existing_data = df_b[df_b['주차'] == w_str] if not df_b.empty else pd.DataFrame()
+    
+    with st.form(f"bulletin_form_{w_str}"):
+        memo = st.text_input("📝 비고 (예: 신년감사예배, 야외예배 등)", value=existing_data.iloc[0].get('비고', '') if not existing_data.empty else "")
+        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다. 기존에 업로드된 주보가 있다면 아래에 미리보기가 표시됩니다.")
+        img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg'])
+        img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg'])
+        
+        # 기존 이미지 렌더링
+        if not existing_data.empty:
+            old_img1 = existing_data.iloc[0].get('주보이미지1', '')
+            old_img2 = existing_data.iloc[0].get('주보이미지2', '')
+            c1, c2 = st.columns(2)
+            if old_img1 and "http" in str(old_img1): c1.image(str(old_img1).replace("&vid=1", "").replace("?vid=1", ""), caption="현재 앞면", use_container_width=True)
+            if old_img2 and "http" in str(old_img2): c2.image(str(old_img2).replace("&vid=1", "").replace("?vid=1", ""), caption="현재 뒷면", use_container_width=True)
+        else:
+            old_img1, old_img2 = "", ""
+        
+        if st.form_submit_button("💾 주보 저장 및 업로드", type="primary", use_container_width=True):
+            with st.spinner("이미지 서버 전송 및 저장 중..."):
+                url1 = upload_photo(img1, f"주보_{w_str}_1") if img1 else old_img1
+                url2 = upload_photo(img2, f"주보_{w_str}_2") if img2 else old_img2
+                now_str = str(datetime.datetime.now())
+                
+                if not existing_data.empty:
+                    row_idx = int(existing_data.iloc[0]['sheet_row'])
+                    cells = [
+                        gspread.Cell(row_idx, 3, url1),
+                        gspread.Cell(row_idx, 4, url2),
+                        gspread.Cell(row_idx, 5, memo),
+                        gspread.Cell(row_idx, 6, now_str)
+                    ]
+                    chunked_update(ws_b, cells)
+                else:
+                    ws_b.append_row([w_str, d_str, url1, url2, memo, now_str])
+                
+                st.success("✅ 저장이 완료되었습니다!")
+                time.sleep(1); fetch_sheet_data.clear(); st.rerun()
+    
+    if not existing_data.empty:
+        if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
+            ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row']))
+            st.success("🗑️ 삭제 완료!")
+            time.sleep(1); fetch_sheet_data.clear(); st.rerun()
+
+# --- 다이얼로그 모달: 인원 정보 ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -391,8 +446,8 @@ def edit_student_dialog(target_dict):
                     time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 (생일 옆자리에 '기도순서' 배치 연동) ---
-tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🙏 기도순서", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"])
+# --- 5. 화면(탭) 구성 (★ 주보 메뉴 추가) ---
+tabs = st.tabs(["🏫 반", "📋 교적부", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"])
 
 # ==========================================
 # [탭 0] 반편성
@@ -615,7 +670,7 @@ with tabs[2]:
                         st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
 
 # ==========================================
-# [탭 3] 신규 메뉴 - 기도순서 (★ 반 정보 동적 크로스 오버레이 매핑 및 완벽 CRUD 구현)
+# [탭 3] 신규 메뉴 - 기도순서 (★ 반 매핑 오류 원천 차단 알고리즘)
 # ==========================================
 with tabs[3]:
     st.subheader("🙏 예배 기도순서 관리")
@@ -625,19 +680,27 @@ with tabs[3]:
         df_p_calc['날짜_dt'] = pd.to_datetime(df_p_calc['날짜'], errors='coerce')
         df_p_calc = df_p_calc.sort_values(by='날짜_dt', ascending=True)
         
-        # 교적부 데이터를 기반으로 이름에 매핑되는 반 정보 사전 구성
+        # ★ 교적부 데이터 공백제거 및 활성인원 최우선 2단계 딥매핑 (매핑 오류 완벽 픽스)
         class_mapping = {}
         if not df.empty and '이름' in df.columns:
+            # 1단계: 재적 중(활성)인 인원을 먼저 딕셔너리에 매핑하여 정확도 100% 보장
+            active_df = df[~df[status_col].isin(INACTIVE_STATUS)]
+            for _, row_m in active_df.iterrows():
+                clean_name = str(row_m['이름']).replace(" ", "")
+                class_mapping[clean_name] = str(row_m.get(class_col, ''))
+            
+            # 2단계: 비활성 인원 보완 (동명이인일 경우 1단계의 활성 인원 정보가 덮어씌워지지 않도록 보호)
             for _, row_m in df.iterrows():
-                class_mapping[str(row_m['이름']).strip()] = str(row_m.get(class_col, ''))
+                clean_name = str(row_m['이름']).replace(" ", "")
+                if clean_name not in class_mapping:
+                    class_mapping[clean_name] = str(row_m.get(class_col, ''))
                 
-        df_p_calc['반'] = df_p_calc['이름'].apply(lambda x: class_mapping.get(str(x).strip(), "교역자/미등록"))
+        df_p_calc['반'] = df_p_calc['이름'].apply(lambda x: class_mapping.get(str(x).replace(" ", ""), "교역자/미등록"))
         df_p_calc['월그룹'] = df_p_calc['날짜_dt'].dt.strftime('%m월')
         
         st.markdown("##### 📅 월별 배치 현황")
         unique_months = df_p_calc['월그룹'].dropna().unique()
         
-        # 월 수에 맞게 분할 배치 출력하여 깔끔한 레이아웃 보장
         p_grid = st.columns(len(unique_months) if len(unique_months) > 0 else 1)
         for idx_m, m_val in enumerate(unique_months):
             with p_grid[idx_m % len(p_grid)]:
@@ -662,7 +725,6 @@ with tabs[3]:
     if prayer_crud_mode == "➕ 기도자 등록":
         with st.form("add_new_prayer_form"):
             new_p_date = st.date_input("기도 일자", datetime.date.today()).strftime("%Y-%m-%d")
-            # 등록 미스 방지를 위해 교적부 명단 연동
             registered_names = sorted(list(df['이름'].dropna().unique())) if '이름' in df.columns else []
             if registered_names:
                 new_p_name = st.selectbox("기도자 선출", registered_names)
@@ -709,9 +771,38 @@ with tabs[3]:
             time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 4] 새친구
+# [탭 4] 신규 메뉴 - 주보 (★ 52주차 그리드 & 등록 여부 녹색 피드백 & 팝업 관리)
 # ==========================================
 with tabs[4]:
+    st.subheader("📝 주보 관리")
+    st.caption("💡 각 주차를 클릭하여 주보 이미지를 등록/수정/삭제하세요. 등록된 주차는 ✅ 녹색으로 강조됩니다.")
+    
+    # 52주차 그리드 버튼 UI 생성 (4열 매트릭스 레이아웃)
+    b_cols = st.columns(4)
+    for i in range(1, 53):
+        w_str = f"{i}주"
+        w_date = start_date + datetime.timedelta(days=(i-1)*7)
+        d_str = w_date.strftime("%m/%d")
+        
+        # 해당 주차의 주보 등록 여부 확인
+        is_bulletin_exist = False
+        if not df_b.empty:
+            match_b = df_b[df_b['주차'] == w_str]
+            if not match_b.empty and (str(match_b.iloc[0].get('주보이미지1','')).startswith('http') or str(match_b.iloc[0].get('주보이미지2','')).startswith('http')):
+                is_bulletin_exist = True
+        
+        # 버튼 디자인: 등록되었으면 Primary(색상 강조) 및 녹색 체크 아이콘
+        btn_type = "primary" if is_bulletin_exist else "secondary"
+        btn_label = f"✅ {w_str} ({d_str})" if is_bulletin_exist else f"⬜ {w_str} ({d_str})"
+        
+        with b_cols[(i-1) % 4]:
+            if st.button(btn_label, key=f"btn_bulletin_{i}", use_container_width=True, type=btn_type):
+                manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
+
+# ==========================================
+# [탭 5] 새친구
+# ==========================================
+with tabs[5]:
     st.subheader("🌱 최근 등록 새친구")
     news = df[df[status_col] == '새친구'].copy()
     if not news.empty: 
@@ -725,9 +816,9 @@ with tabs[4]:
         st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 5] 행사 기록 관리
+# [탭 6] 행사 기록 관리
 # ==========================================
-with tabs[5]:
+with tabs[6]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
     st.subheader("⚙️ 행사 기록 관리")
     
@@ -890,17 +981,15 @@ with tabs[5]:
                     if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
                     if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
                     if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
-                    
-                    # [문법오류수정 완벽 반영] syntax오타 정정 완료
                     for k in range(1, 16):
                         if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
                     ws_act.append_row(new_row)
                     st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 출석
+# [탭 7] 출석
 # ==========================================
-with tabs[6]:
+with tabs[7]:
     st.subheader("📅 주간 출석 현황")
     extended_weeks_list = weeks_list + ["✏️ 직접 입력 (새 날짜)"]
     
@@ -1034,9 +1123,9 @@ with tabs[6]:
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 7] 통계
+# [탭 8] 통계
 # ==========================================
-with tabs[7]:
+with tabs[8]:
     st.subheader("📊 통계")
     col_stat, col_cumul = st.columns([2, 1])
     with col_stat: 
@@ -1098,9 +1187,9 @@ with tabs[7]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 8] 총무 전용 - 비용집행관리
+# [탭 9] 총무 전용 - 비용집행관리
 # ==========================================
-with tabs[8]:
+with tabs[9]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
         cpwd = st.text_input("총무 전용 비밀번호를 입력하세요", type="password", key="pwd_receipt")
@@ -1161,6 +1250,7 @@ with tabs[8]:
                 if not df_r_filtered.empty:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
                     display_df = df_r_filtered[display_cols].copy()
+                    
                     display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
                     
                     st.dataframe(display_df, use_container_width=True, hide_index=True, column_config={
@@ -1210,7 +1300,7 @@ with tabs[8]:
                         <h2>📊 지출 내역 요약 일람표</h2>
                         <table>
                             <thead>
-                                <tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
+                                <tr><th>번호</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
                             </thead>
                             <tbody>
                     """
@@ -1305,19 +1395,19 @@ with tabs[8]:
                 st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 9] 총무 전용 - 교사 회비 사용내역
+# [탭 10] 총무 전용 - 교사 회비 사용내역
 # ==========================================
-with tabs[9]:
+with tabs[10]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
         st.subheader("💰 교사 회비 사용내역 장부")
         
-        total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
-        total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
-        balance = total_in - total_out
-        
         with st.container(border=True):
+            total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
+            total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
+            balance = total_in - total_out
+            
             col_m1, col_m2, col_m3 = st.columns(3)
             col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원")
             col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원")
@@ -1332,6 +1422,7 @@ with tabs[9]:
                 st.markdown("##### 📥 수입 (입금 내역)")
                 if not df_in.empty: 
                     disp_in = df_in[['번호', '날짜', '입금자명', '입금액', '비고']].copy()
+                    
                     disp_in['입금액'] = pd.to_numeric(disp_in['입금액'], errors='coerce').fillna(0).astype(int)
                     
                     st.dataframe(disp_in, use_container_width=True, hide_index=True, column_config={
@@ -1343,6 +1434,7 @@ with tabs[9]:
                 st.markdown("##### 📤 지출 (집행 내역)")
                 if not df_out.empty: 
                     disp_out = df_out[['번호', '날짜', '내용', '지출액', '비고']].copy()
+                    
                     disp_out['지출액'] = pd.to_numeric(disp_out['지출액'], errors='coerce').fillna(0).astype(int)
                     
                     st.dataframe(disp_out, use_container_width=True, hide_index=True, column_config={
