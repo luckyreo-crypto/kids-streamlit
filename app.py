@@ -29,12 +29,16 @@ components.html(
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# 🔴 레이아웃 엉킴 현상(Tangling)을 유발했던 기존 CSS를 제거하고 안정적인 카드 CSS 도입
 st.markdown("""
     <style>
     .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
     
-    /* 네이티브 탭 고정 */
+    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
+    
+    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
+    .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
+    
+    /* 탭(Tabs) 상단 고정 */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important; position: sticky !important; top: 3.5rem !important; 
@@ -47,37 +51,45 @@ st.markdown("""
     div[data-baseweb="tab"] p { font-size: 0.9rem !important; font-weight: 700 !important; white-space: nowrap; margin: 0; }
     
     .fab-button { position: fixed; bottom: 30px; left: 30px; background-color: rgba(3, 102, 214, 0.85); color: white !important; padding: 12px 20px; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 999999; }
-    .fab-button:hover { background-color: rgba(3, 102, 214, 1); transform: translateY(-3px); }
     
-    /* 🔴 1. 반별명단 학생 카드 (요청하신 사진 + 이름 + 생일 가로 디자인 적용) */
-    .student-card {
-        background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; 
-        display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 68px;
+    /* 🔴 반별명단 & 출석부 UI 패딩 최적화 */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card-marker) {
+        padding: 8px 10px !important;
+        border-radius: 8px !important;
+        margin-bottom: 8px !important;
     }
-    .student-card img {
-        width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin-right: 12px; border: 1px solid #eee; flex-shrink: 0;
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card-marker):hover {
+        border-color: #0366d6 !important;
+        background-color: #f8fbff !important;
     }
-    .student-card .info { display: flex; align-items: baseline; flex-grow: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    .student-card .name { font-size: 1.15rem; font-weight: 700; color: #111; }
-    .student-card .bday { font-size: 0.85rem; color: #888; margin-left: 8px; font-weight: 500; }
     
-    .icon-placeholder {
-        width: 48px; height: 48px; border-radius: 50%; background-color: #f1f8ff; display: flex; 
-        align-items: center; justify-content: center; font-size: 20px; margin-right: 12px; flex-shrink: 0;
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {
+        padding: 6px 12px !important; border-radius: 8px !important; margin-bottom: 5px !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container):hover {
+        border-color: #0366d6 !important; background-color: #f8fbff !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {
+        padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; background-color: transparent !important; height: 45px !important; display: flex; align-items: center;
     }
 
-    /* 카드 위에 덮어씌우는 투명 버튼 (클릭 영역) */
-    .overlay-btn-container { position: relative; margin-top: -68px; margin-bottom: 8px; z-index: 10; }
-    .overlay-btn-container div[data-testid="stButton"] button {
-        width: 100%; height: 68px; opacity: 0; cursor: pointer;
+    /* 🔴 모바일 반응형 강제 가로 유지 */
+    @media (max-width: 576px) {
+        div[data-testid="stHorizontalBlock"]:has(.student-card-marker),
+        div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+        }
     }
 
-    /* 🔴 2. 상세 정보 모달 닫기 버튼을 하단에 항상 고정 (Sticky) */
+    /* 🔴 상세 모달 하단 닫기 버튼 Sticky 처리 */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) {
         position: sticky !important; bottom: -25px !important; background-color: white !important; z-index: 99999 !important;
         padding-top: 15px !important; padding-bottom: 15px !important; border-top: 1px solid #eef2f6 !important;
     }
-    .sticky-footer-marker { display: none; }
+    .sticky-footer-marker, .student-card-marker, .attendance-card-container { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -144,6 +156,7 @@ def parse_date_safe(date_str):
     except: return datetime.date(2015, 1, 1)
 
 def natural_sort_key(s): return [int(t) if t.isdigit() else t.lower() for t in re.split('([0-9]+)', str(s).replace(" ", ""))]
+
 def class_sort_key(c):
     c_str = str(c).replace(" ", "")
     priority = 1
@@ -173,7 +186,9 @@ def is_enrolled_at_date(row, target_date):
     return True
 
 def get_role(row):
-    s, c, m = safe_str(row.get('학교상태', '')), safe_str(row.get('학년(담임)', row.get('반', ''))), safe_str(row.get('비고', ''))
+    s = safe_str(row.get('학교상태', ''))
+    c = safe_str(row.get('학년(담임)', row.get('반', '')))
+    m = safe_str(row.get('비고', ''))
     if s in ['교역자', '전도사', '목사'] or any(k in m for k in ['전도사', '목사', '교역자']) or any(k in c for k in ['교역자', '전도사', '목사']): return 'pastor'
     if s == '교사' or any(k in c for k in ['교사', '임원', '선생님']) or any(k in m for k in ['교사', '부장', '부감', '총무', '회계', '선생님']): return 'teacher'
     return 'student'
@@ -280,7 +295,7 @@ if df is None or df.empty:
     st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
     st.stop()
 
-# --- 전역 변수 영역 (NameError 완벽 해결) ---
+# --- 전역 변수 설정 ---
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
 
@@ -377,16 +392,11 @@ def edit_student_dialog(target_dict):
         c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
         c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
         
-        if st.session_state.get('privacy_mode', True):
-            p_phone = "🔒 [보호됨]" if safe_str(target_dict.get('연락처','')) else ""
-            p_parent = "🔒 [보호됨]" if safe_str(target_dict.get('부모(아빠/엄마)','')) else ""
-            p_addr = "🔒 [보호됨]" if safe_str(target_dict.get('주소','')) else ""
-            p_birth = "🔒 [보호됨]" if safe_str(target_dict.get('생년월일','')) else ""
-        else:
-            p_phone = safe_str(target_dict.get('연락처',''))
-            p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
-            p_addr = safe_str(target_dict.get('주소',''))
-            p_birth = safe_str(target_dict.get('생년월일',''))
+        # [6] 상세보기에 적용된 암호화 완전 해제 (Privacy 모드 무시하고 무조건 표시)
+        p_phone = safe_str(target_dict.get('연락처',''))
+        p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
+        p_addr = safe_str(target_dict.get('주소',''))
+        p_birth = safe_str(target_dict.get('생년월일',''))
             
         c1.markdown(f"**생년월일:** {p_birth}")
         c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
@@ -398,7 +408,6 @@ def edit_student_dialog(target_dict):
         st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
         st.divider()
-        # [하단 닫기 버튼 고정 배치]
         with st.container():
             st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
             btn_col1, btn_col2 = st.columns(2)
@@ -444,11 +453,9 @@ def edit_student_dialog(target_dict):
                     
                     r_idx = int(target_dict['sheet_row'])
                     update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
-                    
                     cells_to_update = []
                     for k, v in update_map.items():
                         if k in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index(k)+1, str(v)))
-                            
                     if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
                     elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
                     
@@ -469,7 +476,7 @@ def edit_student_dialog(target_dict):
 tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
 
 # ==========================================
-# [탭 0] 반편성 (★ 반응형 카드 UI 도입, 다단 컬럼 엉킴 해결)
+# [탭 0] 반편성 (★ 반응형 카드, 상세버튼 구조화, 새친구 뱃지, 직분 명시)
 # ==========================================
 with tabs[0]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
@@ -478,7 +485,6 @@ with tabs[0]:
     
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     
-    # 🔴 여러 반을 한 줄에 욱여넣던 코드 제거 (반 순서대로 아래로 쭉 배치)
     for c_name in all_classes:
         group = df[df[class_col] == c_name].copy()
         group['role'] = group.apply(get_role, axis=1)
@@ -509,42 +515,44 @@ with tabs[0]:
         with st.container(border=True):
             st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;'>{header_title}</h4>", unsafe_allow_html=True)
             
-            # 학생은 네이티브 columns를 써서 PC에서는 2열, 모바일에서는 자동으로 1열로 붕괴되게 처리
             stu_cols = st.columns(2)
-            
             for idx_j, (_, r) in enumerate(group.iterrows()):
                 s, n = r[status_col], r['이름']
                 b_str, bd_disp = str(r.get('생년월일', '')), ""
                 if '-' in b_str and len(b_str.split('-')) == 3:
-                    try: bd_disp = f" 🎂{int(b_str.split('-')[1]):02d}/{int(b_str.split('-')[2]):02d}"
+                    try: bd_disp = f"🎂 {int(b_str.split('-')[1]):02d}/{int(b_str.split('-')[2]):02d}"
                     except: pass
                 
+                # [3] 목사님, 전도사님 직분 명시 처리
+                if s in ['목사', '전도사'] and s not in n: n = f"{n} {s}님"
+                elif '목사' in str(r.get('비고', '')) and '목사' not in n: n = f"{n} 목사님"
+                elif '전도사' in str(r.get('비고', '')) and '전도사' not in n: n = f"{n} 전도사님"
+                
+                # [5] 사진이 있어도 새친구 표시 적용
+                new_friend_badge = " 🌱" if s == '새친구' else ""
                 suffix = f" ({s})" if s in INACTIVE_STATUS else ""
+                
                 icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                 p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                 
-                # HTML과 CSS로 완벽하게 제어되는 카드 뷰 생성 (이름 옆에 작은 생일 배치)
-                if p_url and p_url.startswith('http'):
-                    img_element = f'<img src="{p_url}">'
-                else:
-                    img_element = f'<div class="icon-placeholder">{icon}</div>'
-                    
-                card_html = f"""
-                <div class="student-card">
-                    {img_element}
-                    <div class="info">
-                        <span class="name">{n}{suffix}</span>
-                        <span class="bday">{bd_disp}</span>
-                    </div>
-                </div>
-                """
-                
                 with stu_cols[idx_j % 2]:
-                    st.markdown(card_html, unsafe_allow_html=True)
-                    st.markdown('<div class="overlay-btn-container">', unsafe_allow_html=True)
-                    if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
-                        edit_student_dialog(r.to_dict())
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    with st.container(border=True):
+                        st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
+                        
+                        # [2] 이름 텍스트 옆에 생일, 그리고 제일 우측에 [상세] 버튼 배치
+                        c_img, c_info, c_btn = st.columns([1.5, 6, 2.5])
+                        with c_img:
+                            if p_url and p_url.startswith('http'):
+                                st.markdown(f'<img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'<div style="width:45px; height:45px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:20px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
+                        with c_info:
+                            info_html = f'<div style="font-size:1.05rem; font-weight:700; color:#111; line-height:45px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">{n}{suffix}{new_friend_badge} <span style="font-size:0.8rem; color:#888; font-weight:500;">{bd_disp}</span></div>'
+                            st.markdown(info_html, unsafe_allow_html=True)
+                        with c_btn:
+                            st.markdown('<div style="margin-top: 5px;"></div>', unsafe_allow_html=True)
+                            if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
+                                edit_student_dialog(r.to_dict())
             
             with st.expander(f"➕ 새친구 추가"):
                 with st.form(f"qa_{c_name}"):
@@ -701,9 +709,7 @@ with tabs[2]:
                     
                     if st.form_submit_button("📝 수정사항 반영", type="primary"):
                         r_idx = int(target_p['sheet_row'])
-                        ws_p.update_cell(r_idx, 2, e_p_date)
-                        ws_p.update_cell(r_idx, 3, e_p_name)
-                        ws_p.update_cell(r_idx, 4, e_p_memo)
+                        ws_p.update_cell(r_idx, 2, e_p_date); ws_p.update_cell(r_idx, 3, e_p_name); ws_p.update_cell(r_idx, 4, e_p_memo)
                         st.success("✅ 변경사항이 구글시트에 기록되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
                     
     with p_tabs[3]:
@@ -712,11 +718,10 @@ with tabs[2]:
             sel_p_idx = st.selectbox("삭제 대상 선택", range(len(p_options)), format_func=lambda x: p_options[x], key="del_prayer_sel")
             if st.button("🚨 해당 기도 일정 삭제 실행", key="btn_del_prayer") and sel_p_idx > 0:
                 target_p = df_p.iloc[sel_p_idx - 1]
-                ws_p.delete_rows(int(target_p['sheet_row']))
-                st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 3] 주보 관리
+# [탭 3] 주보 관리 (★ 주차 순서 고정 배열)
 # ==========================================
 with tabs[3]:
     st.subheader("📝 주보 관리 및 조회")
@@ -735,31 +740,36 @@ with tabs[3]:
             curr_week_idx = i
             break
             
-    b_cols = st.columns(4)
-    for i in range(1, 53):
-        w_str = f"{i}주"
-        w_date = start_date + datetime.timedelta(days=(i-1)*7)
-        d_str = w_date.strftime("%m/%d")
-        
-        is_bulletin_exist = False
-        match_b = pd.DataFrame()
-        if not df_b.empty:
-            match_b = df_b[df_b['주차'] == w_str]
-            if not match_b.empty and (str(match_b.iloc[0].get('주보이미지1','')).startswith('http') or str(match_b.iloc[0].get('주보이미지2','')).startswith('http')):
-                is_bulletin_exist = True
-        
-        btn_type = "primary" if is_bulletin_exist else "secondary"
-        btn_label = f"✅ {w_str} ({d_str})" if is_bulletin_exist else f"⬜ {w_str} ({d_str})"
-        
-        with b_cols[(i-1) % 4]:
-            if i == curr_week_idx:
-                st.markdown('<div id="current-week-anchor" style="position:relative; top:-80px;"></div>', unsafe_allow_html=True)
-                
-            if st.button(btn_label, key=f"btn_bulletin_{i}", use_container_width=True, type=btn_type):
-                if b_mode == "👀 주보 보기":
-                    if is_bulletin_exist: view_bulletin_dialog(w_str, d_str, match_b.iloc[0])
-                    else: st.warning(f"⚠️ {w_str} ({d_str}) 주보는 아직 등록되지 않았습니다. [⚙️ 주보 등록/수정] 탭에서 먼저 올려주세요.")
-                else: manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
+    # [4] 주보는 화면 크기에 상관없이 1주차부터 번호 순서대로 나열되도록 강제 배치
+    for row_idx in range(0, 52, 4):
+        b_cols = st.columns(4)
+        for col_idx in range(4):
+            week_num = row_idx + col_idx + 1
+            if week_num > 52: break
+            
+            w_str = f"{week_num}주"
+            w_date = start_date + datetime.timedelta(days=(week_num-1)*7)
+            d_str = w_date.strftime("%m/%d")
+            
+            is_bulletin_exist = False
+            match_b = pd.DataFrame()
+            if not df_b.empty:
+                match_b = df_b[df_b['주차'] == w_str]
+                if not match_b.empty and (str(match_b.iloc[0].get('주보이미지1','')).startswith('http') or str(match_b.iloc[0].get('주보이미지2','')).startswith('http')):
+                    is_bulletin_exist = True
+            
+            btn_type = "primary" if is_bulletin_exist else "secondary"
+            btn_label = f"✅ {w_str} ({d_str})" if is_bulletin_exist else f"⬜ {w_str} ({d_str})"
+            
+            with b_cols[col_idx]:
+                if week_num == curr_week_idx:
+                    st.markdown('<div id="current-week-anchor" style="position:relative; top:-80px;"></div>', unsafe_allow_html=True)
+                    
+                if st.button(btn_label, key=f"btn_bulletin_{week_num}", use_container_width=True, type=btn_type):
+                    if b_mode == "👀 주보 보기":
+                        if is_bulletin_exist: view_bulletin_dialog(w_str, d_str, match_b.iloc[0])
+                        else: st.warning(f"⚠️ {w_str} ({d_str}) 주보는 아직 등록되지 않았습니다. [⚙️ 주보 등록/수정] 탭에서 먼저 올려주세요.")
+                    else: manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
 
     components.html("""
         <script>
@@ -869,10 +879,7 @@ with tabs[5]:
                     
     with e_tabs[1]:
         with st.form("new_e"):
-            a_d = st.date_input("날짜")
-            a_t = st.text_input("행사명")
-            a_c = st.text_area("내용")
-            a_n = st.text_input("공지사항")
+            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
             a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
                 with st.spinner("저장 중..."):
@@ -987,7 +994,7 @@ with tabs[5]:
                 ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 출석 (★ 엉킴방지, 네이티브 반응형 적용)
+# [탭 6] 출석
 # ==========================================
 with tabs[6]:
     st.subheader("📅 주간 출석 현황")
@@ -1051,35 +1058,34 @@ with tabs[6]:
             for c_name in sorted(grouped.groups.keys(), key=class_sort_key):
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
                 
-                # 네이티브 st.columns(2)를 써서 모바일에서는 한명씩, PC에서는 두명씩 안정적으로 배치
                 cols = st.columns(2)
                 for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
                     with cols[i % 2]:
-                        s = row[status_col]
-                        icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
-                        p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
-                        
-                        # 컨테이너 안에서 st.columns([1,4])만 사용하여 깔끔하게 배치
                         with st.container(border=True):
+                            st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                             c_img, c_tgl = st.columns([1, 4])
+                            
+                            s = row[status_col]
+                            new_friend_badge = " 🌱" if s == '새친구' else ""
+                            icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
+                            p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+                            
                             with c_img:
                                 if p_url and p_url.startswith('http'):
-                                    st.markdown(f'<img src="{p_url}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-top:2px;">', unsafe_allow_html=True)
+                                    st.markdown(f'<img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f'<div style="width:40px; height:40px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:18px; margin-top:2px;">{icon}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div style="width:45px; height:45px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:20px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
+                            
                             with c_tgl:
-                                st.markdown('<div style="margin-top: 5px;"></div>', unsafe_allow_html=True)
                                 is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                                new_att[row['sheet_row']] = st.toggle(f"{row['이름']}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
+                                new_att[row['sheet_row']] = st.toggle(f"{row['이름']}{new_friend_badge}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
                 target_c = headers.index(sel_w) + 1 if sel_w in headers else len(headers) + 1
                 if sel_w not in headers: 
                     try: ws.update_cell(1, target_c, sel_w)
-                    except: 
-                        ws.add_cols(10)
-                        ws.update_cell(1, target_c, sel_w)
+                    except: ws.add_cols(10); ws.update_cell(1, target_c, sel_w)
                 
                 final_s_p = 0; final_t_p = 0; cells_to_update = []
                 if not is_skip:
@@ -1091,8 +1097,7 @@ with tabs[6]:
                             elif role == 'teacher': final_t_p += 1 
                     for r, v in new_att.items():
                         cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
-                    if cells_to_update: 
-                        chunked_update(ws, cells_to_update)
+                    if cells_to_update: chunked_update(ws, cells_to_update)
                 
                 save_s_p = 0 if is_skip else final_s_p
                 save_t_p = 0 if is_skip else final_t_p
@@ -1145,8 +1150,7 @@ with tabs[6]:
                     row_idx = match_stat.index[0] + 2
                     end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
                     ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
-                else: 
-                    ws_stat.append_row(new_row)
+                else: ws_stat.append_row(new_row)
                 
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
@@ -1180,9 +1184,7 @@ with tabs[7]:
             def highlight_stat_cells(row):
                 try: att = int(row['출석'])
                 except: att = -1
-                if att == 0:
-                    return ['background-color: #ffebee; color: #d32f2f; font-weight: bold;' for _ in row.index]
-                
+                if att == 0: return ['background-color: #ffebee; color: #d32f2f; font-weight: bold;' for _ in row.index]
                 styles = ['' for _ in row.index]
                 for target_col in ['유년부 합계', '총합']:
                     if target_col in row.index:
@@ -1223,13 +1225,10 @@ with tabs[8]:
         cpwd = st.text_input("총무 전용 비밀번호를 입력하세요", type="password", key="pwd_receipt")
         if st.button("인증", key="btn_auth_receipt"):
             if cpwd == st.secrets.get("chongmu_password", "admin1234"): 
-                st.session_state['chongmu_auth'] = True
-                st.rerun()
-            else: 
-                st.error("❌ 비밀번호가 일치하지 않습니다.")
+                st.session_state['chongmu_auth'] = True; st.rerun()
+            else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     else:
         st.subheader("🧾 비용집행관리")
-        
         if not df_r.empty:
             df_r_calc = df_r.copy()
             df_r_calc['날짜_dt'] = pd.to_datetime(df_r_calc['날짜'], errors='coerce')
@@ -1259,23 +1258,18 @@ with tabs[8]:
             if not df_r.empty:
                 with st.container(border=True):
                     col_f1, col_f2, col_f3 = st.columns([2, 2, 1.5])
-                    min_d = df_r_calc['날짜_dt'].min()
-                    max_d = df_r_calc['날짜_dt'].max()
+                    min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
                     min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
                     max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
                     
                     date_range = col_f1.date_input("조회 기간 선택", [min_date, max_date])
                     keyword = col_f2.text_input("검색어 (구매처 또는 내용)", placeholder="검색어를 입력하세요")
                     
-                    if len(date_range) == 2: 
-                        s_date, e_date = date_range
-                    else: 
-                        s_date, e_date = min_date, max_date
+                    if len(date_range) == 2: s_date, e_date = date_range
+                    else: s_date, e_date = min_date, max_date
                     
                     df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
-                    if keyword:
-                        df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
-                    
+                    if keyword: df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
                     total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum() if not df_r_filtered.empty else 0
                     
                     col_f3.metric("📅 선택 기간 총 집행액", f"{int(total_filtered_cost):,}원")
@@ -1283,97 +1277,27 @@ with tabs[8]:
                 if not df_r_filtered.empty:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
                     display_df = df_r_filtered[display_cols].copy()
-                    
                     display_df['번호'] = range(1, len(display_df) + 1)
                     display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
                     
-                    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config={
-                        "비용": st.column_config.NumberColumn("비용", format="%d원")
-                    })
-                    
-                    st.download_button(
-                        label="📊 현재 조회 내역 엑셀(CSV) 다운로드",
-                        data=display_df.to_csv(index=False).encode('utf-8-sig'),
-                        file_name=f"비용집행내역_{s_date}_{e_date}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                    
+                    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config={"비용": st.column_config.NumberColumn("비용", format="%d원")})
+                    st.download_button(label="📊 현재 조회 내역 엑셀(CSV) 다운로드", data=display_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"비용집행내역_{s_date}_{e_date}.csv", mime="text/csv", use_container_width=True)
                     st.info("💡 아래 버튼을 눌러 인쇄용 문서를 다운로드한 후 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 진행하세요.")
                     
-                    html_content = f"""
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>슈팅스타 유년부 집행내역(요약본)</title>
-                        <style>
-                            body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }}
-                            h1, h2 {{ text-align: center; color: #0366d6; }}
-                            table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }}
-                            tr {{ page-break-inside: avoid; page-break-after: auto; }}
-                            th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }}
-                            td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }}
-                            
-                            .align-center {{ text-align: center; }}
-                            .align-right {{ text-align: right; }}
-                            .align-left {{ text-align: left; }}
-                            
-                            .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }}
-                            .receipt-section {{ page-break-before: always; }}
-                            .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }}
-                            .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
-                            @media print {{ body {{ margin: 0; }} }}
-                        </style>
-                    </head>
-                    <body>
-                        <h1>슈팅스타 유년부 집행내역(요약본)</h1>
-                        <div class="summary">
-                            조회 기간: {s_date} ~ {e_date} &nbsp;&nbsp;|&nbsp;&nbsp; 기간 내 총합계금액: {int(total_filtered_cost):,}원
-                        </div>
-                        
-                        <h2>📊 지출 내역 요약 일람표</h2>
-                        <table>
-                            <thead>
-                                <tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr>
-                            </thead>
-                            <tbody>
-                    """
+                    html_content = f"""<html><head><meta charset="utf-8"><title>슈팅스타 유년부 집행내역(요약본)</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }} .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }} @media print {{ body {{ margin: 0; }} }}</style></head><body><h1>슈팅스타 유년부 집행내역(요약본)</h1><div class="summary">조회 기간: {s_date} ~ {e_date} &nbsp;&nbsp;|&nbsp;&nbsp; 기간 내 총합계금액: {int(total_filtered_cost):,}원</div><h2>📊 지출 내역 요약 일람표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr></thead><tbody>"""
                     for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
-                        html_content += f"""<tr>
-                            <td class="align-center">{idx}</td>
-                            <td class="align-center">{row.get('날짜','')}</td>
-                            <td class="align-center">{row.get('구매처','')}</td>
-                            <td class="align-left">{row.get('내용','')}</td>
-                            <td class="align-right">{parse_int_safe(row.get('비용', 0)):,}</td>
-                            <td class="align-left">{row.get('비고','')}</td>
-                        </tr>"""
+                        html_content += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-center">{row.get('구매처','')}</td><td class="align-left">{row.get('내용','')}</td><td class="align-right">{parse_int_safe(row.get('비용', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
                     html_content += "</tbody></table>"
-                    
                     html_content += "<div class='receipt-section'><h2>📸 지출 증빙 영수증 사본 첨부 (순차 정렬)</h2>"
                     for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
                         img_url = str(row.get('영수증사진',''))
                         if img_url and str(img_url).startswith('http'):
                             clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
-                            html_content += f"""
-                            <div class="receipt-box">
-                                <strong>[순번 No.{idx}] {row.get('날짜','')} - {row.get('구매처','')} ({parse_int_safe(row.get('비용', 0)):,}원)</strong>
-                                <br><small>지출내역: {row.get('내용','')} | 비고: {row.get('비고','')}</small>
-                                <img src="{clean_url}" alt="영수증 사본">
-                            </div>
-                            """
+                            html_content += f"""<div class="receipt-box"><strong>[순번 No.{idx}] {row.get('날짜','')} - {row.get('구매처','')} ({parse_int_safe(row.get('비용', 0)):,}원)</strong><br><small>지출내역: {row.get('내용','')} | 비고: {row.get('비고','')}</small><img src="{clean_url}" alt="영수증 사본"></div>"""
                     html_content += "</div></body></html>"
-                    
-                    st.download_button(
-                        label="📄 PDF/인쇄용 보고서 다운로드 (HTML)",
-                        data=html_content.encode("utf-8"),
-                        file_name=f"슈팅스타_집행내역_{s_date}_{e_date}.html",
-                        mime="text/html",
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("조건에 맞는 내역이 없습니다.")
-            else:
-                st.info("등록된 비용 집행 내역이 없습니다.")
+                    st.download_button(label="📄 PDF/인쇄용 보고서 다운로드 (HTML)", data=html_content.encode("utf-8"), file_name=f"슈팅스타_집행내역_{s_date}_{e_date}.html", mime="text/html", use_container_width=True)
+                else: st.warning("조건에 맞는 내역이 없습니다.")
+            else: st.info("등록된 비용 집행 내역이 없습니다.")
                 
         with r_tabs[1]:
             with st.form("new_receipt_form"):
@@ -1383,7 +1307,6 @@ with tabs[8]:
                 rc_cost = st.number_input("비용 (원)", min_value=0, step=1000)
                 rc_memo = st.text_input("비고")
                 rc_photo = st.file_uploader("영수증 사진 업로드", type=['png', 'jpg', 'jpeg'])
-                
                 if st.form_submit_button("등록 완료", type="primary"):
                     with st.spinner("업로드 및 저장 중..."):
                         p_url = upload_photo(rc_photo, f"영수증_{rc_vendor}") if rc_photo else ""
@@ -1404,21 +1327,11 @@ with tabs[8]:
                         e_cost = st.number_input("비용 (원)", value=parse_int_safe(target.get('비용', 0)), step=1000)
                         e_memo = st.text_input("비고", value=target.get('비고',''))
                         e_photo = st.file_uploader("영수증 사진 변경 (새로 올리면 기존 사진 대체)", type=['png', 'jpg', 'jpeg'])
-                        
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("저장 중..."):
                                 p_url = upload_photo(e_photo, f"영수증_{e_vendor}") if e_photo else target.get('영수증사진','')
                                 r_idx = int(target['sheet_row'])
-                                
-                                cells = [
-                                    gspread.Cell(r_idx, 2, e_date),
-                                    gspread.Cell(r_idx, 3, e_vendor),
-                                    gspread.Cell(r_idx, 4, e_detail),
-                                    gspread.Cell(r_idx, 5, str(e_cost)),
-                                    gspread.Cell(r_idx, 6, e_memo),
-                                    gspread.Cell(r_idx, 7, p_url)
-                                ]
-                                chunked_update(ws_r, cells)
+                                chunked_update(ws_r, [gspread.Cell(r_idx, 2, e_date), gspread.Cell(r_idx, 3, e_vendor), gspread.Cell(r_idx, 4, e_detail), gspread.Cell(r_idx, 5, str(e_cost)), gspread.Cell(r_idx, 6, e_memo), gspread.Cell(r_idx, 7, p_url)])
                                 st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
         with r_tabs[3]:
@@ -1426,8 +1339,7 @@ with tabs[8]:
                 sel_idx = st.selectbox("삭제할 내역", range(len(options)), format_func=lambda x: options[x], key="del_rcpt_sel")
                 if st.button("🚨 삭제 실행", key="btn_del_receipt") and sel_idx > 0:
                     target = df_r.iloc[sel_idx - 1]
-                    ws_r.delete_rows(int(target['sheet_row']))
-                    st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                    ws_r.delete_rows(int(target['sheet_row'])); st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 9] 교사 회비 사용내역
@@ -1437,16 +1349,13 @@ with tabs[9]:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
     else:
         st.subheader("💰 교사 회비 사용내역 장부")
-        
         with st.container(border=True):
             total_in = pd.to_numeric(df_in['입금액'], errors='coerce').sum() if not df_in.empty else 0
             total_out = pd.to_numeric(df_out['지출액'], errors='coerce').sum() if not df_out.empty else 0
             balance = total_in - total_out
             
             col_m1, col_m2, col_m3 = st.columns(3)
-            col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원")
-            col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원")
-            col_m3.metric("💲 현재 잔액 (총 합계)", f"{int(balance):,}원")
+            col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원"); col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원"); col_m3.metric("💲 현재 잔액 (총 합계)", f"{int(balance):,}원")
         st.divider()
         
         l_tabs = st.tabs(["👀 전체 장부 조회", "➕ 내역 등록(입금/지출)", "📝 내역 수정", "🚨 내역 삭제"])
@@ -1456,165 +1365,56 @@ with tabs[9]:
             with col_l1:
                 st.markdown("##### 📥 수입 (입금 내역)")
                 if not df_in.empty: 
-                    disp_in = df_in[['번호', '날짜', '입금자명', '입금액', '비고']].copy()
-                    disp_in['입금액'] = pd.to_numeric(disp_in['입금액'], errors='coerce').fillna(0).astype(int)
-                    
-                    st.dataframe(disp_in, use_container_width=True, hide_index=True, column_config={
-                        "입금액": st.column_config.NumberColumn("입금액", format="%d원")
-                    })
+                    disp_in = df_in[['번호', '날짜', '입금자명', '입금액', '비고']].copy(); disp_in['입금액'] = pd.to_numeric(disp_in['입금액'], errors='coerce').fillna(0).astype(int)
+                    st.dataframe(disp_in, use_container_width=True, hide_index=True, column_config={"입금액": st.column_config.NumberColumn("입금액", format="%d원")})
                     st.download_button("📥 수입내역 엑셀 다운로드", data=df_in.to_csv(index=False).encode('utf-8-sig'), file_name="회비_수입내역.csv", mime="text/csv", use_container_width=True)
-                else: 
-                    st.info("수입 내역이 없습니다.")
+                else: st.info("수입 내역이 없습니다.")
             with col_l2:
                 st.markdown("##### 📤 지출 (집행 내역)")
                 if not df_out.empty: 
-                    disp_out = df_out[['번호', '날짜', '내용', '지출액', '비고']].copy()
-                    disp_out['지출액'] = pd.to_numeric(disp_out['지출액'], errors='coerce').fillna(0).astype(int)
-                    
-                    st.dataframe(disp_out, use_container_width=True, hide_index=True, column_config={
-                        "지출액": st.column_config.NumberColumn("지출액", format="%d원")
-                    })
+                    disp_out = df_out[['번호', '날짜', '내용', '지출액', '비고']].copy(); disp_out['지출액'] = pd.to_numeric(disp_out['지출액'], errors='coerce').fillna(0).astype(int)
+                    st.dataframe(disp_out, use_container_width=True, hide_index=True, column_config={"지출액": st.column_config.NumberColumn("지출액", format="%d원")})
                     st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
-                else: 
-                    st.info("지출 내역이 없습니다.")
+                else: st.info("지출 내역이 없습니다.")
             
             st.markdown("---")
             st.markdown("##### 📄 회비장부 보고서 출력 (인쇄/PDF 저장)")
-            
-            html_ledger = f"""
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>교사 회비 사용내역 보고서</title>
-                <style>
-                    body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }}
-                    h1, h2 {{ text-align: center; color: #0366d6; }}
-                    .summary-box {{ padding: 15px; background-color: #f1f8ff; border: 1px solid #cce5ff; border-radius: 8px; margin-bottom: 25px; font-size: 15px; font-weight: bold; text-align: center; }}
-                    table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }}
-                    tr {{ page-break-inside: avoid; page-break-after: auto; }}
-                    th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }}
-                    td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }}
-                    
-                    .align-center {{ text-align: center; }}
-                    .align-right {{ text-align: right; }}
-                    .align-left {{ text-align: left; }}
-                    
-                    .receipt-section {{ page-break-before: always; }}
-                    .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }}
-                    .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}
-                </style>
-            </head>
-            <body>
-                <h1>교사 회비 사용내역 보고서</h1>
-                <div class="summary-box">
-                    보고서 출력일: {datetime.date.today().strftime('%Y-%m-%d')} &nbsp;&nbsp;|&nbsp;&nbsp; 🟢 누적 수입: {int(total_in):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 🔴 누적 지출: {int(total_out):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 💲 현재 잔액: {int(balance):,}원
-                </div>
-                
-                <h2>📥 1. 회비 입금 내역 요약표</h2>
-                <table>
-                    <thead>
-                        <tr><th>순번</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr>
-                    </thead>
-                    <tbody>
-            """
+            html_ledger = f"""<html><head><meta charset="utf-8"><title>교사 회비 사용내역 보고서</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} .summary-box {{ padding: 15px; background-color: #f1f8ff; border: 1px solid #cce5ff; border-radius: 8px; margin-bottom: 25px; font-size: 15px; font-weight: bold; text-align: center; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }} .receipt-box img {{ width: 68%; max-width: 800px; height: auto; max-height: 850px; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}</style></head><body><h1>교사 회비 사용내역 보고서</h1><div class="summary-box">보고서 출력일: {datetime.date.today().strftime('%Y-%m-%d')} &nbsp;&nbsp;|&nbsp;&nbsp; 🟢 누적 수입: {int(total_in):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 🔴 누적 지출: {int(total_out):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 💲 현재 잔액: {int(balance):,}원</div><h2>📥 1. 회비 입금 내역 요약표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr></thead><tbody>"""
             if not df_in.empty:
-                for idx, (_, row) in enumerate(df_in.iterrows(), start=1):
-                    html_ledger += f"""<tr>
-                        <td class="align-center">{idx}</td>
-                        <td class="align-center">{row.get('날짜','')}</td>
-                        <td class="align-center">{row.get('입금자명','')}</td>
-                        <td class="align-right">{parse_int_safe(row.get('입금액', 0)):,}</td>
-                        <td class="align-left">{row.get('비고','')}</td>
-                    </tr>"""
-            else:
-                html_ledger += "<tr><td colspan='5' class='align-center'>입금 내역이 존재하지 않습니다.</td></tr>"
-                
-            html_ledger += """
-                    </tbody>
-                </table>
-                
-                <h2>📤 2. 회비 지출 내역 요약표</h2>
-                <table>
-                    <thead>
-                        <tr><th>순번</th><th>날짜</th><th>내용</th><th>지출액(원)</th><th>비고</th></tr>
-                    </thead>
-                    <tbody>
-            """
+                for idx, (_, row) in enumerate(df_in.iterrows(), start=1): html_ledger += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-center">{row.get('입금자명','')}</td><td class="align-right">{parse_int_safe(row.get('입금액', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
+            else: html_ledger += "<tr><td colspan='5' class='align-center'>입금 내역이 존재하지 않습니다.</td></tr>"
+            html_ledger += """</tbody></table><h2>📤 2. 회비 지출 내역 요약표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>내용</th><th>지출액(원)</th><th>비고</th></tr></thead><tbody>"""
             if not df_out.empty:
-                for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
-                    html_ledger += f"""<tr>
-                        <td class="align-center">{idx}</td>
-                        <td class="align-center">{row.get('날짜','')}</td>
-                        <td class="align-left">{row.get('내용','')}</td>
-                        <td class="align-right">{parse_int_safe(row.get('지출액', 0)):,}</td>
-                        <td class="align-left">{row.get('비고','')}</td>
-                    </tr>"""
-            else:
-                html_ledger += "<tr><td colspan='5' class='align-center'>지출 내역이 존재하지 않습니다.</td></tr>"
-                
-            html_ledger += """
-                    </tbody>
-                </table>
-                
-                <div class="receipt-section">
-                    <h2>📸 3. 회비 지출 증빙 영수증 사본 목록</h2>
-            """
+                for idx, (_, row) in enumerate(df_out.iterrows(), start=1): html_ledger += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-left">{row.get('내용','')}</td><td class="align-right">{parse_int_safe(row.get('지출액', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
+            else: html_ledger += "<tr><td colspan='5' class='align-center'>지출 내역이 존재하지 않습니다.</td></tr>"
+            html_ledger += """</tbody></table><div class="receipt-section"><h2>📸 3. 회비 지출 증빙 영수증 사본 목록</h2>"""
             if not df_out.empty:
                 for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
                     img_url = str(row.get('영수증사진',''))
-                    if img_url and img_url.startswith('http'):
-                        clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
-                        html_ledger += f"""
-                        <div class="receipt-box">
-                            <strong>[지출 No.{idx}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong>
-                            <br><small>비고 내역: {row.get('비고','')}</small>
-                            <img src="{clean_url}" alt="회비 영수증">
-                        </div>
-                        """
-            else:
-                html_ledger += "<p style='text-align:center; color:gray;'>증빙된 영수증 사본이 존재하지 않습니다.</p>"
-                
-            html_ledger += """
-                </div>
-            </body>
-            </html>
-            """
-            
-            st.download_button(
-                label="📄 회비장부 전체 PDF 인쇄용 다운로드 (HTML 형식)",
-                data=html_ledger.encode("utf-8"),
-                file_name=f"교사회비사용내역_{datetime.date.today()}.html",
-                mime="text/html",
-                use_container_width=True
-            )
+                    if img_url and img_url.startswith('http'): html_ledger += f"""<div class="receipt-box"><strong>[지출 No.{idx}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong><br><small>비고 내역: {row.get('비고','')}</small><img src="{img_url.replace("&vid=1", "").replace("?vid=1", "")}" alt="회비 영수증"></div>"""
+            else: html_ledger += "<p style='text-align:center; color:gray;'>증빙된 영수증 사본이 존재하지 않습니다.</p>"
+            html_ledger += """</div></body></html>"""
+            st.download_button(label="📄 회비장부 전체 PDF 인쇄용 다운로드 (HTML 형식)", data=html_ledger.encode("utf-8"), file_name=f"교사회비사용내역_{datetime.date.today()}.html", mime="text/html", use_container_width=True)
 
         with l_tabs[1]:
             tab_in, tab_out = st.tabs(["📥 회비 입금 등록", "📤 회비 지출 등록"])
             with tab_in:
                 with st.form("new_income_form"):
                     col_i1, col_i2 = st.columns(2)
-                    in_date = col_i1.date_input("입금 일자", datetime.date.today()).strftime("%Y-%m-%d")
-                    in_name = col_i2.text_input("입금자명")
-                    in_amount = col_i1.number_input("입금액 (원)", min_value=0, step=1000)
-                    in_memo = col_i2.text_input("비고")
+                    in_date = col_i1.date_input("입금 일자", datetime.date.today()).strftime("%Y-%m-%d"); in_name = col_i2.text_input("입금자명"); in_amount = col_i1.number_input("입금액 (원)", min_value=0, step=1000); in_memo = col_i2.text_input("비고")
                     if st.form_submit_button("입금 내역 추가", type="primary"):
                         new_num = len(df_in) + 1 if not df_in.empty else 1
-                        ws_in.append_row([new_num, in_date, in_name, in_amount, in_memo])
-                        st.success("입금 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                        ws_in.append_row([new_num, in_date, in_name, in_amount, in_memo]); st.success("입금 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
             with tab_out:
                 with st.form("new_expense_form"):
                     col_o1, col_o2 = st.columns(2)
-                    out_date = col_o1.date_input("지출 일자", datetime.date.today()).strftime("%Y-%m-%d")
-                    out_detail = col_o2.text_input("내용")
-                    out_amount = col_o1.number_input("지출액 (원)", min_value=0, step=1000)
-                    out_memo = col_o2.text_input("비고")
+                    out_date = col_o1.date_input("지출 일자", datetime.date.today()).strftime("%Y-%m-%d"); out_detail = col_o2.text_input("내용"); out_amount = col_o1.number_input("지출액 (원)", min_value=0, step=1000); out_memo = col_o2.text_input("비고")
                     out_photo = st.file_uploader("지출 증빙(영수증) 업로드", type=['png', 'jpg', 'jpeg'])
                     if st.form_submit_button("지출 내역 추가", type="primary"):
                         with st.spinner("업로드 중..."):
                             p_url = upload_photo(out_photo, f"회비지출_{out_detail}") if out_photo else ""
                             new_num = len(df_out) + 1 if not df_out.empty else 1
-                            ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url])
-                            st.success("지출 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                            ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url]); st.success("지출 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
         
         with l_tabs[2]:
             st.markdown("수정할 장부를 선택해주세요.")
@@ -1625,31 +1425,20 @@ with tabs[9]:
                 if idx > 0:
                     t = df_in.iloc[idx - 1]
                     with st.form("edit_in_form"):
-                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d")
-                        e_n = st.text_input("입금자명", value=t.get('입금자명',''))
-                        e_a = st.number_input("입금액", value=parse_int_safe(t.get('입금액', 0)), step=1000)
-                        e_m = st.text_input("비고", value=t.get('비고',''))
+                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d"); e_n = st.text_input("입금자명", value=t.get('입금자명','')); e_a = st.number_input("입금액", value=parse_int_safe(t.get('입금액', 0)), step=1000); e_m = st.text_input("비고", value=t.get('비고',''))
                         if st.form_submit_button("수정 저장", type="primary"):
-                            r_idx = int(t['sheet_row'])
-                            chunked_update(ws_in, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_n), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m)])
-                            st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                            r_idx = int(t['sheet_row']); chunked_update(ws_in, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_n), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m)]); st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
             elif e_type == "지출 장부" and not df_out.empty:
                 opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("수정할 지출 내역", range(len(opts)), format_func=lambda x: opts[x])
                 if idx > 0:
                     t = df_out.iloc[idx - 1]
                     with st.form("edit_out_form"):
-                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d")
-                        e_c = st.text_input("내용", value=t.get('내용',''))
-                        e_a = st.number_input("지출액", value=parse_int_safe(t.get('지출액', 0)), step=1000)
-                        e_m = st.text_input("비고", value=t.get('비고',''))
-                        e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg'])
+                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d"); e_c = st.text_input("내용", value=t.get('내용','')); e_a = st.number_input("지출액", value=parse_int_safe(t.get('지출액', 0)), step=1000); e_m = st.text_input("비고", value=t.get('비고','')); e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg'])
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("업로드 중..."):
                                 p_url = upload_photo(e_p, f"회비지출_{e_c}") if e_p else t.get('영수증사진','')
-                                r_idx = int(t['sheet_row'])
-                                chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)])
-                                st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                                r_idx = int(t['sheet_row']); chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)]); st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
         with l_tabs[3]:
             st.markdown("삭제할 장부를 선택해주세요.")
@@ -1657,15 +1446,11 @@ with tabs[9]:
             if d_type == "입금 장부" and not df_in.empty:
                 opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {parse_int_safe(r.get('입금액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_in_sel")
-                if st.button("🚨 입금 삭제 실행", key="btn_del_in") and idx > 0:
-                    ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row']))
-                    st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                if st.button("🚨 입금 삭제 실행", key="btn_del_in") and idx > 0: ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
             elif d_type == "지출 장부" and not df_out.empty:
                 opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_out_sel")
-                if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0:
-                    ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row']))
-                    st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0: ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 11] 교적부 통합 관리
@@ -1695,8 +1480,7 @@ with tabs[10]:
     with col_dash2:
         st.markdown('<div class="small-btn">', unsafe_allow_html=True)
         if st.button("🔄 새로고침", use_container_width=True, key="refresh_tab1"):
-            fetch_sheet_data.clear()
-            st.rerun()
+            fetch_sheet_data.clear(); st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
     active_sum_calc = len(df) - total_inact
@@ -1734,16 +1518,11 @@ with tabs[10]:
             c_p1, c_p2 = st.columns([3, 1])
             priv_pwd = c_p1.text_input("시스템 비밀번호 입력", type="password", key="priv_pwd_input", label_visibility="collapsed", placeholder="비밀번호 입력")
             if c_p2.button("🔓 블라인드 해제", use_container_width=True):
-                if priv_pwd == st.secrets.get("admin_password", ""):
-                    st.session_state['privacy_mode'] = False
-                    st.rerun()
-                else: 
-                    st.error("비밀번호가 일치하지 않습니다.")
+                if priv_pwd == st.secrets.get("admin_password", ""): st.session_state['privacy_mode'] = False; st.rerun()
+                else: st.error("비밀번호가 일치하지 않습니다.")
         else:
             st.success("🔓 개인정보 열람 모드가 활성화되었습니다.")
-            if st.button("🔒 다시 블라인드 처리하기"):
-                st.session_state['privacy_mode'] = True
-                st.rerun()
+            if st.button("🔒 다시 블라인드 처리하기"): st.session_state['privacy_mode'] = True; st.rerun()
 
     st.divider()
     
@@ -1753,8 +1532,7 @@ with tabs[10]:
         df_display = df[available_cols].copy()
         if st.session_state['privacy_mode']:
             for c_priv in ['생년월일', '부모(아빠/엄마)', '연락처', '주소']:
-                if c_priv in df_display.columns: 
-                    df_display[c_priv] = df_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
+                if c_priv in df_display.columns: df_display[c_priv] = df_display[c_priv].apply(lambda x: "🔒 [보호됨]" if str(x).strip() else "")
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
     with m_tabs[1]:
@@ -1767,8 +1545,7 @@ with tabs[10]:
     with m_tabs[2]:
         with st.form("add_new"):
             col1, col2 = st.columns(2)
-            n_name = col1.text_input("이름 (필수)")
-            n_class = col1.text_input("학년(담임) (필수)")
+            n_name = col1.text_input("이름 (필수)"); n_class = col1.text_input("학년(담임) (필수)")
             n_status = col2.selectbox("구분", ALL_STATUS_OPTS, index=1)
             n_reg = col1.date_input("등록일자", value=datetime.date.today()).strftime("%Y-%m-%d")
             n_photo = st.file_uploader("사진 첨부")
@@ -1785,8 +1562,4 @@ with tabs[10]:
                     if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
                     elif '상태' in h_map: new_row[h_map['상태']] = n_status
                     if '사진' in h_map: new_row[h_map['사진']] = p_url
-                    ws.append_row(new_row)
-                    st.success("✅ 등록 완료!")
-                    time.sleep(1.5)
-                    fetch_sheet_data.clear()
-                    st.rerun()
+                    ws.append_row(new_row); st.success("✅ 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
