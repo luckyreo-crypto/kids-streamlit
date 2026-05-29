@@ -45,7 +45,7 @@ st.markdown("""
     /* 🔴 1. 탭 메뉴 글씨 크기 조절 및 줄바꿈(Wrap) 적용 */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
-        position: -webkit-sticky !important; position: sticky !important; top: 3.5rem !important; 
+        position: -webkit-sticky !important; position: sticky !important; top: 2.5rem !important; 
         background-color: #ffffff !important; z-index: 999990 !important;
         padding-top: 5px !important; padding-bottom: 10px !important; border-bottom: 2px solid #eef2f6 !important;
         box-shadow: 0 4px 10px -2px rgba(0,0,0,0.05) !important;
@@ -99,7 +99,7 @@ st.markdown("""
         background-color: transparent !important; min-height: 70px !important; display: flex; align-items: center;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
-        font-size: 1.8rem !important; 
+        font-size: 1.5rem !important; 
         font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
     }
     /* 토글 스위치 크기 2.5배 확대 체감 */
@@ -132,7 +132,7 @@ st.markdown("""
 
     /* 🔴 새친구 추가 아코디언 / 행사 제목 폰트 크기 조정 */
     div[data-testid="stExpander"] summary p {
-        font-size: 1.3rem !important; 
+        font-size: 1.2rem !important; 
         font-weight: 800 !important;
     }
     div[data-testid="stExpander"] summary {
@@ -628,8 +628,8 @@ with tabs[0]:
                             # 폰트 사이즈 조정 (이름 약 1.5배~2배 적용)
                             info_html = f'''
                             <div style="height:60px; display:flex; align-items:center; flex-wrap:wrap;">
-                                <span style="font-size:1.6rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 이름 글자 크기 */ font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
-                                <span style="font-size:1.0rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 생일 글자 크기 */ color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
+                                <span style="font-size:1.5rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 이름 글자 크기 */ font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
+                                <span style="font-size:0.8rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 생일 글자 크기 */ color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
                             </div>
                             '''
                             st.markdown(info_html, unsafe_allow_html=True)
