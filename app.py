@@ -625,7 +625,7 @@ with tabs[0]:
                             # 폰트 사이즈 조정 (이름 약 1.5배~2배 적용)
                             info_html = f'''
                             <div style="height:60px; display:flex; align-items:center; flex-wrap:wrap;">
-                                <span style="font-size:2.0rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 이름 글자 크기 */ font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
+                                <span style="font-size:1.5rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 이름 글자 크기 */ font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
                                 <span style="font-size:1.0rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 생일 글자 크기 */ color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
                             </div>
                             '''
