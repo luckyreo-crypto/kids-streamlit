@@ -36,7 +36,7 @@ st.markdown("""
     html { scroll-behavior: smooth; }
     button, input, select, textarea, div[data-testid="stToggle"] { touch-action: manipulation !important; font-size: 16px !important; }
     
-    .class-header { background-color: #f1f8ff; padding: 15px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .class-header { background-color: #f1f8ff; padding: 15px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.2rem; margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
@@ -62,7 +62,7 @@ st.markdown("""
         background-color: #0366d6 !important; border-color: #0366d6 !important; 
     }
     div[data-testid="stTabs"] [role="tab"] p { 
-        font-size: 1.5rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 상단 탭 메뉴 글자 크기 (기존 2.2rem -> 1.5rem) */
+        font-size: 1.2rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 상단 탭 메뉴 글자 크기 (기존 2.2rem -> 1.2rem) */
         font-weight: 800 !important; white-space: nowrap; margin: 0; color: inherit;
     }
     div[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: white !important; }
@@ -99,7 +99,7 @@ st.markdown("""
         background-color: transparent !important; min-height: 70px !important; display: flex; align-items: center;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
-        font-size: 1.8rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 출석부 스위치 옆 이름 글자 크기 */
+        font-size: 1.5rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 출석부 스위치 옆 이름 글자 크기 */
         font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
     }
     /* 토글 스위치 크기 2.5배 확대 체감 */
@@ -123,7 +123,7 @@ st.markdown("""
 
     /* 🔴 닫기 및 수정하기 버튼 글자 크기 (모달창 하단) */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button p {
-        font-size: 2.0rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 모달 하단 닫기/수정 버튼 글씨 크기 */
+        font-size: 1.8rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 모달 하단 닫기/수정 버튼 글씨 크기 */
         font-weight: 800 !important;
     }
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button {
