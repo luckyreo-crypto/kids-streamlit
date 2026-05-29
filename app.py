@@ -633,7 +633,7 @@ with tabs[0]:
                         with c_info:
                             info_html = f'''
                             <div style="height:60px; display:flex; align-items:center; flex-wrap:wrap;">
-                                <span style="font-size:2.0rem; font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
+                                <span style="font-size:1.5rem; font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
                                 <span style="font-size:1.0rem; color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
                             </div>
                             '''
