@@ -11,7 +11,6 @@ import re
 import time
 
 # --- 1. 전역 설정 및 상수 ---
-# 외부에 노출되는 버전 V1.0으로 통일
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon="🌱", layout="wide")
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
@@ -35,7 +34,6 @@ st.markdown("""
     .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
     
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
-    div[data-testid="stButton"] button { width: 100%; border-radius: 6px; text-align: left; padding: 4px 8px; font-size: 0.9rem; }
     
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
@@ -61,69 +59,73 @@ st.markdown("""
     .fab-button { position: fixed; bottom: 30px; left: 30px; background-color: rgba(3, 102, 214, 0.85); color: white !important; padding: 12px 20px; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 999999; }
     .fab-button:hover { background-color: rgba(3, 102, 214, 1); transform: translateY(-3px); }
     
-    /* 🔴 핵심 개선 1: 반별명단 & 출석부 통합 네모박스 (모바일 틀어짐 방지) */
-    div[data-testid="stVerticalBlock"]:has(.student-row) {
+    /* 🔴 반별명단 & 출석부 공통 카드 UI (모바일 줄바꿈 원천 차단 및 통합 네모박스화) */
+    div[data-testid="stHorizontalBlock"]:has(.student-card),
+    div[data-testid="stHorizontalBlock"]:has(.attendance-card) {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        background-color: #ffffff !important;
-        border: 1px solid #ddd !important;
-        border-radius: 8px !important;
-        padding: 6px 12px !important;
-        margin-bottom: 8px !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-        gap: 12px !important;
-    }
-    div[data-testid="stVerticalBlock"]:has(.student-row):hover {
-        border-color: #0366d6 !important;
-        background-color: #f8fbff !important;
+        background-color: #ffffff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 10px;
+        gap: 15px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     
-    /* 사진 영역 (크기 고정 40px) */
-    div[data-testid="stVerticalBlock"]:has(.student-row) > div:nth-child(1) {
-        width: 40px !important;
-        min-width: 40px !important;
-        max-width: 40px !important;
-        flex: 0 0 40px !important;
+    div[data-testid="stHorizontalBlock"]:has(.student-card):hover,
+    div[data-testid="stHorizontalBlock"]:has(.attendance-card):hover {
+        border-color: #0366d6;
+        background-color: #f8fbff;
     }
     
-    /* 버튼/토글 영역 (오른쪽 빈공간 채움) */
-    div[data-testid="stVerticalBlock"]:has(.student-row) > div:nth-child(2) {
+    /* 사진 컬럼 크기 고정 */
+    div[data-testid="stHorizontalBlock"]:has(.student-card) > div[data-testid="column"]:nth-child(1),
+    div[data-testid="stHorizontalBlock"]:has(.attendance-card) > div[data-testid="column"]:nth-child(1) {
+        width: 45px !important;
+        flex: 0 0 45px !important;
+        min-width: 45px !important;
+    }
+    
+    /* 이름 및 버튼 컬럼 크기 가변화 */
+    div[data-testid="stHorizontalBlock"]:has(.student-card) > div[data-testid="column"]:nth-child(2),
+    div[data-testid="stHorizontalBlock"]:has(.attendance-card) > div[data-testid="column"]:nth-child(2) {
         flex: 1 1 auto !important;
         min-width: 0 !important;
-        width: 100% !important;
     }
-    
-    /* 네모박스 내 버튼 투명화 */
-    div[data-testid="stVerticalBlock"]:has(.student-row) div[data-testid="stButton"] button {
+
+    /* 반별명단 버튼 투명화 (텍스트처럼 보이게) */
+    div[data-testid="stHorizontalBlock"]:has(.student-card) div[data-testid="stButton"] button {
         border: none !important;
         background-color: transparent !important;
         box-shadow: none !important;
         padding: 0 !important;
+        text-align: left !important;
         height: auto !important;
-        font-size: 0.95rem !important;
-        color: #333 !important;
-        justify-content: flex-start !important;
+        color: #222 !important;
     }
-    div[data-testid="stVerticalBlock"]:has(.student-row) div[data-testid="stButton"] button:hover {
-        color: #0366d6 !important;
+    div[data-testid="stHorizontalBlock"]:has(.student-card) div[data-testid="stButton"] button:hover p { color: #0366d6 !important; }
+    div[data-testid="stHorizontalBlock"]:has(.student-card) div[data-testid="stButton"] button p {
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
     }
-    
-    /* 네모박스 내 토글 투명화 */
-    div[data-testid="stVerticalBlock"]:has(.student-row) div[data-testid="stToggle"] {
+
+    /* 출석부 토글 투명화 */
+    div[data-testid="stHorizontalBlock"]:has(.attendance-card) div[data-testid="stToggle"] {
         border: none !important;
+        background-color: transparent !important;
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        background-color: transparent !important;
-        width: 100% !important;
     }
-    
-    /* 🔴 핵심 개선 2: 상세 정보 모달 닫기 버튼을 하단에 항상 고정 (Sticky) */
+
+    /* 🔴 상세 정보 모달 닫기 버튼을 하단에 항상 고정 (Sticky) */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) {
         position: sticky !important;
-        bottom: -25px !important; /* 모달 패딩 고려 */
+        bottom: -25px !important;
         background-color: white !important;
         z-index: 99999 !important;
         padding-top: 15px !important;
@@ -131,6 +133,8 @@ st.markdown("""
         border-top: 1px solid #eef2f6 !important;
     }
     .sticky-footer-marker { display: none; }
+    .student-card { display: none; }
+    .attendance-card { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -365,7 +369,7 @@ if df is None or df.empty:
     st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
     st.stop()
 
-# --- 전역 변수 영역 (NameError 완벽 해결) ---
+# --- 전역 변수 설정 ---
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
 
@@ -512,7 +516,8 @@ def edit_student_dialog(target_dict):
         st.markdown(f"**비고:** {safe_str(target_dict.get('비고',''))}")
         st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
-        # [닫기 버튼 항상 화면 하단 왼쪽에 고정되도록 Sticky 처리]
+        st.divider()
+        # [닫기 버튼 하단 왼쪽 고정 배치 적용]
         with st.container():
             st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
             btn_col1, btn_col2 = st.columns(2)
@@ -603,7 +608,7 @@ def edit_student_dialog(target_dict):
 tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
 
 # ==========================================
-# [탭 0] 반편성 (사진과 버튼 가로 배치 완전 개선)
+# [탭 0] 반편성 (사진과 버튼을 네모 박스로 완벽히 통합)
 # ==========================================
 with tabs[0]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
@@ -657,19 +662,20 @@ with tabs[0]:
                                 except: pass
                             
                             suffix = f" ({s})" if s in INACTIVE_STATUS else ""
-                            label = f"{n}{suffix}{bd_disp}"
+                            label = f"{n}{suffix}\n\n{bd_disp}" if bd_disp else f"{n}{suffix}"
                             icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                             
                             with btn_cols[idx_j % 2]:
-                                # 사진과 버튼을 감싸는 컨테이너 생성 (CSS Flex로 모바일 줄바꿈 원천 차단)
-                                with st.container():
+                                # CSS 오류 해결: 내부 컬럼을 1:4로 나누어 모바일 세로분리 원천 차단
+                                c_img, c_btn = st.columns([1, 4])
+                                with c_img:
+                                    st.markdown('<div class="student-card"></div>', unsafe_allow_html=True)
                                     p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                                     if p_url and p_url.startswith('http'):
-                                        img_html = f'<div class="student-row"></div><img src="{p_url}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; display:block;">'
+                                        st.markdown(f'<img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; display:block;">', unsafe_allow_html=True)
                                     else:
-                                        img_html = f'<div class="student-row"></div><div style="width:40px; height:40px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:18px;">{icon}</div>'
-                                        
-                                    st.markdown(img_html, unsafe_allow_html=True)
+                                        st.markdown(f'<div style="width:45px; height:45px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:20px;">{icon}</div>', unsafe_allow_html=True)
+                                with c_btn:
                                     if st.button(label, key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
                                         edit_student_dialog(r.to_dict())
                         
@@ -1169,7 +1175,7 @@ with tabs[5]:
                 st.rerun()
 
 # ==========================================
-# [탭 6] 출석 (사진과 토글 가로 배치 및 UI 개선)
+# [탭 6] 출석 (사진과 토글 네모박스 통합 UI 적용)
 # ==========================================
 with tabs[6]:
     st.subheader("📅 주간 출석 현황")
@@ -1238,19 +1244,19 @@ with tabs[6]:
                 cols = st.columns(3)
                 for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
                     with cols[i%3]:
-                        # 출석부 토글 버튼에 맞춘 강제 가로정렬 컨테이너
-                        with st.container():
+                        # CSS와 매칭되어 네모박스로 병합되도록 구조 설계
+                        c_img, c_tgl = st.columns([1, 4])
+                        with c_img:
+                            st.markdown('<div class="attendance-card"></div>', unsafe_allow_html=True)
                             s = row[status_col]
                             icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                             p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                             
                             if p_url and p_url.startswith('http'):
-                                img_html = f'<div class="student-row"></div><img src="{p_url}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; display:block;">'
+                                st.markdown(f'<img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; display:block;">', unsafe_allow_html=True)
                             else:
-                                img_html = f'<div class="student-row"></div><div style="width:40px; height:40px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:18px;">{icon}</div>'
-                                
-                            st.markdown(img_html, unsafe_allow_html=True)
-                            
+                                st.markdown(f'<div style="width:45px; height:45px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:20px;">{icon}</div>', unsafe_allow_html=True)
+                        with c_tgl:
                             is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
                             new_att[row['sheet_row']] = st.toggle(f"{row['이름']}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
@@ -1992,7 +1998,7 @@ with tabs[10]:
                 if n_name and n_class:
                     p_url = upload_photo(n_photo, n_name)
                     new_row = [""] * len(headers)
-                    h_map = {str(h): i for i, h in enumerate(headers)}
+                    h_map = {str(h): idx for idx, h in enumerate(headers)}
                     if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
                     if '이름' in h_map: new_row[h_map['이름']] = n_name
                     if class_col in h_map: new_row[h_map[class_col]] = n_class
