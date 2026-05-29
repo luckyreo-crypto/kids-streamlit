@@ -13,7 +13,7 @@ import time
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon="🌱", layout="wide")
 
-# ✅ 모든 메뉴에서 항상 보이도록 우측 하단 고정형 "맨 위로" 버튼 추가
+# ✅ 모든 탭 메뉴에서 우측 하단에 보이도록 '맨 위로' 버튼 고정
 st.markdown('<div id="top-anchor"></div><a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
 
 components.html(
@@ -36,49 +36,53 @@ st.markdown("""
     html { scroll-behavior: smooth; }
     button, input, select, textarea, div[data-testid="stToggle"] { touch-action: manipulation !important; font-size: 16px !important; }
     
-    .class-header { background-color: #f1f8ff; padding: 12px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.1rem; margin-top: 20px; margin-bottom: 15px; border-left: 5px solid #0366d6; }
+    .class-header { background-color: #f1f8ff; padding: 15px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     
     .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
-    
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* ✅ 1. 탭(Tabs) 글씨 3배 확대 & 모바일 가로 스크롤 적용 */
+    /* 🔴 1. 탭 메뉴 글씨 3배 확대 및 모바일 좌우 스와이프 기능 적용 */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important; position: sticky !important; top: 3.5rem !important; 
         background-color: #ffffff !important; z-index: 999990 !important;
-        padding-top: 10px !important; padding-bottom: 10px !important; border-bottom: 2px solid #eef2f6 !important;
+        padding-top: 5px !important; padding-bottom: 10px !important; border-bottom: 2px solid #eef2f6 !important;
+        box-shadow: 0 4px 10px -2px rgba(0,0,0,0.05) !important;
     }
-    div[data-baseweb="tab-list"] { 
+    div[data-testid="stTabs"] [role="tablist"] { 
         display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; 
-        -webkit-overflow-scrolling: touch !important; padding-bottom: 5px !important; scrollbar-width: none !important;
+        -webkit-overflow-scrolling: touch !important; padding-bottom: 10px !important; scrollbar-width: none !important;
+        gap: 10px !important;
     }
-    div[data-baseweb="tab-list"]::-webkit-scrollbar { display: none !important; }
-    div[data-baseweb="tab"] { 
-        flex: 0 0 auto !important; justify-content: center; padding: 15px 25px !important; margin: 0 5px 0 0 !important; 
-        background-color: #f8f9fa; border-radius: 10px; border: 1px solid #eee; min-height: 80px !important;
+    div[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar { display: none !important; }
+    div[data-testid="stTabs"] [role="tab"] { 
+        flex: 0 0 auto !important; justify-content: center; padding: 15px 25px !important; margin: 0 !important; 
+        background-color: #f8f9fa !important; border-radius: 12px !important; border: 1px solid #ddd !important;
     }
-    div[data-baseweb="tab"][aria-selected="true"] { background-color: #0366d6 !important; color: white !important; border: 1px solid #0366d6; }
-    
-    /* 탭 메뉴 글씨 3배 확대 (약 2.5rem) */
-    div[data-baseweb="tab"] p { font-size: 2.5rem !important; font-weight: 800 !important; white-space: nowrap; margin: 0; }
-    
-    /* ✅ 모든 화면 위치에서 우측 하단에 고정되는 '맨 위로' 버튼 */
-    .fab-button { position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 999999; }
-    
-    /* ✅ 2. 반별명단 학생 카드 및 투명 오버레이 버튼 기법 */
+    div[data-testid="stTabs"] [role="tab"][aria-selected="true"] { 
+        background-color: #0366d6 !important; border-color: #0366d6 !important; 
+    }
+    /* 탭 글자 크기 3배 (2.2rem) */
+    div[data-testid="stTabs"] [role="tab"] p { 
+        font-size: 2.2rem !important; font-weight: 800 !important; white-space: nowrap; margin: 0; color: inherit;
+    }
+    div[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: white !important; }
+
+    /* 맨위로 버튼 (우측 하단) */
+    .fab-button { position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }
+
+    /* 🔴 2. 반별명단 학생 카드 (HTML 통합으로 UI 엉킴/이름짤림 원천 차단) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) {
         position: relative !important;
-        padding: 8px 10px !important;
-        border-radius: 8px !important;
-        margin-bottom: 8px !important;
+        padding: 8px 10px !important; border-radius: 12px !important; margin-bottom: 10px !important; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important;
+        background-color: #ffffff !important; transition: background-color 0.2s;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row):hover {
-        border-color: #0366d6 !important;
-        background-color: #f8fbff !important;
+        background-color: #f8fbff !important; border-color: #0366d6 !important;
     }
-    /* 카드 전체를 덮는 투명 버튼 (클릭 시 상세 모달) */
+    /* 투명 오버레이 버튼 (카드 클릭 시 상세 모달창 실행) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] {
         position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
         opacity: 0 !important; z-index: 10 !important; width: 100% !important; height: 100% !important;
@@ -86,59 +90,50 @@ st.markdown("""
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] button {
         width: 100% !important; height: 100% !important; cursor: pointer !important;
     }
-
-    /* ✅ 4. 출석부 UI 패딩 및 스위치/이름 폰트 확대 */
+    
+    /* 🔴 3. 출석부 UI (스위치 2.5배, 이름 2배) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {
-        padding: 6px 12px !important; border-radius: 8px !important; margin-bottom: 5px !important;
+        padding: 10px 12px !important; border-radius: 12px !important; margin-bottom: 10px !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important;
     }
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container):hover {
-        border-color: #0366d6 !important; background-color: #f8fbff !important;
-    }
-    /* 스위치 컨테이너 크기 및 이름 2배 확대 */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {
         padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; 
-        background-color: transparent !important; min-height: 80px !important; display: flex; align-items: center;
+        background-color: transparent !important; min-height: 70px !important; display: flex; align-items: center;
     }
+    /* 토글 이름 글자 2배 (1.8rem) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
-        font-size: 2.0rem !important; /* 이름 폰트 2배 */
-        font-weight: 800 !important;
+        font-size: 1.8rem !important; font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
     }
-    /* 스위치 2.5배 확대 */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] div[data-baseweb="checkbox"] > div:first-child {
-        transform: scale(2.5) !important;
-        transform-origin: left center !important;
-        margin-right: 40px !important; /* 커진 스위치 옆 여백 */
+    /* 토글 스위치 크기 2.5배 확대 체감 */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {
+        transform: scale(2.2) !important; transform-origin: left center !important; 
+        margin-left: 15px !important; margin-right: 25px !important;
     }
 
-    /* 모바일 반응형 강제 가로 유지 */
+    /* 🔴 출석부 모바일 가로 엉킴 방지 */
     @media (max-width: 576px) {
-        div[data-testid="stHorizontalBlock"]:has(.keep-row),
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {
             display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important;
         }
-        div[data-testid="stHorizontalBlock"]:has(.keep-row) > div[data-testid="column"]:nth-child(1),
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"]:nth-child(1) {
             width: 75px !important; min-width: 75px !important; flex: 0 0 75px !important;
         }
-        div[data-testid="stHorizontalBlock"]:has(.keep-row) > div[data-testid="column"]:nth-child(2),
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"]:nth-child(2) {
             flex: 1 1 auto !important; min-width: 0 !important;
         }
     }
 
-    /* ✅ 2. 닫기, 수정하기 버튼 2배 확대 (모달창 하단) */
+    /* 🔴 닫기 및 수정하기 버튼 2배 확대 (모달창 하단) */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button p {
-        font-size: 2.0rem !important;
-        font-weight: 800 !important;
+        font-size: 2.0rem !important; font-weight: 800 !important;
     }
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button {
-        min-height: 70px !important;
+        min-height: 70px !important; border-radius: 12px !important;
     }
 
-    /* ✅ 3. 새친구 추가 글자 2배 확대 */
+    /* 🔴 새친구 추가 글자 2배 확대 */
     div[data-testid="stExpander"] summary p {
-        font-size: 1.5rem !important;
-        font-weight: 700 !important;
+        font-size: 1.8rem !important; font-weight: 800 !important;
     }
     div[data-testid="stExpander"] summary {
         min-height: 70px !important;
@@ -339,40 +334,32 @@ if df is None or df.empty:
     st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
     st.stop()
 
-# --- 전역 변수 설정 및 대시보드 사전 연산 ---
+# --- 전역 변수 설정 ---
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
-
 req_cols = ['학생ID', '학년(담임)', '이름', '생년월일', '학교상태', '등록일', '변동일', '학교', '부모(아빠/엄마)', '연락처', '주소', '비고']
 available_cols = [c for c in req_cols if c in df.columns]
 
 if '이름' in df.columns:
     df['role'] = df.apply(get_role, axis=1)
     df['is_staff_flag'] = df.apply(check_is_staff, axis=1)
-    
     active_students = df[(df['role'] == 'student') & (~df[status_col].isin(INACTIVE_STATUS))]
     st_count = len(active_students[active_students[status_col] == '일반'])
     new_count = len(active_students[active_students[status_col] == '새친구'])
-    
     active_staff = df[(df['role'].isin(['teacher', 'pastor'])) & (~df[status_col].isin(INACTIVE_STATUS))]
     tc_count = len(active_staff[active_staff['role'] == 'teacher'])
     ps_count = len(active_staff[active_staff['role'] == 'pastor'])
-    
     mv_count = len(df[df[status_col] == '이사'])
     gr_count = len(df[df[status_col] == '졸업'])
     other_ch_count = len(df[df[status_col] == '타교회'])
     inact_count = len(df[df[status_col] == '비활성'])
     total_inact = mv_count + gr_count + other_ch_count + inact_count
-    
     active_sum_calc = len(df) - total_inact
 
     valid_names_df = df[df['이름'].astype(str).str.strip() != '']
     dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
     if len(dup_names) > 0:
-        dup_details = []
-        for n in dup_names:
-            rows = valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()
-            dup_details.append(f"[{n}: 구글시트 {rows}행]")
+        dup_details = [f"[{n}: 구글시트 {valid_names_df[valid_names_df['이름'] == n]['sheet_row'].tolist()}행]" for n in dup_names]
         st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다!\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 weeks_list = [f"{i}주" for i in range(1, 53)]
@@ -388,14 +375,10 @@ def view_bulletin_dialog(w_str, d_str, row_data):
     img1, img2 = str(row_data.get('주보이미지1', '')), str(row_data.get('주보이미지2', ''))
     t1, t2 = st.tabs(["앞면 (1쪽)", "뒷면 (2쪽)"])
     with t1:
-        if img1 and "http" in img1:
-            clean_url = img1.replace("&vid=1", "").replace("?vid=1", "")
-            st.markdown(f"<img src='{clean_url}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
+        if img1 and "http" in img1: st.markdown(f"<img src='{img1.replace('&vid=1', '').replace('?vid=1', '')}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else: st.write("등록된 앞면 이미지가 없습니다.")
     with t2:
-        if img2 and "http" in img2:
-            clean_url = img2.replace("&vid=1", "").replace("?vid=1", "")
-            st.markdown(f"<img src='{clean_url}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
+        if img2 and "http" in img2: st.markdown(f"<img src='{img2.replace('&vid=1', '').replace('?vid=1', '')}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else: st.write("등록된 뒷면 이미지가 없습니다.")
 
 # --- 다이얼로그 모달: 주보 관리 ---
@@ -403,10 +386,8 @@ def view_bulletin_dialog(w_str, d_str, row_data):
 def manage_bulletin_dialog(w_str, d_str):
     st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보 설정</h4>", unsafe_allow_html=True)
     existing_data = df_b[df_b['주차'] == w_str] if not df_b.empty else pd.DataFrame()
-    
     with st.form(f"bulletin_form_{w_str}"):
         memo = st.text_input("📝 비고 (예: 신년감사예배, 야외예배 등)", value=existing_data.iloc[0].get('비고', '') if not existing_data.empty else "")
-        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다.")
         img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg'])
         img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg'])
         
@@ -427,7 +408,6 @@ def manage_bulletin_dialog(w_str, d_str):
                     chunked_update(ws_b, [gspread.Cell(row_idx, 3, url1), gspread.Cell(row_idx, 4, url2), gspread.Cell(row_idx, 5, memo), gspread.Cell(row_idx, 6, now_str)])
                 else: ws_b.append_row([w_str, d_str, url1, url2, memo, now_str])
                 st.success("✅ 저장이 완료되었습니다!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
-    
     if not existing_data.empty:
         if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
             ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
@@ -452,19 +432,10 @@ def edit_student_dialog(target_dict):
         c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
         c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
         
-        # 상세보기 무조건 암호화 해제 (100% 정보 표출)
-        p_phone = safe_str(target_dict.get('연락처',''))
-        p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
-        p_addr = safe_str(target_dict.get('주소',''))
-        p_birth = safe_str(target_dict.get('생년월일',''))
-            
-        c1.markdown(f"**생년월일:** {p_birth}")
-        c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
-        c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}")
-        c2.markdown(f"**연락처:** {p_phone}")
-        st.markdown(f"**부모(아빠/엄마):** {p_parent}")
-        st.markdown(f"**주소:** {p_addr}")
-        st.markdown(f"**비고:** {safe_str(target_dict.get('비고',''))}")
+        p_phone, p_parent, p_addr, p_birth = safe_str(target_dict.get('연락처','')), safe_str(target_dict.get('부모(아빠/엄마)','')), safe_str(target_dict.get('주소','')), safe_str(target_dict.get('생년월일',''))
+        c1.markdown(f"**생년월일:** {p_birth}"); c2.markdown(f"**구분:** {safe_str(target_dict.get('학교상태', '일반'))}")
+        c1.markdown(f"**학교:** {safe_str(target_dict.get('학교',''))}"); c2.markdown(f"**연락처:** {p_phone}")
+        st.markdown(f"**부모(아빠/엄마):** {p_parent}"); st.markdown(f"**주소:** {p_addr}"); st.markdown(f"**비고:** {safe_str(target_dict.get('비고',''))}")
         st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
         st.divider()
@@ -535,7 +506,7 @@ def edit_student_dialog(target_dict):
 tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
 
 # ==========================================
-# [탭 0] 반편성 (★ 반응형 네이티브 카드, 버튼 텍스트 통합, 직분 표시 등)
+# [탭 0] 반편성 (★ 반응형 HTML 카드와 투명 오버레이 버튼)
 # ==========================================
 with tabs[0]:
     st.markdown(f"""
@@ -568,16 +539,9 @@ with tabs[0]:
         
         is_teacher_grp = any(k in str(c_name) for k in ['선생님', '교사'])
         is_pastor_grp = any(k in str(c_name) for k in ['교역자', '전도사', '목사'])
-        
-        if is_teacher_grp: 
-            active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'teacher')])
-            header_title = f"{c_name} ({active_count}명)"
-        elif is_pastor_grp: 
-            active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'pastor')])
-            header_title = f"{c_name} ({active_count}명)"
-        else: 
-            active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')])
-            header_title = f"{c_name} (학생 {active_count}명)"
+        if is_teacher_grp: active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'teacher')]); header_title = f"{c_name} ({active_count}명)"
+        elif is_pastor_grp: active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'pastor')]); header_title = f"{c_name} ({active_count}명)"
+        else: active_count = len(group[~group[status_col].isin(INACTIVE_STATUS) & (group['role'] == 'student')]); header_title = f"{c_name} (학생 {active_count}명)"
         
         with st.container(border=True):
             st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;'>{header_title}</h4>", unsafe_allow_html=True)
@@ -588,43 +552,40 @@ with tabs[0]:
                 s, n = r[status_col], r['이름']
                 b_str, bd_disp = str(r.get('생년월일', '')), ""
                 if '-' in b_str and len(b_str.split('-')) == 3:
-                    try: bd_disp = f" 🎂 {int(b_str.split('-')[1]):02d}/{int(b_str.split('-')[2]):02d}"
+                    try: bd_disp = f"🎂 {int(b_str.split('-')[1]):02d}/{int(b_str.split('-')[2]):02d}"
                     except: pass
                 
-                # 목사님, 전도사님 직분 명시 처리
                 if s in ['목사', '전도사'] and s not in n: n = f"{n} {s}님"
                 elif '목사' in str(r.get('비고', '')) and '목사' not in n: n = f"{n} 목사님"
                 elif '전도사' in str(r.get('비고', '')) and '전도사' not in n: n = f"{n} 전도사님"
                 
                 new_friend_badge = " 🌱" if s == '새친구' else ""
                 suffix = f" ({s})" if s in INACTIVE_STATUS else ""
-                
                 icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                 p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                 
                 with stu_cols[idx_j % 2]:
                     with st.container(border=True):
+                        # 오버레이 처리를 위한 마커
                         st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                         
-                        # [2] 이름 텍스트 옆에 생일과 상세기능(버튼) 통합 배치
-                        c_img, c_info = st.columns([1.5, 4.5])
-                        with c_img:
-                            if p_url and p_url.startswith('http'):
-                                st.markdown(f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
-                            else:
-                                st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:30px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
-                        with c_info:
-                            # 폰트 사이즈 조정 (이름 2.0rem, 생일 1.0rem 유지)
-                            info_html = f'''
-                            <div style="height:60px; display:flex; align-items:center;">
-                                <span style="font-size:2.0rem; font-weight:800; color:#111; margin-right:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{n}{suffix}{new_friend_badge}</span>
-                                <span style="font-size:1.0rem; color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
+                        # [2] HTML/CSS 기반으로 엉킴 없이 사진과 이름+생일 가로 정렬
+                        img_elem = f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; border:1px solid #eee;">' if p_url and p_url.startswith('http') else f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:26px;">{icon}</div>'
+                        bd_disp_html = f'<span style="font-size:1.0rem; color:#888; margin-left:8px; display:inline-block;">{bd_disp}</span>' if bd_disp else ''
+                        
+                        html_str = f"""
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="flex-shrink: 0;">{img_elem}</div>
+                            <div style="flex-grow: 1; display:flex; align-items:center; flex-wrap:wrap;">
+                                <span style="font-size: 1.4rem; font-weight: 800; color: #111; line-height:1.3; display:inline-block;">{n}{suffix}{new_friend_badge}</span>
+                                {bd_disp_html}
                             </div>
-                            '''
-                            st.markdown(info_html, unsafe_allow_html=True)
-                            
-                        # 카드 전체를 덮어씌우는 투명 버튼 (오버레이 적용)
-                        if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
+                        </div>
+                        """
+                        st.markdown(html_str, unsafe_allow_html=True)
+                        
+                        # 투명한 버튼을 덮어씌워서 클릭 시 상세창 노출
+                        if st.button("상세", key=f"btn_link_{r['sheet_row']}", use_container_width=True):
                             edit_student_dialog(r.to_dict())
             
             with st.expander(f"➕ 새친구 추가"):
@@ -675,20 +636,17 @@ with tabs[1]:
                             if p['role'] == 'pastor': n_disp = f"<span style='color:#2E7D32;'>✝️ <b>{p['name']}</b></span>"
                             elif p['role'] == 'teacher': n_disp = f"<span style='color:#E91E63;'>🧑‍🏫 <b>{p['name']}</b></span>"
                             else: n_disp = f"<span>🎈 <b>{p['name']}</b></span>"
-                            
                             c_only = str(p['class']).split('(')[0].strip()
                             st.markdown(f"<div style='display:flex; justify-content:space-between; margin-bottom:5px;'>{n_disp} <span style='font-size:0.8rem; color:gray;'>({c_only})</span><strong style='color:#e65100;'>{p['day']}일</strong></div>", unsafe_allow_html=True)
-                    else:
-                        st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
+                    else: st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
                         
     components.html("""
         <script>
         let scrollDoneMonth = false;
         setInterval(() => {
             const el = window.parent.document.getElementById('current-month-anchor');
-            if (el && el.offsetParent !== null && !scrollDoneMonth) {
-                el.scrollIntoView({behavior: 'smooth', block: 'center'}); scrollDoneMonth = true;
-            } else if (el && el.offsetParent === null) { scrollDoneMonth = false; }
+            if (el && el.offsetParent !== null && !scrollDoneMonth) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); scrollDoneMonth = true; } 
+            else if (el && el.offsetParent === null) { scrollDoneMonth = false; }
         }, 500);
         </script>
     """, height=0, width=0)
@@ -698,26 +656,18 @@ with tabs[1]:
 # ==========================================
 with tabs[2]:
     st.subheader("🙏 예배 기도순서 관리")
-    
     if not df_p.empty:
         df_p_calc = df_p.copy()
         df_p_calc['날짜_dt'] = pd.to_datetime(df_p_calc['날짜'], errors='coerce')
         df_p_calc = df_p_calc.sort_values(by='날짜_dt', ascending=True)
-        
         class_mapping = {}
         if not df.empty and '이름' in df.columns:
             active_df = df[~df[status_col].isin(INACTIVE_STATUS)]
-            for _, row_m in active_df.iterrows():
-                clean_name = str(row_m['이름']).replace(" ", "")
-                class_mapping[clean_name] = str(row_m.get(class_col, ''))
-            
+            for _, row_m in active_df.iterrows(): class_mapping[str(row_m['이름']).replace(" ", "")] = str(row_m.get(class_col, ''))
             for _, row_m in df.iterrows():
-                clean_name = str(row_m['이름']).replace(" ", "")
-                if clean_name not in class_mapping: class_mapping[clean_name] = str(row_m.get(class_col, ''))
-                
+                if str(row_m['이름']).replace(" ", "") not in class_mapping: class_mapping[str(row_m['이름']).replace(" ", "")] = str(row_m.get(class_col, ''))
         df_p_calc['반'] = df_p_calc['이름'].apply(lambda x: class_mapping.get(str(x).replace(" ", ""), "교역자/미등록"))
         df_p_calc['월그룹'] = df_p_calc['날짜_dt'].dt.strftime('%m월')
-        
         st.markdown("##### 📅 월별 배치 현황")
         unique_months = df_p_calc['월그룹'].dropna().unique()
         p_grid = st.columns(len(unique_months) if len(unique_months) > 0 else 1)
@@ -731,14 +681,11 @@ with tabs[2]:
                         st.markdown(f"**{d_text}** : {r_p['이름']} <span style='font-size:0.85rem; color:gray;'>({r_p['반']})</span>", unsafe_allow_html=True)
         st.markdown("---")
     else: st.info("등록된 기도순서 일정이 없습니다.")
-        
     st.divider()
     p_tabs = st.tabs(["👀 전체일정 보기", "➕ 기도자 등록", "📝 내역 수정", "🚨 내역 삭제"])
-    
     with p_tabs[0]:
         if not df_p.empty:
             grid_p_display = df_p_calc[['날짜', '이름', '반', '비고']].copy(); st.dataframe(grid_p_display, use_container_width=True, hide_index=True)
-            
     with p_tabs[1]:
         with st.form("add_new_prayer_form"):
             new_p_date = st.date_input("기도 일자", datetime.date.today()).strftime("%Y-%m-%d")
@@ -749,7 +696,6 @@ with tabs[2]:
             if st.form_submit_button("💾 기도순서 저장", type="primary"):
                 new_p_num = len(df_p) + 1 if not df_p.empty else 1
                 ws_p.append_row([str(new_p_num), new_p_date, new_p_name, new_p_memo]); st.success("🙏 기도 일정이 성공적으로 기록되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
-                
     with p_tabs[2]:
         if not df_p.empty:
             p_options = ["수정할 일정을 고르세요"] + df_p.apply(lambda r: f"[{r.get('날짜','').strip()}] {r.get('이름','').strip()}", axis=1).tolist()
@@ -764,27 +710,21 @@ with tabs[2]:
                     else: e_p_name = st.text_input("기도자 수정", value=curr_p_name)
                     e_p_memo = st.text_input("비고 수정", value=target_p.get('비고',''))
                     if st.form_submit_button("📝 수정사항 반영", type="primary"):
-                        r_idx = int(target_p['sheet_row'])
-                        ws_p.update_cell(r_idx, 2, e_p_date); ws_p.update_cell(r_idx, 3, e_p_name); ws_p.update_cell(r_idx, 4, e_p_memo)
-                        st.success("✅ 변경사항이 구글시트에 기록되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
-                    
+                        r_idx = int(target_p['sheet_row']); ws_p.update_cell(r_idx, 2, e_p_date); ws_p.update_cell(r_idx, 3, e_p_name); ws_p.update_cell(r_idx, 4, e_p_memo); st.success("✅ 변경사항이 구글시트에 기록되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
     with p_tabs[3]:
         if not df_p.empty:
             p_options = ["삭제할 일정을 고르세요"] + df_p.apply(lambda r: f"[{r.get('날짜','').strip()}] {r.get('이름','').strip()}", axis=1).tolist()
             sel_p_idx = st.selectbox("삭제 대상 선택", range(len(p_options)), format_func=lambda x: p_options[x], key="del_prayer_sel")
-            if st.button("🚨 해당 기도 일정 삭제 실행", key="btn_del_prayer") and sel_p_idx > 0:
-                target_p = df_p.iloc[sel_p_idx - 1]; ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+            if st.button("🚨 해당 기도 일정 삭제 실행", key="btn_del_prayer") and sel_p_idx > 0: target_p = df_p.iloc[sel_p_idx - 1]; ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 3] 주보 관리 (주차 순서 고정 배열)
+# [탭 3] 주보 관리
 # ==========================================
 with tabs[3]:
     st.subheader("📝 주보 관리 및 조회")
-    
     b_mode = st.radio("작업 모드 선택", ["👀 주보 보기", "⚙️ 주보 등록/수정"], horizontal=True)
     if b_mode == "👀 주보 보기": st.caption("💡 아래에서 ✅ 표시된 주차를 클릭하면 등록된 주보 이미지를 크고 선명하게 볼 수 있습니다.")
     else: st.caption("💡 각 주차를 클릭하여 주보 이미지를 새롭게 등록하거나 기존 주보를 수정/삭제하세요.")
-        
     st.divider()
     
     today_date = datetime.date.today()
@@ -792,8 +732,7 @@ with tabs[3]:
     for i in range(1, 53):
         w_date = start_date + datetime.timedelta(days=(i-1)*7)
         if w_date <= today_date < w_date + datetime.timedelta(days=7):
-            curr_week_idx = i
-            break
+            curr_week_idx = i; break
             
     for row_idx in range(0, 52, 4):
         b_cols = st.columns(4)
@@ -801,24 +740,19 @@ with tabs[3]:
             week_num = row_idx + col_idx + 1
             if week_num > 52: break
             
-            w_str = f"{week_num}주"
-            w_date = start_date + datetime.timedelta(days=(week_num-1)*7)
-            d_str = w_date.strftime("%m/%d")
+            w_str = f"{week_num}주"; w_date = start_date + datetime.timedelta(days=(week_num-1)*7); d_str = w_date.strftime("%m/%d")
             
             is_bulletin_exist = False
             match_b = pd.DataFrame()
             if not df_b.empty:
                 match_b = df_b[df_b['주차'] == w_str]
-                if not match_b.empty and (str(match_b.iloc[0].get('주보이미지1','')).startswith('http') or str(match_b.iloc[0].get('주보이미지2','')).startswith('http')):
-                    is_bulletin_exist = True
+                if not match_b.empty and (str(match_b.iloc[0].get('주보이미지1','')).startswith('http') or str(match_b.iloc[0].get('주보이미지2','')).startswith('http')): is_bulletin_exist = True
             
             btn_type = "primary" if is_bulletin_exist else "secondary"
             btn_label = f"✅ {w_str} ({d_str})" if is_bulletin_exist else f"⬜ {w_str} ({d_str})"
             
             with b_cols[col_idx]:
-                if week_num == curr_week_idx:
-                    st.markdown('<div id="current-week-anchor" style="position:relative; top:-80px;"></div>', unsafe_allow_html=True)
-                    
+                if week_num == curr_week_idx: st.markdown('<div id="current-week-anchor" style="position:relative; top:-80px;"></div>', unsafe_allow_html=True)
                 if st.button(btn_label, key=f"btn_bulletin_{week_num}", use_container_width=True, type=btn_type):
                     if b_mode == "👀 주보 보기":
                         if is_bulletin_exist: view_bulletin_dialog(w_str, d_str, match_b.iloc[0])
@@ -868,20 +802,14 @@ with tabs[5]:
             view_act_df = df_act.copy()
             view_act_df['sort_date'] = pd.to_datetime(view_act_df['날짜'], errors='coerce')
             view_act_df = view_act_df.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
-            
-            html_event = """<html><head><meta charset="utf-8"><title>행사 일정 요약</title><style>body { font-family: 'Malgun Gothic', sans-serif; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f1f8ff; text-align:center; } .page-break { page-break-before: always; } img { max-width: 400px; max-height: 400px; margin: 10px; border-radius: 8px; border: 1px solid #eee; }</style></head><body>"""
-            html_event += "<h1 style='text-align:center; color:#0366d6;'>행사 일정 요약표</h1><table><tr><th>날짜</th><th>행사명</th><th>세부 내용</th></tr>"
-            
+            html_event = """<html><head><meta charset="utf-8"><title>행사 일정 요약</title><style>body { font-family: 'Malgun Gothic', sans-serif; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f1f8ff; text-align:center; } .page-break { page-break-before: always; } img { max-width: 400px; max-height: 400px; margin: 10px; border-radius: 8px; border: 1px solid #eee; }</style></head><body><h1 style='text-align:center; color:#0366d6;'>행사 일정 요약표</h1><table><tr><th>날짜</th><th>행사명</th><th>세부 내용</th></tr>"""
             for _, row in view_act_df.iterrows():
                 short_desc = str(row.get('세부내용',''))[:50] + "..." if len(str(row.get('세부내용',''))) > 50 else str(row.get('세부내용',''))
                 html_event += f"<tr><td style='text-align:center;'>{row.get('날짜','')}</td><td>{row.get('활동명','')}</td><td>{short_desc}</td></tr>"
             html_event += "</table>"
-            
             for _, row in view_act_df.iterrows():
-                html_event += f"<div class='page-break'></div><h2>{row.get('날짜','')} - {row.get('활동명','')}</h2>"
-                html_event += f"<p><strong>📝 내용:</strong> {row.get('세부내용','')}</p>"
+                html_event += f"<div class='page-break'></div><h2>{row.get('날짜','')} - {row.get('활동명','')}</h2><p><strong>📝 내용:</strong> {row.get('세부내용','')}</p>"
                 if str(row.get('공지사항', '')).strip(): html_event += f"<p style='color:red;'><strong>📢 공지:</strong> {row.get('공지사항','')}</p>"
-                
                 v_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if v_urls:
                     html_event += "<div style='text-align:center;'>"
@@ -891,14 +819,13 @@ with tabs[5]:
                     html_event += "</div>"
             html_event += "</body></html>"
             
-            st.download_button(label="📄 전체 행사일정 PDF 인쇄용 다운로드 (다운로드 후 문서 열어서 인쇄 -> PDF로 저장)", data=html_event.encode('utf-8'), file_name="슈팅스타_행사일정보고서.html", mime="text/html", use_container_width=True)
+            st.download_button(label="📄 전체 행사일정 PDF 인쇄용 다운로드", data=html_event.encode('utf-8'), file_name="슈팅스타_행사일정보고서.html", mime="text/html", use_container_width=True)
             st.divider()
 
             for _, row in view_act_df.iterrows():
                 with st.expander(f"📅 {row.get('날짜', '')} | {row.get('활동명', '')}"):
                     st.write(f"**내용:** {row.get('세부내용', '')}")
                     if str(row.get('공지사항', '')).strip(): st.markdown(f"**<span style='color: #d32f2f;'>공지:</span>** <span style='color: #d32f2f;'>{row.get('공지사항', '')}</span>", unsafe_allow_html=True)
-                    
                     valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                     if valid_urls:
                         st.markdown("---")
@@ -907,9 +834,7 @@ with tabs[5]:
                             clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                             if 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
                                 file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url) or re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
-                                if file_id_match:
-                                    f_id = file_id_match.group(1)
-                                    gallery_html += f'''<div style="width: 100%; max-width: 800px; margin-bottom: 10px;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="500" style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe><div style="text-align: right; padding-top: 5px;"><a href="https://drive.google.com/file/d/{f_id}/view" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 원본 열기</a></div></div>'''
+                                if file_id_match: gallery_html += f'''<div style="width: 100%; max-width: 800px; margin-bottom: 10px;"><iframe src="https://drive.google.com/file/d/{file_id_match.group(1)}/preview" width="100%" height="500" style="border: none; border-radius: 8px; background-color: black;"></iframe></div>'''
                                 else: gallery_html += f'''<div style="width: 100%; max-width: 800px; margin-bottom: 10px;"><video src="{clean_url}" controls playsinline preload="metadata" style="width: 100%; height: 515px; object-fit: contain; border-radius: 8px; background-color: black; display: block;"></video></div>'''
                             else: gallery_html += f'''<div style="width: 100%; margin-bottom: 5px;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;"><img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block;"></a></div>'''
                         gallery_html += '</div>'
@@ -932,9 +857,7 @@ with tabs[5]:
                         for mh in missing_act: act_sh_headers.append(mh)
                         try: chunked_update(ws_act, h_cells)
                         except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
-                    
-                    h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}
-                    new_row = [""] * len(act_sh_headers)
+                    h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}; new_row = [""] * len(act_sh_headers)
                     if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
                     if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
                     if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
@@ -942,7 +865,6 @@ with tabs[5]:
                     if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
                     for k in range(1, 16):
                         if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
-                        
                     ws_act.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
     with e_tabs[2]:
@@ -952,22 +874,15 @@ with tabs[5]:
             sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
             event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
             sel_edit = st.selectbox("수정할 행사 선택", event_options, format_func=format_event, key="event_edit_sel")
-            
             if sel_edit != "행사 선택":
                 target_row_id = int(sel_edit)
                 target_event = df_act[df_act['sheet_row'] == target_row_id].iloc[0]
                 with st.form("edit_event_form"):
                     e_d_val = parse_date_safe(target_event.get('날짜', ''))
-                    e_d = st.date_input("날짜", value=e_d_val)
-                    e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
-                    e_c = st.text_area("내용", value=target_event.get('세부내용', ''))
-                    e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
-                    bulk_files = st.file_uploader("🔄 일괄 덮어쓰기 (기존 미디어를 모두 지우고 최대 15개까지 새로 올립니다)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
-                    st.markdown("---")
-                    st.write("📸 개별 사진/동영상 수정")
-                    old_urls = [target_event.get(f'사진{i}', "") for i in range(1, 16)]
-                    new_files, delete_flags = [None] * 15, [False] * 15
-                    
+                    e_d = st.date_input("날짜", value=e_d_val); e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
+                    e_c = st.text_area("내용", value=target_event.get('세부내용', '')); e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
+                    bulk_files = st.file_uploader("🔄 일괄 덮어쓰기", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
+                    old_urls = [target_event.get(f'사진{i}', "") for i in range(1, 16)]; new_files, delete_flags = [None] * 15, [False] * 15
                     for i in range(0, 15, 2):
                         p_cols = st.columns(2)
                         for j in range(2):
@@ -976,22 +891,10 @@ with tabs[5]:
                             with p_cols[j]:
                                 media_url = old_urls[idx]
                                 if media_url and str(media_url).startswith('http'):
-                                    clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
-                                    if 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
-                                        file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url) or re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
-                                        if file_id_match:
-                                            f_id = file_id_match.group(1)
-                                            st.markdown(f'<div style="width: 100%; max-width: 560px; margin-bottom: 10px;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="315" style="border: none; border-radius: 8px; background-color: black;" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe></div>', unsafe_allow_html=True)
-                                        else:
-                                            st.markdown(f'<div style="width: 100%; max-width: 560px; margin-bottom: 10px;"><video src="{clean_url}" controls playsinline preload="metadata" style="width: 100%; height: 315px; object-fit: contain; border-radius: 8px; background-color: black; display: block;"></video></div>', unsafe_allow_html=True)
-                                    else:
-                                        st.markdown(f'<div style="width: 100%; margin-bottom: 10px;"><a href="{clean_url}" target="_blank"><img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: block;"></a></div>', unsafe_allow_html=True)
+                                    st.write(f"사진 {idx+1}")
                                     delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
                                     new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
-                                else:
-                                    st.markdown(f"**[{idx+1}] 빈 칸**")
-                                    new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
-                    
+                                else: new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                     if st.form_submit_button("📝 행사 수정 저장", type="primary"):
                         with st.spinner("미디어 반영 중..."):
                             final_urls = old_urls.copy()
@@ -1002,7 +905,6 @@ with tabs[5]:
                                 for k in range(15):
                                     if new_files[k] is not None: final_urls[k] = upload_photo(new_files[k], e_t)
                                     elif delete_flags[k]: final_urls[k] = ""
-                            
                             act_sh_headers = ws_act.row_values(1)
                             missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
                             if missing_act:
@@ -1011,13 +913,10 @@ with tabs[5]:
                                 for mh in missing_act: act_sh_headers.append(mh)
                                 try: chunked_update(ws_act, h_cells)
                                 except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
-                            
                             update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
                             for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
-                            
                             cells_to_update = [gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)) for k, v in update_map.items() if k in act_sh_headers]
                             if cells_to_update: chunked_update(ws_act, cells_to_update)
-                            
                             st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
     with e_tabs[3]:
@@ -1031,7 +930,7 @@ with tabs[5]:
                 ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 출석 (✅ 출석 스위치 및 폰트 2배 확대 적용)
+# [탭 6] 출석 (✅ 출석 스위치 2.5배, 이름 2배)
 # ==========================================
 with tabs[6]:
     st.subheader("📅 주간 출석 현황")
@@ -1041,16 +940,10 @@ with tabs[6]:
         c1, c2 = st.columns(2)
         with c1: 
             sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, datetime.date.today().isocalendar()[1] - 1)), format_func=lambda x: week_display_map.get(x, x))
-            if sel_w_raw == "✏️ 직접 입력 (새 날짜)": 
-                target_date = st.date_input("새로운 날짜 선택", datetime.date.today())
-                sel_w = target_date.strftime("%Y-%m-%d")
-            else: 
-                sel_w = sel_w_raw
-                w_num = int(sel_w_raw.replace("주", ""))
-                target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
+            if sel_w_raw == "✏️ 직접 입력 (새 날짜)": target_date = st.date_input("새로운 날짜 선택", datetime.date.today()); sel_w = target_date.strftime("%Y-%m-%d")
+            else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
         with c2: 
             sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
-        
         show_inactive = st.checkbox("👀 강제 전체명단 표시 (이사/졸업 포함)")
     
     att_df = df.copy() if show_inactive else df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
@@ -1094,22 +987,18 @@ with tabs[6]:
             grouped = att_df.sort_values(by=['이름']).groupby(class_col)
             for c_name in sorted(grouped.groups.keys(), key=class_sort_key):
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
-                
                 cols = st.columns(2)
                 for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
                     with cols[i % 2]:
                         with st.container(border=True):
                             st.markdown('<div class="attendance-card-container"></div>', unsafe_allow_html=True)
-                            c_img, c_tgl = st.columns([1.5, 4.5])
-                            
+                            c_img, c_tgl = st.columns([1, 4])
                             s = row[status_col]
                             icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                             p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
-                            
                             with c_img:
                                 if p_url and p_url.startswith('http'): st.markdown(f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
                                 else: st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:26px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
-                            
                             with c_tgl:
                                 is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
                                 new_friend_badge = " 🌱" if row[status_col] == '새친구' else ""
@@ -1139,7 +1028,6 @@ with tabs[6]:
                 valid_enrollment_df['role'] = valid_enrollment_df.apply(get_role, axis=1)
                 student_count = len(valid_enrollment_df[valid_enrollment_df['role'] == 'student'])
                 teacher_count = len(valid_enrollment_df[valid_enrollment_df['role'] == 'teacher'])
-                
                 kids_total = save_s_p + guest_in
                 grand_total = kids_total + save_t_p
                 
@@ -1148,33 +1036,21 @@ with tabs[6]:
                 h_map = {norm_text(h): idx for idx, h in enumerate(stat_headers)}
                 req_headers_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
                 missing_headers = [h for h in req_headers_order if norm_text(h) not in h_map]
-                
                 if missing_headers:
                     try: ws_stat.add_cols(len(missing_headers) + 5)
                     except: pass
-                    start_col = len(stat_headers) + 1
-                    h_cells = []
+                    start_col = len(stat_headers) + 1; h_cells = []
                     for i, mh in enumerate(missing_headers):
-                        stat_headers.append(mh)
-                        h_map[norm_text(mh)] = len(stat_headers) - 1
-                        h_cells.append(gspread.Cell(1, start_col + i, mh))
+                        stat_headers.append(mh); h_map[norm_text(mh)] = len(stat_headers) - 1; h_cells.append(gspread.Cell(1, start_col + i, mh))
                     chunked_update(ws_stat, h_cells)
                 
                 new_row = [""] * len(stat_headers)
                 val_map = {
-                    norm_text("주차"): sel_w,
-                    norm_text("행사명"): event_text,
-                    norm_text("유년부 재적"): student_count,
-                    norm_text("출석"): save_s_p,
-                    norm_text("추가"): guest_in,
-                    norm_text("유년부 합계"): kids_total,
-                    norm_text("교사재적"): teacher_count,
-                    norm_text("교사출석"): save_t_p,
-                    norm_text("총합"): grand_total,
-                    norm_text("비고"): custom_note,
-                    norm_text("업데이트일시"): str(datetime.datetime.now())
+                    norm_text("주차"): sel_w, norm_text("행사명"): event_text, norm_text("유년부 재적"): student_count,
+                    norm_text("출석"): save_s_p, norm_text("추가"): guest_in, norm_text("유년부 합계"): kids_total,
+                    norm_text("교사재적"): teacher_count, norm_text("교사출석"): save_t_p, norm_text("총합"): grand_total,
+                    norm_text("비고"): custom_note, norm_text("업데이트일시"): str(datetime.datetime.now())
                 }
-                
                 for key_norm, value in val_map.items():
                     if key_norm in h_map: new_row[h_map[key_norm]] = value
                         
@@ -1184,11 +1060,10 @@ with tabs[6]:
                     end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
                     ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
                 else: ws_stat.append_row(new_row)
-                
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 7] 통계 (✅ 개인별 누적 출석을 표 밑으로 내림)
+# [탭 7] 통계 (✅ 표 상하 배치)
 # ==========================================
 with tabs[7]:
     st.subheader("📊 통계")
@@ -1291,8 +1166,7 @@ with tabs[8]:
             if not df_r.empty:
                 with st.container(border=True):
                     col_f1, col_f2, col_f3 = st.columns([2, 2, 1.5])
-                    min_d = df_r_calc['날짜_dt'].min()
-                    max_d = df_r_calc['날짜_dt'].max()
+                    min_d, max_d = df_r_calc['날짜_dt'].min(), df_r_calc['날짜_dt'].max()
                     min_date = min_d.date() if pd.notnull(min_d) else datetime.date.today()
                     max_date = max_d.date() if pd.notnull(max_d) else datetime.date.today()
                     
@@ -1305,7 +1179,6 @@ with tabs[8]:
                     df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
                     if keyword: df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
                     total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum() if not df_r_filtered.empty else 0
-                    
                     col_f3.metric("📅 선택 기간 총 집행액", f"{int(total_filtered_cost):,}원")
                 
                 if not df_r_filtered.empty:
@@ -1526,19 +1399,19 @@ with tabs[10]:
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 5px; background-color:#f1f8ff; border-radius:10px; border: 1px solid #cce5ff; overflow: hidden;">
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_st}">
             <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총 재적</div>
-            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{st_count + new_count}명</div>
+            <div data-testid="stMetricValue">{st_count + new_count}명</div>
         </div>
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_tc}">
             <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">사역자</div>
-            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{tc_count + ps_count}명</div>
+            <div data-testid="stMetricValue">{tc_count + ps_count}명</div>
         </div>
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_inact}">
             <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">비활성</div>
-            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{total_inact}명</div>
+            <div data-testid="stMetricValue">{total_inact}명</div>
         </div>
         <div style="text-align: center; flex: 1; padding: 0 5px;" title="{tt_total}">
             <div style="font-size: clamp(0.9rem, 2.5vw, 1.4rem); font-weight: 800; color: #0366d6; margin-bottom: 4px; white-space: nowrap; cursor: help;">총합</div>
-            <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; color: #333; white-space: nowrap; cursor: help;">{active_sum_calc}명</div>
+            <div data-testid="stMetricValue">{active_sum_calc}명</div>
         </div>
     </div>
     """
