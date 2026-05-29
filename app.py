@@ -137,8 +137,8 @@ st.markdown("""
 
     /* ✅ 3. 새친구 추가 글자 2배 확대 */
     div[data-testid="stExpander"] summary p {
-        font-size: 2.0rem !important;
-        font-weight: 800 !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
     }
     div[data-testid="stExpander"] summary {
         min-height: 70px !important;
