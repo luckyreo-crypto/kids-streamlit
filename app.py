@@ -277,8 +277,12 @@ if df is None or df.empty:
     st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
     st.stop()
 
+# --- 전역 변수 선언 위치 이동 (NameError 해결) ---
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
+
+req_cols = ['학생ID', '학년(담임)', '이름', '생년월일', '학교상태', '등록일', '변동일', '학교', '부모(아빠/엄마)', '연락처', '주소', '비고']
+available_cols = [c for c in req_cols if c in df.columns]
 
 if '이름' in df.columns:
     valid_names_df = df[df['이름'].astype(str).str.strip() != '']
@@ -294,7 +298,6 @@ weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
 # --- 다이얼로그 모달: 주보 보기 (2배 줌) ---
-# width="large" 속성을 적용하여 모달 크기 대폭 확장
 @st.dialog("📖 주보 보기", width="large")
 def view_bulletin_dialog(w_str, d_str, row_data):
     st.markdown(f"<h3 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h3>", unsafe_allow_html=True)
@@ -309,7 +312,6 @@ def view_bulletin_dialog(w_str, d_str, row_data):
     with t1:
         if img1 and "http" in img1:
             clean_url = img1.replace("&vid=1", "").replace("?vid=1", "")
-            # 커스텀 HTML 마크업으로 가로 100% 꽉 채우기 (2배 확대 효과)
             st.markdown(f"<img src='{clean_url}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else:
             st.write("등록된 앞면 이미지가 없습니다.")
@@ -465,7 +467,7 @@ def edit_student_dialog(target_dict):
 tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
 
 # ==========================================
-# [탭 0] 반편성
+# [탭 0] 반편성 (사진과 버튼 가로 배치 적용)
 # ==========================================
 with tabs[0]:
     st.markdown('<a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
@@ -511,18 +513,24 @@ with tabs[0]:
                             
                             prefix = "🚫 " if s in INACTIVE_STATUS else ""
                             suffix = f" ({s})" if s in INACTIVE_STATUS else ""
-                            if r['role'] == 'pastor': label = f"{prefix}✝️ {n}{suffix}{bd_disp}"
-                            elif r['role'] == 'teacher': label = f"{prefix}🧑‍🏫 {n}{suffix}{bd_disp}"
-                            elif s == '새친구': label = f"{prefix}🔴 {n}{suffix}{bd_disp}"
-                            else: label = f"{prefix}👤 {n}{suffix}{bd_disp}"
+                            
+                            # 버튼에 들어갈 텍스트 (아이콘은 사진란에 넣기위해 제외)
+                            label = f"{n}{suffix}{bd_disp}"
+                            
+                            # 사진 아이콘 처리 로직
+                            icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                             
                             with btn_cols[idx_j % 2]:
-                                # 반별 명단 사진 출력 로직 추가
-                                p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
-                                if p_url and p_url.startswith('http'):
-                                    st.markdown(f'<div style="text-align:center; margin-bottom: 5px;"><img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; border:1px solid #ddd;"></div>', unsafe_allow_html=True)
-
-                                if st.button(label, key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True): edit_student_dialog(r.to_dict())
+                                # 가로로 사진과 버튼을 착 붙이는 레이아웃
+                                c_img, c_btn = st.columns([1, 3], gap="small")
+                                with c_img:
+                                    p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+                                    if p_url and p_url.startswith('http'):
+                                        st.markdown(f'<img src="{p_url}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:1px solid #ddd; margin-top:2px;">', unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f'<div style="width:36px; height:36px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:18px; margin-top:2px;">{icon}</div>', unsafe_allow_html=True)
+                                with c_btn:
+                                    if st.button(label, key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True): edit_student_dialog(r.to_dict())
                         
                         with st.expander(f"➕ 새친구 추가"):
                             with st.form(f"qa_{i+j}"):
@@ -700,7 +708,7 @@ with tabs[2]:
 # ==========================================
 # [탭 4] 신규 메뉴 - 주보
 # ==========================================
-with tabs[4]:
+with tabs[3]:
     st.subheader("📝 주보 관리 및 조회")
     
     b_mode = st.radio("작업 모드 선택", ["👀 주보 보기", "⚙️ 주보 등록/수정"], horizontal=True)
@@ -980,12 +988,11 @@ with tabs[5]:
             sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
             event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
             sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event, key="event_del_sel")
-            # --- 버튼의 key 지정하여 중복 문제 해결 ---
             if st.button("🚨 삭제 실행", key="btn_del_event") and sel_del != "행사 선택": 
                 ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 7] 출석
+# [탭 7] 출석 (사진과 토글의 가로 배치 적용)
 # ==========================================
 with tabs[6]:
     st.subheader("📅 주간 출석 현황")
@@ -1039,9 +1046,21 @@ with tabs[6]:
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
                 cols = st.columns(3)
                 for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
-                    is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                    prefix = f"🚫 " if row[status_col] in INACTIVE_STATUS else ("🌱 " if row[status_col] == '새친구' else "✝️ " if row['role'] == 'pastor' else "🧑‍🏫 " if row['role'] == 'teacher' else "👤 ")
-                    new_att[row['sheet_row']] = cols[i%3].toggle(f"{prefix}{row['이름']}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
+                    with cols[i%3]:
+                        # 출석부: 사진과 토글버튼 가로 결합 UI
+                        s = row[status_col]
+                        icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
+                        
+                        c_img, c_tgl = st.columns([1, 4], gap="small")
+                        with c_img:
+                            p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+                            if p_url and p_url.startswith('http'):
+                                st.markdown(f'<img src="{p_url}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:1px solid #ddd; margin-top:2px;">', unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'<div style="width:36px; height:36px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:18px; margin-top:2px;">{icon}</div>', unsafe_allow_html=True)
+                        with c_tgl:
+                            is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
+                            new_att[row['sheet_row']] = st.toggle(f"{row['이름']}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
@@ -1185,7 +1204,7 @@ with tabs[7]:
         st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 9] 총무 전용 - 비용집행관리 (★ 탭 분리, 순번 1번부터 시작 적용)
+# [탭 9] 총무 전용 - 비용집행관리
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
@@ -1249,7 +1268,6 @@ with tabs[8]:
                     display_cols = ['번호', '날짜', '구매처', '내용', '비용', '비고']
                     display_df = df_r_filtered[display_cols].copy()
                     
-                    # [5] 순번 1번부터 시작하도록 초기화 적용
                     display_df['번호'] = range(1, len(display_df) + 1)
                     display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
                     
@@ -1304,7 +1322,6 @@ with tabs[8]:
                             </thead>
                             <tbody>
                     """
-                    # 여기서는 보여지는 순번(idx)을 1부터 다시 매겨줍니다
                     for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
                         html_content += f"""<tr>
                             <td class="align-center">{idx}</td>
@@ -1391,14 +1408,13 @@ with tabs[8]:
         with r_tabs[3]:
             if not df_r.empty:
                 sel_idx = st.selectbox("삭제할 내역", range(len(options)), format_func=lambda x: options[x], key="del_rcpt_sel")
-                # --- 버튼의 key 지정하여 중복 문제 해결 ---
                 if st.button("🚨 삭제 실행", key="btn_del_receipt") and sel_idx > 0:
                     target = df_r.iloc[sel_idx - 1]
                     ws_r.delete_rows(int(target['sheet_row']))
                     st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 10] 총무 전용 - 교사 회비 사용내역 (★ 탭 분리)
+# [탭 10] 총무 전용 - 교사 회비 사용내역
 # ==========================================
 with tabs[9]:
     if not st.session_state['chongmu_auth']:
@@ -1625,20 +1641,18 @@ with tabs[9]:
             if d_type == "입금 장부" and not df_in.empty:
                 opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {parse_int_safe(r.get('입금액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_in_sel")
-                # --- 버튼의 key 지정하여 중복 문제 해결 ---
                 if st.button("🚨 입금 삭제 실행", key="btn_del_in") and idx > 0:
                     ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row']))
                     st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
             elif d_type == "지출 장부" and not df_out.empty:
                 opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_out_sel")
-                # --- 버튼의 key 지정하여 중복 문제 해결 ---
                 if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0:
                     ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row']))
                     st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 11] 교적부 통합 관리 (★ 교적부를 맨 뒤로 이동)
+# [탭 11] 교적부 통합 관리
 # ==========================================
 with tabs[10]:
     st.subheader("📋 교적부 통합 관리")
@@ -1712,10 +1726,7 @@ with tabs[10]:
 
     st.divider()
     
-    # 교적부 탭도 직관성을 위해 st.tabs 로 분리 적용
     m_tabs = st.tabs(["👀 전체보기", "📝 수정/비활성", "➕ 인원추가"])
-    req_cols = ['학생ID', '학년(담임)', '이름', '생년월일', '학교상태', '등록일', '변동일', '학교', '부모(아빠/엄마)', '연락처', '주소', '비고']
-    available_cols = [c for c in req_cols if c in df.columns]
     
     with m_tabs[0]:
         df_display = df[available_cols].copy()
