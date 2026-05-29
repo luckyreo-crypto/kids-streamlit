@@ -10,12 +10,15 @@ import uuid
 import re
 import time
 
-# --- 1. 전역 설정 및 상수 ---
+# ==========================================
+# 📌 1. 전역 설정 및 상수 (앱의 기본 틀을 설정합니다)
+# ==========================================
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon="🌱", layout="wide")
 
 # ✅ 모든 메뉴에서 항상 보이도록 우측 하단 고정형 "맨 위로" 버튼 추가
 st.markdown('<div id="top-anchor"></div><a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
 
+# 뒤로가기 버튼 오작동 방지 (세션 유지)
 components.html(
     """
     <script>
@@ -28,21 +31,30 @@ components.html(
     height=0, width=0
 )
 
+# 학교상태 (교적부) 옵션 설정
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
+# ==========================================
+# 🎨 2. UI/디자인 CSS 설정 구역
+# (이곳에서 화면의 글씨 크기, 틀, 색상을 수정할 수 있습니다)
+# ==========================================
 st.markdown("""
     <style>
+    /* 기본 스크롤 및 폰트 부드럽게 설정 */
     html { scroll-behavior: smooth; }
     button, input, select, textarea, div[data-testid="stToggle"] { touch-action: manipulation !important; font-size: 16px !important; }
     
-    .class-header { background-color: #f1f8ff; padding: 15px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.2rem; margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    /* 🎨 반별명단 헤더 (예: 1학년 1반) 디자인 */
+    .class-header { 
+        background-color: #f1f8ff; /* 연한 파란색 배경 */
+        padding: 15px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; 
+        font-size: 1.3rem; /* 글자 크기 */
+        margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+    }
     
-    .event-card { border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: #fafafa; }
-    .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
-    .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
-    
-    /* 🔴 1. 탭 메뉴 글씨 크기 조절 및 줄바꿈(Wrap) 적용 */
+    /* 🎨 1. 탭 메뉴 (화면 맨 위 메뉴들) 디자인 */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important; position: sticky !important; top: 3.5rem !important; 
@@ -59,18 +71,18 @@ st.markdown("""
         background-color: #f8f9fa !important; border-radius: 12px !important; border: 1px solid #ddd !important;
     }
     div[data-testid="stTabs"] [role="tab"][aria-selected="true"] { 
-        background-color: #0366d6 !important; border-color: #0366d6 !important; 
+        background-color: #0366d6 !important; border-color: #0366d6 !important; /* 선택된 탭 파란색 */
     }
     div[data-testid="stTabs"] [role="tab"] p { 
-        font-size: 1.2rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 상단 탭 메뉴 글자 크기 (기존 2.2rem -> 1.2rem) */
+        font-size: 1.5rem !important; /* 👈 [수정 포인트] 상단 탭 메뉴 글자 크기 (기본 1.5rem) */
         font-weight: 800 !important; white-space: nowrap; margin: 0; color: inherit;
     }
     div[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: white !important; }
 
-    /* 맨위로 버튼 (우측 하단) */
+    /* 우측 하단 맨위로 버튼 디자인 */
     .fab-button { position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }
 
-    /* 🔴 2. 반별명단 학생 카드 (HTML 통합으로 UI 엉킴 원천 차단) */
+    /* 🎨 2. 반별명단 학생 카드 (교적부 연동 버튼 덮어씌우기) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) {
         position: relative !important;
         padding: 8px 10px !important; border-radius: 12px !important; margin-bottom: 10px !important; 
@@ -80,7 +92,7 @@ st.markdown("""
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row):hover {
         background-color: #f8fbff !important; border-color: #0366d6 !important;
     }
-    /* 투명 오버레이 버튼 (카드 클릭 시 상세 모달창 실행) */
+    /* 카드 전체를 클릭 가능하게 만드는 투명 오버레이 버튼 */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] {
         position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
         opacity: 0 !important; z-index: 10 !important; width: 100% !important; height: 100% !important;
@@ -89,26 +101,26 @@ st.markdown("""
         width: 100% !important; height: 100% !important; cursor: pointer !important;
     }
     
-    /* 🔴 3. 출석부 UI (스위치 2.5배, 이름 2배) */
+    /* 🎨 3. 출석부 UI (토글 스위치 및 이름 크기 대폭 확대) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {
-        padding: 10px 12px !important; border-radius: 12px !important; margin-bottom: 10px !important;
+        /* 카드의 위아래 여백(padding)을 늘려 확대된 토글이 짤리지 않게 합니다. */
+        padding: 20px 20px !important; 
+        border-radius: 12px !important; margin-bottom: 12px !important;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important;
+        display: flex; align-items: center; min-height: 80px !important;
     }
+    /* 토글 스위치 전체(스위치+텍스트) 줌인 (scale 조절) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {
-        padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; 
-        background-color: transparent !important; min-height: 70px !important; display: flex; align-items: center;
+        transform: scale(1.5) !important; /* 👈 [수정 포인트] 스위치와 이름 동시 확대 비율 (1.5 = 1.5배) */
+        transform-origin: left center !important; 
+        width: 100% !important; margin: 0 !important; padding: 0 !important;
     }
+    /* 토글 옆 이름 글씨 굵기 및 여백 */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
-        font-size: 1.5rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 출석부 스위치 옆 이름 글자 크기 */
-        font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
+        font-weight: 800 !important; color: #111 !important; margin-left: 8px !important;
     }
-    /* 토글 스위치 크기 2.5배 확대 체감 */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {
-        transform: scale(2.2) !important; transform-origin: left center !important; 
-        margin-left: 15px !important; margin-right: 25px !important;
-    }
-
-    /* 🔴 출석부 모바일 가로 엉킴 방지 */
+    
+    /* 모바일 출석부 디자인 (화면 밖으로 넘어가는 현상 방지) */
     @media (max-width: 576px) {
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {
             display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important;
@@ -119,49 +131,40 @@ st.markdown("""
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"]:nth-child(2) {
             flex: 1 1 auto !important; min-width: 0 !important;
         }
+        /* 모바일에서는 스위치 확대 비율을 살짝 줄임 */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {
+            transform: scale(1.35) !important; /* 모바일용 크기 조절 */
+        }
     }
 
-    /* 🔴 닫기 및 수정하기 버튼 글자 크기 (모달창 하단) */
+    /* 🎨 4. 모달창(상세정보) 닫기/수정 버튼 크게 만들기 */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button p {
-        font-size: 1.8rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 모달 하단 닫기/수정 버튼 글씨 크기 */
+        font-size: 2.0rem !important; /* 👈 [수정 포인트] 모달 하단 버튼 글자 크기 */
         font-weight: 800 !important;
     }
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button {
         min-height: 70px !important; border-radius: 12px !important;
     }
 
-    /* 🔴 새친구 추가 아코디언 / 행사 제목 폰트 크기 조정 */
-    div[data-testid="stExpander"] summary p {
-        font-size: 1.3rem !important; /* 👈 [폰트 사이즈 수정하는 곳] 행사 제목 및 새친구추가 아코디언 글씨 크기 (기존 1.8rem -> 1.3rem 축소) */
-        font-weight: 800 !important;
-    }
-    div[data-testid="stExpander"] summary {
-        min-height: 60px !important;
-    }
-
-    /* 상세 모달 하단 닫기 버튼 Sticky 처리 */
+    /* 상세 모달 하단 버튼 Sticky 처리 (항상 화면 아래 고정) */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) {
         position: sticky !important; bottom: -25px !important; background-color: white !important; z-index: 99999 !important;
         padding-top: 15px !important; padding-bottom: 15px !important; border-top: 1px solid #eef2f6 !important;
     }
     
-    /* 버튼/입력폼 터치 영역 최적화 */
+    /* 기타 버튼/입력폼 터치 영역 최적화 */
     div[data-testid="stButton"] button { min-height: 50px !important; font-size: 1.1rem !important; font-weight: 700 !important; border-radius: 8px !important; }
     input[type="text"], input[type="number"], textarea, div[data-baseweb="select"] { min-height: 50px !important; border-radius: 8px !important; font-size: 16px !important; }
 
-    /* 모바일 반응형 디테일 */
-    @media (max-width: 576px) {
-        div[data-testid="stHorizontalBlock"]:has(.keep-row) { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
-        div[data-testid="stHorizontalBlock"]:has(.keep-row) > div[data-testid="column"]:nth-child(1) { width: 75px !important; min-width: 75px !important; flex: 0 0 75px !important; }
-        div[role="dialog"] > div { padding: 1rem !important; } 
-        div[data-testid="stMetricValue"] { font-size: 2.2rem !important; }
-    }
-    
+    /* 숨김 처리용 마커 속성 */
     .sticky-footer-marker, .keep-row, .attendance-card-container { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 시스템 접근 제어 및 글로벌 상태 초기화 ---
+
+# ==========================================
+# 📌 3. 시스템 접근 제어 (비밀번호 로그인)
+# ==========================================
 if "authenticated" not in st.session_state: st.session_state["authenticated"] = False
 if 'privacy_mode' not in st.session_state: st.session_state['privacy_mode'] = True
 if 'chongmu_auth' not in st.session_state: st.session_state['chongmu_auth'] = False
@@ -184,7 +187,9 @@ else: st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!"
 
 start_date = datetime.date(2026, 1, 4)
 
-# --- 3. 공통 유틸리티 함수 ---
+# ==========================================
+# 📌 4. 공통 유틸리티 함수 (데이터 파싱 및 정렬 도구)
+# ==========================================
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
     return str(val).strip()
@@ -279,7 +284,9 @@ def check_is_staff(row):
     if s in INACTIVE_STATUS and (any(k in c for k in ['교사', '교역자', '전도사', '목사', '임원', '선생님']) or any(k in m for k in ['교사', '교역자', '전도사', '목사', '부장', '부감', '총무', '선생님'])): return True
     return False
 
-# --- 4. 구글 시트 데이터 연동 ---
+# ==========================================
+# 📌 5. 구글 시트 연동 (데이터 저장 및 불러오기)
+# ==========================================
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -347,7 +354,7 @@ if df is None or df.empty:
     st.warning("⚠️ 데이터 로딩 중입니다. 잠시만 기다려주세요.")
     st.stop()
 
-# --- 전역 변수 설정 및 대시보드 사전 연산 ---
+# 전역 변수 설정 및 대시보드 사전 연산
 class_col = '학년(담임)' if '학년(담임)' in df.columns else ('반' if '반' in df.columns else '')
 status_col = '학교상태' if '학교상태' in df.columns else '상태'
 
@@ -386,7 +393,9 @@ if '이름' in df.columns:
 weeks_list = [f"{i}주" for i in range(1, 53)]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 
-# --- 다이얼로그 모달: 주보 보기 ---
+# ==========================================
+# 📌 모달창 (팝업): 주보 보기 / 수정 / 인원정보 상세
+# ==========================================
 @st.dialog("📖 주보 보기", width="large")
 def view_bulletin_dialog(w_str, d_str, row_data):
     st.markdown(f"<h3 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보</h3>", unsafe_allow_html=True)
@@ -404,7 +413,6 @@ def view_bulletin_dialog(w_str, d_str, row_data):
             st.markdown(f"<img src='{img2.replace('&vid=1', '').replace('?vid=1', '')}' style='width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else: st.write("등록된 뒷면 이미지가 없습니다.")
 
-# --- 다이얼로그 모달: 주보 관리 ---
 @st.dialog("📝 주보 등록/수정 관리")
 def manage_bulletin_dialog(w_str, d_str):
     st.markdown(f"<h4 style='color:#0366d6; text-align:center;'>{w_str} ({d_str}) 주보 설정</h4>", unsafe_allow_html=True)
@@ -438,7 +446,6 @@ def manage_bulletin_dialog(w_str, d_str):
         if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
             ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
 
-# --- 다이얼로그 모달: 인원 정보 ---
 @st.dialog("👤 인원 정보 상세")
 def edit_student_dialog(target_dict):
     row_id = target_dict['sheet_row']
@@ -458,7 +465,7 @@ def edit_student_dialog(target_dict):
         c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
         c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
         
-        # 상세보기 무조건 암호화 해제 (100% 정보 표출)
+        # 상세보기는 프라이버시 해제되어 무조건 보임
         p_phone = safe_str(target_dict.get('연락처',''))
         p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
         p_addr = safe_str(target_dict.get('주소',''))
@@ -478,10 +485,8 @@ def edit_student_dialog(target_dict):
             st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
-                # 닫기 버튼은 단순히 rerun 처리 (가장 빠름)
                 if st.button("닫기", use_container_width=True): st.rerun()
             with btn_col2:
-                # '정보 수정하기' ➔ '수정' 으로 변경
                 st.button("✏️ 수정", use_container_width=True, on_click=set_edit_true)
             
     else:
@@ -539,11 +544,16 @@ def edit_student_dialog(target_dict):
             with btn_col2:
                 st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
-# --- 5. 화면(탭) 구성 ---
-tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
 
 # ==========================================
-# [탭 0] 반편성
+# 📌 6. 전체 화면 (탭) 구성 시작
+# (탭의 이름이나 순서를 바꾸려면 아래 리스트를 수정하세요)
+# ==========================================
+tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
+
+
+# ==========================================
+# 📌 탭 0 : 🏫 반편성 (명단 화면)
 # ==========================================
 with tabs[0]:
     st.markdown(f"""
@@ -599,7 +609,7 @@ with tabs[0]:
                     try: bd_disp = f" 🎂 {int(b_str.split('-')[1]):02d}/{int(b_str.split('-')[2]):02d}"
                     except: pass
                 
-                # 목사님, 전도사님 직분 명시 처리
+                # 목사님, 전도사님 직분 자동 명시
                 if s in ['목사', '전도사'] and s not in n: n = f"{n} {s}님"
                 elif '목사' in str(r.get('비고', '')) and '목사' not in n: n = f"{n} 목사님"
                 elif '전도사' in str(r.get('비고', '')) and '전도사' not in n: n = f"{n} 전도사님"
@@ -614,7 +624,6 @@ with tabs[0]:
                     with st.container(border=True):
                         st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                         
-                        # [2] 이름 텍스트 옆에 생일과 상세기능(버튼) 통합 배치
                         c_img, c_info = st.columns([1.5, 4.5])
                         with c_img:
                             if p_url and p_url.startswith('http'):
@@ -622,16 +631,15 @@ with tabs[0]:
                             else:
                                 st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:30px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
                         with c_info:
-                            # 폰트 사이즈 조정 (이름 약 1.5배~2배 적용)
                             info_html = f'''
                             <div style="height:60px; display:flex; align-items:center; flex-wrap:wrap;">
-                                <span style="font-size:1.5rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 이름 글자 크기 */ font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
-                                <span style="font-size:1.0rem; /* 👈 [폰트 사이즈 수정하는 곳] 반별 명단 생일 글자 크기 */ color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
+                                <span style="font-size:2.0rem; font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
+                                <span style="font-size:1.0rem; color:#888; font-weight:500; white-space:nowrap;">{bd_disp}</span>
                             </div>
                             '''
                             st.markdown(info_html, unsafe_allow_html=True)
                             
-                        # 카드 전체를 덮어씌우는 투명 버튼 (오버레이 적용)
+                        # 카드 전체 투명 버튼 (클릭 시 모달창 실행)
                         if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
                             edit_student_dialog(r.to_dict())
             
@@ -651,7 +659,7 @@ with tabs[0]:
                         ws.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 1] 생일표
+# 📌 탭 1 : 🎂 생일표 관리
 # ==========================================
 with tabs[1]:
     st.subheader("🎂 월별 생일 명단")
@@ -702,11 +710,10 @@ with tabs[1]:
     """, height=0, width=0)
 
 # ==========================================
-# [탭 2] 기도순서
+# 📌 탭 2 : 🙏 기도순서
 # ==========================================
 with tabs[2]:
     st.subheader("🙏 예배 기도순서 관리")
-    
     if not df_p.empty:
         df_p_calc = df_p.copy()
         df_p_calc['날짜_dt'] = pd.to_datetime(df_p_calc['날짜'], errors='coerce')
@@ -782,11 +789,10 @@ with tabs[2]:
                 target_p = df_p.iloc[sel_p_idx - 1]; ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 3] 주보 관리
+# 📌 탭 3 : 📝 주보 관리
 # ==========================================
 with tabs[3]:
     st.subheader("📝 주보 관리 및 조회")
-    
     b_mode = st.radio("작업 모드 선택", ["👀 주보 보기", "⚙️ 주보 등록/수정"], horizontal=True)
     if b_mode == "👀 주보 보기": st.caption("💡 아래에서 ✅ 표시된 주차를 클릭하면 등록된 주보 이미지를 크고 선명하게 볼 수 있습니다.")
     else: st.caption("💡 각 주차를 클릭하여 주보 이미지를 새롭게 등록하거나 기존 주보를 수정/삭제하세요.")
@@ -837,7 +843,7 @@ with tabs[3]:
     """, height=0, width=0)
 
 # ==========================================
-# [탭 4] 새친구
+# 📌 탭 4 : 🌱 새친구
 # ==========================================
 with tabs[4]:
     st.subheader("🌱 최근 등록 새친구")
@@ -851,7 +857,7 @@ with tabs[4]:
     else: st.info("등록된 새친구가 없습니다.")
 
 # ==========================================
-# [탭 5] 행사 기록 관리
+# 📌 탭 5 : ⚙️ 행사 기록 관리
 # ==========================================
 with tabs[5]:
     st.subheader("⚙️ 행사 기록 관리")
@@ -1007,7 +1013,7 @@ with tabs[5]:
                 ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 6] 출석
+# 📌 탭 6 : ✅ 출석 (출석 체크 및 통계 자동 저장)
 # ==========================================
 with tabs[6]:
     st.subheader("📅 주간 출석 현황")
@@ -1034,10 +1040,13 @@ with tabs[6]:
     t_p = len(ui_t_df[ui_t_df[sel_w].astype(str).str.strip() == "1"])
     
     saved_guest = 0; saved_note = ""; saved_event = ""
+    
+    # 📌 [기능: 통계 시트에서 기존 정보 불러오기]
     if not df_stat.empty and '주차' in df_stat.columns:
         match = df_stat[df_stat['주차'] == sel_w]
         if not match.empty: 
-            try: saved_guest = int(match.iloc[0].get('추가', match.iloc[0].get('새친구/추가예배', 0)))
+            # 레거시 데이터 호환을 위해 추가출석 항목을 여러 이름으로 시도합니다
+            try: saved_guest = int(match.iloc[0].get('추가', match.iloc[0].get('새친구/추가예배', match.iloc[0].get('추가출석', 0))))
             except: pass
             saved_event = str(match.iloc[0].get('행사명', ''))
             saved_note = str(match.iloc[0].get('비고', match.iloc[0].get('내용(비고)', match.iloc[0].get('추가입력(비고)', ''))))
@@ -1084,6 +1093,7 @@ with tabs[6]:
                                 new_friend_badge = " 🌱" if row[status_col] == '새친구' else ""
                                 new_att[row['sheet_row']] = st.toggle(f"{row['이름']}{new_friend_badge}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
+        # 📌 [기능: 출석 데이터 구글 시트 저장 버튼 동작 영역]
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
                 target_c = headers.index(sel_w) + 1 if sel_w in headers else len(headers) + 1
@@ -1102,6 +1112,7 @@ with tabs[6]:
                     for r, v in new_att.items(): cells_to_update.append(gspread.Cell(int(r), target_c, "1" if v else ""))
                     if cells_to_update: chunked_update(ws, cells_to_update)
                 
+                # 통계 계산을 위한 변수 갱신
                 save_s_p = 0 if is_skip else final_s_p
                 save_t_p = 0 if is_skip else final_t_p
                 valid_enrollment_df = df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
@@ -1111,11 +1122,37 @@ with tabs[6]:
                 kids_total = save_s_p + guest_in
                 grand_total = kids_total + save_t_p
                 
+                # 📌 [기능: 통계 시트 연동 버그 수정 완료] - 옛날 시트 헤더명이 있어도 매핑이 깨지지 않도록 강화
                 stat_headers = [str(h).strip() for h in ws_stat.row_values(1)]
                 def norm_text(t): return re.sub(r'\s+', '', str(t))
                 h_map = {norm_text(h): idx for idx, h in enumerate(stat_headers)}
+                
                 req_headers_order = ["주차", "행사명", "유년부 재적", "출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
-                missing_headers = [h for h in req_headers_order if norm_text(h) not in h_map]
+                
+                # 레거시(예전) 헤더 이름 매핑 (이 이름들이 시트에 있으면 새 헤더를 중복으로 추가하지 않음)
+                legacy_map = {
+                    "추가": ["새친구/추가예배", "추가출석"],
+                    "유년부 합계": ["유년부합계"],
+                    "총합": ["총합계"],
+                    "출석": ["학생출석"],
+                    "유년부 재적": ["학생재적"],
+                    "행사명": ["내용(비고)"],
+                    "비고": ["추가입력(비고)"]
+                }
+                
+                missing_headers = []
+                for h in req_headers_order:
+                    found = False
+                    if norm_text(h) in h_map:
+                        found = True
+                    else:
+                        for legacy_h in legacy_map.get(h, []):
+                            if norm_text(legacy_h) in h_map:
+                                found = True
+                                break
+                    if not found:
+                        missing_headers.append(h)
+                        
                 if missing_headers:
                     try: ws_stat.add_cols(len(missing_headers) + 5)
                     except: pass
@@ -1125,14 +1162,28 @@ with tabs[6]:
                     chunked_update(ws_stat, h_cells)
                 
                 new_row = [""] * len(stat_headers)
-                val_map = {
-                    norm_text("주차"): sel_w, norm_text("행사명"): event_text, norm_text("유년부 재적"): student_count,
-                    norm_text("출석"): save_s_p, norm_text("추가"): guest_in, norm_text("유년부 합계"): kids_total,
-                    norm_text("교사재적"): teacher_count, norm_text("교사출석"): save_t_p, norm_text("총합"): grand_total,
-                    norm_text("비고"): custom_note, norm_text("업데이트일시"): str(datetime.datetime.now())
-                }
-                for key_norm, value in val_map.items():
-                    if key_norm in h_map: new_row[h_map[key_norm]] = value
+                
+                # 표준 헤더 또는 예전 헤더 중 존재하는 칸에 알맞게 데이터를 삽입하는 함수
+                def set_row_val(standard_h, val):
+                    if norm_text(standard_h) in h_map:
+                        new_row[h_map[norm_text(standard_h)]] = val
+                        return
+                    for legacy_h in legacy_map.get(standard_h, []):
+                        if norm_text(legacy_h) in h_map:
+                            new_row[h_map[norm_text(legacy_h)]] = val
+                            return
+                            
+                set_row_val("주차", sel_w)
+                set_row_val("행사명", event_text)
+                set_row_val("유년부 재적", student_count)
+                set_row_val("출석", save_s_p)
+                set_row_val("추가", guest_in)            # 🎉 유년부 합계 및 추가출석 정상 반영
+                set_row_val("유년부 합계", kids_total)   # 🎉 유년부 합계 및 추가출석 정상 반영
+                set_row_val("교사재적", teacher_count)
+                set_row_val("교사출석", save_t_p)
+                set_row_val("총합", grand_total)
+                set_row_val("비고", custom_note)
+                set_row_val("업데이트일시", str(datetime.datetime.now()))
                         
                 match_stat = df_stat[df_stat['주차'] == sel_w] if not df_stat.empty else pd.DataFrame()
                 if not match_stat.empty: 
@@ -1140,10 +1191,10 @@ with tabs[6]:
                     end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
                     ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
                 else: ws_stat.append_row(new_row)
-                st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                st.success(f"✅ [{sel_w}] 출석 체크 및 통계 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 7] 통계 (✅ 표 상하 배치 적용 완벽 반영)
+# 📌 탭 7 : 📊 통계 (데이터 시각화 탭)
 # ==========================================
 with tabs[7]:
     st.subheader("📊 통계")
@@ -1156,7 +1207,8 @@ with tabs[7]:
         df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
         df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
         
-        rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고', '내용(비고)': '행사명'}
+        # 화면 출력을 위해 예전 헤더들을 최신 명칭으로 맵핑하여 깔끔하게 보여줍니다
+        rename_dict = {'학생재적': '유년부 재적', '학생출석': '출석', '새친구/추가예배': '추가', '추가출석': '추가', '총합계': '총합', '유년부합계': '유년부 합계', '추가입력(비고)': '비고', '내용(비고)': '행사명'}
         df_stat_renamed = df_stat_calc.rename(columns=rename_dict)
         df_stat_renamed.columns = [str(c).strip() for c in df_stat_renamed.columns]
         df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
@@ -1205,7 +1257,7 @@ with tabs[7]:
     st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
 # ==========================================
-# [탭 8] 비용집행관리 
+# 📌 탭 8 : 🧾 비용집행관리 
 # ==========================================
 with tabs[8]:
     if not st.session_state['chongmu_auth']:
@@ -1330,7 +1382,7 @@ with tabs[8]:
                     ws_r.delete_rows(int(target['sheet_row'])); st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 9] 교사 회비 사용내역
+# 📌 탭 9 : 💰 교사 회비 사용내역
 # ==========================================
 with tabs[9]:
     if not st.session_state['chongmu_auth']:
@@ -1440,7 +1492,7 @@ with tabs[9]:
                 if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0: ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 11] 교적부 통합 관리
+# 📌 탭 10 : 📋 교적부 통합 관리
 # ==========================================
 with tabs[10]:
     st.subheader("📋 교적부 통합 관리")
