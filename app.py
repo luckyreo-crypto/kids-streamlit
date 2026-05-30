@@ -16,9 +16,20 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon=
 # ✅ 모든 메뉴에서 항상 보이도록 우측 하단 고정형 "맨 위로" 버튼 추가
 st.markdown('<div id="top-anchor"></div><a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
 
+# [수정 1] 모바일 브라우저 줌(Zoom) 강제 방지 스크립트 추가
 components.html(
     """
     <script>
+    // 부모 창(Streamlit 메인 앱)의 메타 태그를 조작하여 강제 확대 방지
+    const parentDoc = window.parent.document;
+    let metaViewport = parentDoc.querySelector('meta[name="viewport"]');
+    if (!metaViewport) {
+        metaViewport = parentDoc.createElement('meta');
+        metaViewport.name = 'viewport';
+        parentDoc.head.appendChild(metaViewport);
+    }
+    metaViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+
     window.history.pushState(null, "", window.location.href);
     window.onpopstate = function() {
         window.history.pushState(null, "", window.location.href);
@@ -31,10 +42,24 @@ components.html(
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
+# [수정 2] 폰트 사이즈 세션 상태 관리 초기화 (기본값 16px)
+if "base_font_size" not in st.session_state: 
+    st.session_state["base_font_size"] = 16
+
+# 글로벌 폰트 사이즈 적용을 위한 동적 CSS
+st.markdown(f"""
+    <style>
+    html {{ font-size: {st.session_state["base_font_size"]}px !important; }}
+    </style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
     <style>
     html { scroll-behavior: smooth; }
+    
+    /* [수정 3] 입력창(비밀번호 포함) 터치 액션 및 폰트 강제 16px 유지 (아이폰 줌 방지) */
     button, input, select, textarea, div[data-testid="stToggle"] { touch-action: manipulation !important; font-size: 16px !important; }
+    input[type="text"], input[type="password"], input[type="number"], textarea, div[data-baseweb="select"] { min-height: 50px !important; border-radius: 8px !important; font-size: 16px !important; }
     
     .class-header { background-color: #f1f8ff; padding: 15px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     
@@ -62,7 +87,7 @@ st.markdown("""
         background-color: #0366d6 !important; border-color: #0366d6 !important; 
     }
     div[data-testid="stTabs"] [role="tab"] p { 
-        font-size: clamp(1.1rem, 3vw, 1.5rem) !important; /* 👈 데스크탑/모바일 폰트 유동적 조절 */
+        font-size: clamp(1.1rem, 3vw, 1.5rem) !important;
         font-weight: 800 !important; white-space: nowrap; margin: 0; color: inherit;
     }
     div[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: white !important; }
@@ -99,7 +124,7 @@ st.markdown("""
         background-color: transparent !important; min-height: 70px !important; display: flex; align-items: center;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
-        font-size: clamp(1.1rem, 3.5vw, 1.5rem) !important; /* 👈 화면 크기에 따라 폰트 부드럽게 조절 */
+        font-size: clamp(1.1rem, 3.5vw, 1.5rem) !important; 
         font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
     }
     /* 토글 스위치 기본 크기 */
@@ -124,30 +149,26 @@ st.markdown("""
     
     /* 버튼/입력폼 터치 영역 최적화 */
     div[data-testid="stButton"] button { min-height: 50px !important; font-size: 1.1rem !important; font-weight: 700 !important; border-radius: 8px !important; }
-    input[type="text"], input[type="number"], textarea, div[data-baseweb="select"] { min-height: 50px !important; border-radius: 8px !important; font-size: 16px !important; }
 
-    /* 📱 [핵심 수정] 모바일 반응형 디테일 (가로 스크롤/넘어감 방지) */
+    /* 📱 모바일 반응형 디테일 (가로 스크롤/넘어감 방지) */
     @media (max-width: 768px) {
-        /* 강제 nowrap을 해제하여 모바일에서 화면을 뚫고 나가는 현상 방지 */
         div[data-testid="stHorizontalBlock"]:has(.keep-row),
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) { 
-            display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; /* 👈 wrap 허용 */
+            display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; 
             align-items: center !important; 
         }
         
-        /* 토글 스위치 크기 모바일 맞춤 축소 (가로폭 확보) */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {
-            transform: scale(1.5) !important; /* 2.2배 -> 1.5배로 축소 */
+            transform: scale(1.5) !important; 
             margin-left: 5px !important; margin-right: 10px !important;
         }
         
-        /* 출석부 및 반명단 이름 줄바꿈 허용 (텍스트가 길어 화면이 넘어가는 현상 방지) */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
             white-space: normal !important; word-break: keep-all; font-size: 1.1rem !important;
         }
         
         div[role="dialog"] > div { padding: 1rem !important; } 
-        div[data-testid="stMetricValue"] { font-size: 1.8rem !important; } /* 메트릭 폰트 모바일 맞춤 */
+        div[data-testid="stMetricValue"] { font-size: 1.8rem !important; } 
         .class-header { font-size: 1.1rem !important; padding: 10px 10px !important; margin-top: 15px !important; }
     }
     
@@ -172,6 +193,18 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True; st.rerun()
                 else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     st.stop()
+
+# --- [수정 4] 시스템에 로그인된 후, 전체 페이지 상단에 폰트 조절 버튼 노출 ---
+col_f1, col_f2, col_f3 = st.columns([6, 2, 2])
+with col_f2:
+    if st.button("A -", help="글자 작게", use_container_width=True):
+        st.session_state["base_font_size"] = max(10, st.session_state["base_font_size"] - 1)
+        st.rerun()
+with col_f3:
+    if st.button("A +", help="글자 크게", use_container_width=True):
+        st.session_state["base_font_size"] = min(24, st.session_state["base_font_size"] + 1)
+        st.rerun()
+st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
 if "GOOGLE_PROXY_URL" in st.secrets: GOOGLE_PROXY_URL = st.secrets["GOOGLE_PROXY_URL"]
 else: st.error("Secrets 설정에서 GOOGLE_PROXY_URL이 누락되었습니다!"); st.stop()
@@ -288,7 +321,6 @@ def get_worksheets():
     try: ws_a = sh.worksheet("활동간식")
     except: ws_a = sh.add_worksheet("활동간식", 500, 20); ws_a.append_row(["날짜", "활동명", "세부내용", "공지사항"] + [f"사진{i}" for i in range(1, 16)] + ["등록일"])
     
-    # 🟢 [수정] 통계 헤더 생성 시 '유년부 출석'으로 강제 지정
     try: ws_s = sh.worksheet("주차별통계")
     except: ws_s = sh.add_worksheet("주차별통계", 200, 15); ws_s.append_row(["주차", "행사명", "유년부 재적", "유년부 출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"])
     
@@ -1030,7 +1062,6 @@ with tabs[6]:
     s_p = len(ui_s_df[ui_s_df[sel_w].astype(str).str.strip() == "1"])
     t_p = len(ui_t_df[ui_t_df[sel_w].astype(str).str.strip() == "1"])
     
-    # 🟢 [수정] 통계에서 빈 문자열 등 에러 방지 처리 및 숫자형 0을 철저히 확보
     saved_guest = 0; saved_note = ""; saved_event = ""
     if not df_stat.empty and '주차' in df_stat.columns:
         match = df_stat[df_stat['주차'] == sel_w]
@@ -1048,8 +1079,6 @@ with tabs[6]:
     cs1.metric(f"유년부 출석 (재적 {len(ui_s_df)})", f"{s_p}명")
     cs2.metric(f"선생님 출석 (재적 {len(ui_t_df)})", f"{t_p}명") 
     cs3.metric("유년부 합계 (출석+추가)", f"{s_p + saved_guest}명")
-    
-    # 🟢 [수정] 비어있던 4번째 카드 활성화 및 총합계 매핑
     cs4.metric("총합계 (유년부+교사)", f"{s_p + saved_guest + t_p}명")
     
     with st.expander("🛠️ 추가 설정 (행사명 / 새친구 / 예외결석 입력)", expanded=bool(saved_event or saved_note or saved_guest)):
@@ -1119,7 +1148,6 @@ with tabs[6]:
                 def norm_text(t): return re.sub(r'\s+', '', str(t))
                 h_map = {norm_text(h): idx for idx, h in enumerate(stat_headers)}
                 
-                # 🟢 [수정] 출석 열을 '유년부 출석'으로 강제 및 데이터 매핑
                 req_headers_order = ["주차", "행사명", "유년부 재적", "유년부 출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
                 missing_headers = [h for h in req_headers_order if norm_text(h) not in h_map]
                 if missing_headers:
@@ -1149,7 +1177,7 @@ with tabs[6]:
                 st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
 
 # ==========================================
-# [탭 7] 통계 (✅ 표 상하 배치 적용 완벽 반영)
+# [탭 7] 통계 
 # ==========================================
 with tabs[7]:
     st.subheader("📊 통계")
@@ -1162,7 +1190,6 @@ with tabs[7]:
         df_stat_calc['sort_date'] = df_stat_calc['주차'].apply(get_date_from_week_str)
         df_stat_calc = df_stat_calc.sort_values(by='sort_date', ascending=False).drop(columns=['sort_date'])
         
-        # 🟢 [수정] 통일된 '유년부 출석'으로 매핑
         rename_dict = {
             '학생재적': '유년부 재적', 
             '학생출석': '유년부 출석', 
@@ -1177,13 +1204,11 @@ with tabs[7]:
         df_stat_renamed.columns = [str(c).strip() for c in df_stat_renamed.columns]
         df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
         
-        # 🟢 [추가 및 중요 해결 로직] 구글시트에서 불러올 때 비어있던 '추가', '합계' 셀들을 강제 0으로 채워 출력 활성화
         numeric_cols = ['유년부 재적', '유년부 출석', '추가', '유년부 합계', '교사재적', '교사출석', '총합']
         for col in numeric_cols:
             if col in df_stat_renamed.columns:
                 df_stat_renamed[col] = pd.to_numeric(df_stat_renamed[col], errors='coerce').fillna(0).astype(int)
         
-        # 🟢 [수정] 출력 순서에 '유년부 출석' 삽입
         preferred_order = ["주차", "행사명", "유년부 재적", "유년부 출석", "추가", "유년부 합계", "교사재적", "교사출석", "총합", "비고", "업데이트일시"]
         actual_order = [c for c in preferred_order if c in df_stat_renamed.columns]
         for c in df_stat_renamed.columns:
@@ -1192,7 +1217,7 @@ with tabs[7]:
         df_stat_display = df_stat_renamed[actual_order]
         
         def highlight_stat_cells(row):
-            try: att = int(row['유년부 출석']) # 🟢 여기도 '유년부 출석'으로 변경 완료
+            try: att = int(row['유년부 출석']) 
             except: att = -1
             if att == 0: return ['background-color: #ffebee; color: #d32f2f; font-weight: bold;' for _ in row.index]
             styles = ['' for _ in row.index]
