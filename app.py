@@ -765,7 +765,7 @@ with tabs[2]:
                     sub_m_df = df_p_calc[df_p_calc['월그룹'] == m_val]
                     for _, r_p in sub_m_df.iterrows():
                         d_text = f"{r_p['날짜_dt'].day}일" if pd.notnull(r_p['날짜_dt']) else str(r_p['날짜'])
-                        st.markdown(f"**{d_text}** : {r_p['이름']} <span style='font-size:1.2rem; color:gray;'>({r_p['반']})</span>", unsafe_allow_html=True)
+                        st.markdown(f"**{d_text}** : {r_p['이름']} <span style='font-size:0.8rem; color:gray;'>({r_p['반']})</span>", unsafe_allow_html=True)
         st.markdown("---")
     else: st.info("등록된 기도순서 일정이 없습니다.")
         
