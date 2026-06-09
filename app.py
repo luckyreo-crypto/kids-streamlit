@@ -221,17 +221,48 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
+# ⭐ [오류 해결 핵심 수정] 안정적인 파일 업로드를 위한 upload_photo 로직 개선
 def upload_photo(file, name):
     if not file: return ""
     try:
-        b64 = base64.b64encode(file.getvalue()).decode()
-        headers = {"Authorization": f"Bearer {st.secrets.get('PROXY_AUTH_KEY', '')}"} if "PROXY_AUTH_KEY" in st.secrets else {}
-        res = requests.post(GOOGLE_PROXY_URL, json={"fileName": f"{name}_{file.name}", "mimeType": file.type, "base64Data": b64}, headers=headers, timeout=120)
-        res.raise_for_status()
+        # 1. 원본 파일 확장자 추출 및 파일명 안전망 처리 (공백/특수문자 정제)
+        orig_ext = "." + file.name.split('.')[-1] if '.' in file.name else ".jpg"
+        clean_name = re.sub(r'[^a-zA-Z0-9ㄱ-ㅣ가-힣_-]', '', str(name).strip())
+        final_filename = f"{clean_name}_{int(time.time())}{orig_ext}"
+        
+        # 2. Base64 인코딩 진행
+        b64 = base64.b64encode(file.getvalue()).decode('utf-8')
+        
+        # 3. 요청 헤더 정의
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if "PROXY_AUTH_KEY" in st.secrets: 
+            headers["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
+            
+        # 4. 페이로드 구성
+        payload = {
+            "fileName": final_filename, 
+            "mimeType": file.type, 
+            "base64Data": b64
+        }
+        
+        # 5. 프록시 서버 전송 및 예외처리 강화
+        res = requests.post(GOOGLE_PROXY_URL, json=payload, headers=headers, timeout=120)
+        
+        if res.status_code != 200:
+            st.error(f"❌ 파일 업로드 서버 에러 발생! (코드: {res.status_code}) - 디버깅용 응답: {res.text[:150]}")
+            return ""
+            
         url = res.json().get("fileUrl", "")
-        if file.type and file.type.startswith('video/') and "vid=1" not in url: url += "&vid=1" if "?" in url else "?vid=1"
+        
+        # 6. 비디오 파일 핸들링 플래그 추가
+        if file.type and file.type.startswith('video/') and "vid=1" not in url: 
+            url += "&vid=1" if "?" in url else "?vid=1"
         return url
-    except Exception as e: return ""
+    except Exception as e: 
+        st.error(f"❌ 업로드 프로세스 예외 발생: {str(e)}")
+        return ""
 
 def chunked_update(worksheet, cells, chunk_size=200):
     if not cells: return
@@ -945,7 +976,7 @@ with tabs[5]:
                                 gallery_html += f'''<div style="width: 100%; margin-bottom: 5px;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;"><img src="{clean_url}" loading="lazy" style="width: 100%; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block;"></a></div>'''
                         gallery_html += '</div>'
                         st.markdown(gallery_html, unsafe_allow_html=True)
-                    
+                        
     with e_tabs[1]:
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
@@ -1051,7 +1082,7 @@ with tabs[6]:
         with c2: 
             sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
         show_inactive = st.checkbox("👀 강제 전체명단 표시 (이사/졸업 포함)")
-    
+        
     att_df = df.copy() if show_inactive else df[df.apply(lambda r: is_enrolled_at_date(r, target_date), axis=1)].copy()
     if sel_class != "전체보기": att_df = att_df[att_df[class_col] == sel_class]
     if sel_w not in att_df.columns: att_df[sel_w] = ""
@@ -1081,6 +1112,13 @@ with tabs[6]:
     cs3.metric("유년부 합계 (출석+추가)", f"{s_p + saved_guest}명")
     cs4.metric("총합계 (유년부+교사)", f"{s_p + saved_guest + t_p}명")
     
+    with st.container():
+        st.markdown("""
+            <style>
+            .total-summary { font-size: 1.25rem; font-weight: 800; padding: 12px; background-color: #f1f8ff; color: #0366d6; border-radius: 8px; margin: 15px 0; border: 1px solid #cce5ff; text-align: center; }
+            </style>
+        """, unsafe_allow_html=True)
+
     with st.expander("🛠️ 추가 설정 (행사명 / 새친구 / 예외결석 입력)", expanded=bool(saved_event or saved_note or saved_guest)):
         c_e1, c_e2, c_e3 = st.columns([1, 2, 2])
         guest_in = c_e1.number_input("🎉 새친구/추가", min_value=0, value=saved_guest)
