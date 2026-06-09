@@ -182,7 +182,7 @@ if not st.session_state["authenticated"]:
                 else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     st.stop()
 
-# --- [개선 3] 시스템 상단: 데이터 동기화 및 폰트 조절 ---
+# --- 시스템 상단: 데이터 동기화 및 폰트 조절 ---
 col_f1, col_spacer, col_f2, col_f3 = st.columns([3, 3, 2, 2])
 with col_f1:
     if st.button("🔄 서버 데이터 동기화", help="구글시트 최신 정보 불러오기", use_container_width=True):
@@ -213,43 +213,49 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
-# ⭐ [오류 해결 및 개선 1, 5] 파일 업로드 안정성 확보 및 진행상태(Toast) 적용
+# ⭐ [핵심 수정] 업로드 함수가 에러를 삼키지 않고 바깥으로 던지도록(raise Exception) 완벽 수정
 def upload_photo(file, name):
     if not file: return ""
+    st.toast(f"⏳ '{file.name}' 서버로 전송 중...", icon="☁️")
+    
+    # 1. 고유 파일명 생성 (동시다발적 업로드 시 덮어쓰기 방지)
+    orig_ext = "." + file.name.split('.')[-1] if '.' in file.name else ".jpg"
+    clean_name = re.sub(r'[^a-zA-Z0-9ㄱ-ㅣ가-힣_-]', '', str(name).strip())
+    if not clean_name: clean_name = "file"
+    final_filename = f"{clean_name}_{uuid.uuid4().hex[:6]}{orig_ext}"
+    
+    # 2. 페이로드 준비
+    b64 = base64.b64encode(file.getvalue()).decode('utf-8')
+    headers = {"Content-Type": "application/json"}
+    if "PROXY_AUTH_KEY" in st.secrets: 
+        headers["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
+        
+    payload = {"fileName": final_filename, "mimeType": file.type, "base64Data": b64}
+    
+    # 3. 전송 및 예외 발생 시키기 (이전처럼 빈 값을 반환하지 않음)
     try:
-        # 진행상태 팝업 (UX 개선)
-        st.toast(f"⏳ '{file.name}' 전송 중...", icon="☁️")
-        
-        # 안전한 파일명 생성
-        orig_ext = "." + file.name.split('.')[-1] if '.' in file.name else ".jpg"
-        clean_name = re.sub(r'[^a-zA-Z0-9ㄱ-ㅣ가-힣_-]', '', str(name).strip())
-        final_filename = f"{clean_name}_{int(time.time())}{orig_ext}"
-        
-        b64 = base64.b64encode(file.getvalue()).decode('utf-8')
-        headers = {"Content-Type": "application/json"}
-        if "PROXY_AUTH_KEY" in st.secrets: 
-            headers["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
-            
-        payload = {"fileName": final_filename, "mimeType": file.type, "base64Data": b64}
-        
-        # 업로드 전송 (타임아웃 여유 부여)
         res = requests.post(GOOGLE_PROXY_URL, json=payload, headers=headers, timeout=120)
+    except requests.exceptions.Timeout:
+        raise Exception("업로드 시간 초과(120초). 파일 용량이 너무 큽니다.")
+    except Exception as e:
+        raise Exception(f"네트워크 통신 오류: {str(e)}")
         
-        if res.status_code != 200:
-            st.error(f"❌ 업로드 서버 거부 (코드: {res.status_code}). 용량이 너무 크거나 네트워크 불안정일 수 있습니다.")
-            return ""
-            
+    if res.status_code != 200:
+        raise Exception(f"서버 거부 (에러코드: {res.status_code}) - 구글 앱스스크립트 한도 초과일 수 있습니다.")
+        
+    try:
         url = res.json().get("fileUrl", "")
+    except:
+        raise Exception("서버 응답 파싱 실패 (정상적인 형태가 아닙니다).")
         
-        if file.type and file.type.startswith('video/') and "vid=1" not in url: 
-            url += "&vid=1" if "?" in url else "?vid=1"
-            
-        # 성공 팝업 (UX 개선)
-        st.toast(f"✅ '{file.name}' 저장 완료!", icon="🎉")
-        return url
-    except Exception as e: 
-        st.error(f"❌ 전송 오류: {str(e)}")
-        return ""
+    if not url:
+        raise Exception("전송은 하였으나 서버로부터 정상적인 이미지 URL을 반환받지 못했습니다.")
+        
+    if file.type and file.type.startswith('video/') and "vid=1" not in url: 
+        url += "&vid=1" if "?" in url else "?vid=1"
+        
+    st.toast(f"✅ '{file.name}' 저장 성공!", icon="🎉")
+    return url
 
 def chunked_update(worksheet, cells, chunk_size=200):
     if not cells: return
@@ -472,14 +478,18 @@ def manage_bulletin_dialog(w_str, d_str):
         
         if st.form_submit_button("💾 주보 저장 및 업로드", type="primary", use_container_width=True):
             with st.spinner("이미지 서버 전송 및 저장 중... (창을 닫지 마세요)"):
-                url1 = upload_photo(img1, f"주보_{w_str}_1") if img1 else old_img1
-                url2 = upload_photo(img2, f"주보_{w_str}_2") if img2 else old_img2
-                now_str = str(datetime.datetime.now())
-                if not existing_data.empty:
-                    row_idx = int(existing_data.iloc[0]['sheet_row'])
-                    chunked_update(ws_b, [gspread.Cell(row_idx, 3, url1), gspread.Cell(row_idx, 4, url2), gspread.Cell(row_idx, 5, memo), gspread.Cell(row_idx, 6, now_str)])
-                else: ws_b.append_row([w_str, d_str, url1, url2, memo, now_str])
-                st.success("✅ 저장이 완료되었습니다!"); time.sleep(1); st.cache_data.clear(); st.rerun()
+                try:
+                    url1 = upload_photo(img1, f"주보_{w_str}_1") if img1 else old_img1
+                    url2 = upload_photo(img2, f"주보_{w_str}_2") if img2 else old_img2
+                    now_str = str(datetime.datetime.now())
+                    if not existing_data.empty:
+                        row_idx = int(existing_data.iloc[0]['sheet_row'])
+                        chunked_update(ws_b, [gspread.Cell(row_idx, 3, url1), gspread.Cell(row_idx, 4, url2), gspread.Cell(row_idx, 5, memo), gspread.Cell(row_idx, 6, now_str)])
+                    else: ws_b.append_row([w_str, d_str, url1, url2, memo, now_str])
+                    st.success("✅ 저장이 완료되었습니다!"); time.sleep(1); st.cache_data.clear(); st.rerun()
+                except Exception as e:
+                    st.error(f"🚨 주보 업로드 실패: {str(e)}")
+                    st.stop()
     
     if not existing_data.empty:
         if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
@@ -553,27 +563,31 @@ def edit_student_dialog(target_dict):
             
             if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
                 with st.spinner("저장 중..."):
-                    p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
-                    actual_headers = ws.row_values(1)
-                    missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
-                    if missing_headers:
-                        start_col = len(actual_headers) + 1
-                        h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_headers)]
-                        for mh in missing_headers: actual_headers.append(mh)
-                        try: chunked_update(ws, h_cells)
-                        except: ws.add_cols(15); chunked_update(ws, h_cells)
-                    
-                    r_idx = int(target_dict['sheet_row'])
-                    update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
-                    cells_to_update = []
-                    for k, v in update_map.items():
-                        if k in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index(k)+1, str(v)))
-                    if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
-                    elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
-                    if cells_to_update: chunked_update(ws, cells_to_update)
-                    
-                    st.session_state[edit_key] = False
-                    st.success("✅ 저장이 완료되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                    try:
+                        p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
+                        actual_headers = ws.row_values(1)
+                        missing_headers = [col for col in ['등록일', '변동일'] if col not in actual_headers]
+                        if missing_headers:
+                            start_col = len(actual_headers) + 1
+                            h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_headers)]
+                            for mh in missing_headers: actual_headers.append(mh)
+                            try: chunked_update(ws, h_cells)
+                            except: ws.add_cols(15); chunked_update(ws, h_cells)
+                        
+                        r_idx = int(target_dict['sheet_row'])
+                        update_map = {'이름': e_name, '학년(담임)': e_class, '반': e_class, '생년월일': e_birth, '학교': e_school, '주소': e_addr, '부모(아빠/엄마)': e_parents, '연락처': e_phone, '비고': e_memo, '사진': p_url, '등록일': e_reg, '변동일': e_change}
+                        cells_to_update = []
+                        for k, v in update_map.items():
+                            if k in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index(k)+1, str(v)))
+                        if '상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('상태')+1, e_status))
+                        elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
+                        if cells_to_update: chunked_update(ws, cells_to_update)
+                        
+                        st.session_state[edit_key] = False
+                        st.success("✅ 저장이 완료되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                    except Exception as e:
+                        st.error(f"🚨 정보 수정 중 오류: {str(e)}")
+                        st.stop()
                     
         with st.container():
             st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
@@ -603,7 +617,6 @@ with tabs[0]:
     st.subheader("🏫 반별 명단")
     st.info("💡 **아이콘 안내** &nbsp;|&nbsp; 👤 일반 &nbsp;&nbsp; 🌱 새친구 &nbsp;&nbsp; 🧑‍🏫 교사 &nbsp;&nbsp; ✝️ 교역자 &nbsp;&nbsp; 🚫 비활성(이사/졸업 등)")
     
-    # ⭐ [개선 2] 빠른 학생 찾기(필터) 기능 추가
     search_query = st.text_input("🔍 특정 학생 이름 빠르게 찾기 (이름의 일부를 입력하세요)", placeholder="예: 김슈팅")
     st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
     
@@ -612,11 +625,9 @@ with tabs[0]:
     for c_name in all_classes:
         group = df[df[class_col] == c_name].copy()
         
-        # 검색어가 있을 경우 해당 학생이 포함된 결과만 추출
         if search_query:
             group = group[group['이름'].str.contains(search_query, na=False)]
         
-        # 검색 결과가 없는 반은 그리지 않고 패스
         if group.empty:
             continue
             
@@ -692,7 +703,6 @@ with tabs[0]:
                     col_n, col_btn = st.columns([3, 1])
                     new_n = col_n.text_input("이름", placeholder="이름 입력", label_visibility="collapsed")
                     if col_btn.form_submit_button("등록"):
-                        # ⭐ [개선 4] 빈값 등록 방지 처리
                         if not new_n.strip():
                             st.error("🚨 이름을 입력해주세요.")
                         else:
@@ -811,7 +821,6 @@ with tabs[2]:
             else: new_p_name = st.text_input("기도자 이름")
             new_p_memo = st.text_input("비고")
             if st.form_submit_button("💾 기도순서 저장", type="primary"):
-                # ⭐ [개선 4] 빈값 등록 방지 처리
                 if not new_p_name.strip():
                     st.error("🚨 기도자 이름을 입력해주세요!")
                 else:
@@ -980,35 +989,41 @@ with tabs[5]:
     with e_tabs[1]:
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명 (필수)"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
-            # ⭐ [개선 5] 업로드 크기 및 확장자 명확화
-            st.caption("✅ 권장 용량: 개당 10MB 이하 (구글 드라이브 정책)")
+            st.caption("✅ 권장 용량: 개당 10MB 이하. (파일 첨부 후 막대기가 '업로드 완료' 상태인지 꼭 확인한 뒤 저장버튼을 누르세요)")
             a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
-                # ⭐ [개선 4] 필수입력란 누락시 에러표출 방지
                 if not a_t.strip():
                     st.error("🚨 행사명을 반드시 입력해주세요.")
                 else:
                     with st.spinner("미디어 파일 전송 및 저장 중... (창을 닫지 마세요)"):
                         urls = [""] * 15
-                        if a_f: 
-                            for i, f in enumerate(a_f[:15]): urls[i] = upload_photo(f, a_t)
-                        act_sh_headers = ws_act.row_values(1)
-                        missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
-                        if missing_act:
-                            start_col = len(act_sh_headers) + 1
-                            h_cells = [gspread.Cell(1, start_col + idx_h, mh) for idx_h, mh in enumerate(missing_act)]
-                            for mh in missing_act: act_sh_headers.append(mh)
-                            try: chunked_update(ws_act, h_cells)
-                            except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
-                        h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}; new_row = [""] * len(act_sh_headers)
-                        if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
-                        if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
-                        if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
-                        if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
-                        if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
-                        for k in range(1, 16):
-                            if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
-                        ws_act.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                        try:
+                            if a_f: 
+                                for i, f in enumerate(a_f[:15]): urls[i] = upload_photo(f, a_t)
+                            
+                            act_sh_headers = ws_act.row_values(1)
+                            missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
+                            if missing_act:
+                                start_col = len(act_sh_headers) + 1
+                                h_cells = [gspread.Cell(1, start_col + idx_h, mh) for idx_h, mh in enumerate(missing_act)]
+                                for mh in missing_act: act_sh_headers.append(mh)
+                                try: chunked_update(ws_act, h_cells)
+                                except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
+                            
+                            h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}; new_row = [""] * len(act_sh_headers)
+                            if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
+                            if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
+                            if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
+                            if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
+                            if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
+                            for k in range(1, 16):
+                                if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
+                            
+                            ws_act.append_row(new_row)
+                            st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                        except Exception as e:
+                            st.error(f"🚨 저장 중 오류 발생: {str(e)}")
+                            st.stop() # 에러를 사용자에게 보여주고 더 이상 진행하지 않음
 
     with e_tabs[2]:
         if not df_act.empty:
@@ -1043,27 +1058,33 @@ with tabs[5]:
                             st.error("🚨 행사명은 지울 수 없습니다. 다시 입력해주세요.")
                         else:
                             with st.spinner("미디어 파일 전송 및 저장 중... (창을 닫지 마세요)"):
-                                final_urls = old_urls.copy()
-                                if bulk_files:
-                                    final_urls = [""] * 15
-                                    for k, f in enumerate(bulk_files[:15]): final_urls[k] = upload_photo(f, e_t)
-                                else:
-                                    for k in range(15):
-                                        if new_files[k] is not None: final_urls[k] = upload_photo(new_files[k], e_t)
-                                        elif delete_flags[k]: final_urls[k] = ""
-                                act_sh_headers = ws_act.row_values(1)
-                                missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
-                                if missing_act:
-                                    start_col = len(act_sh_headers) + 1
-                                    h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_act)]
-                                    for mh in missing_act: act_sh_headers.append(mh)
-                                    try: chunked_update(ws_act, h_cells)
-                                    except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
-                                update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
-                                for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
-                                cells_to_update = [gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)) for k, v in update_map.items() if k in act_sh_headers]
-                                if cells_to_update: chunked_update(ws_act, cells_to_update)
-                                st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                try:
+                                    final_urls = old_urls.copy()
+                                    if bulk_files:
+                                        final_urls = [""] * 15
+                                        for k, f in enumerate(bulk_files[:15]): final_urls[k] = upload_photo(f, e_t)
+                                    else:
+                                        for k in range(15):
+                                            if new_files[k] is not None: final_urls[k] = upload_photo(new_files[k], e_t)
+                                            elif delete_flags[k]: final_urls[k] = ""
+                                            
+                                    act_sh_headers = ws_act.row_values(1)
+                                    missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
+                                    if missing_act:
+                                        start_col = len(act_sh_headers) + 1
+                                        h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_act)]
+                                        for mh in missing_act: act_sh_headers.append(mh)
+                                        try: chunked_update(ws_act, h_cells)
+                                        except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
+                                        
+                                    update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
+                                    for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
+                                    cells_to_update = [gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)) for k, v in update_map.items() if k in act_sh_headers]
+                                    if cells_to_update: chunked_update(ws_act, cells_to_update)
+                                    st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                except Exception as e:
+                                    st.error(f"🚨 수정 중 오류 발생: {str(e)}")
+                                    st.stop()
 
     with e_tabs[3]:
         if not df_act.empty:
@@ -1392,15 +1413,18 @@ with tabs[8]:
                 st.caption("✅ 권장 용량: 영수증 사진 당 5MB 이하")
                 rc_photo = st.file_uploader("영수증 사진 업로드", type=['png', 'jpg', 'jpeg'])
                 if st.form_submit_button("등록 완료", type="primary"):
-                    # ⭐ [개선 4] 필수입력란 누락시 에러표출 방지
                     if not rc_vendor.strip() or rc_cost == 0:
                         st.error("🚨 구매처와 비용(원)을 정확히 입력해주세요!")
                     else:
                         with st.spinner("이미지 서버 업로드 및 저장 중..."):
-                            p_url = upload_photo(rc_photo, f"영수증_{rc_vendor}") if rc_photo else ""
-                            new_num = len(df_r) + 1 if not df_r.empty else 1
-                            ws_r.append_row([new_num, rc_date, rc_vendor, rc_detail, rc_cost, rc_memo, p_url])
-                            st.success("등록되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                            try:
+                                p_url = upload_photo(rc_photo, f"영수증_{rc_vendor}") if rc_photo else ""
+                                new_num = len(df_r) + 1 if not df_r.empty else 1
+                                ws_r.append_row([new_num, rc_date, rc_vendor, rc_detail, rc_cost, rc_memo, p_url])
+                                st.success("등록되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                            except Exception as e:
+                                st.error(f"🚨 등록 실패: {str(e)}")
+                                st.stop()
 
         with r_tabs[2]:
             if not df_r.empty:
@@ -1417,10 +1441,14 @@ with tabs[8]:
                         e_photo = st.file_uploader("영수증 사진 변경 (새로 올리면 기존 사진 대체)", type=['png', 'jpg', 'jpeg'])
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("저장 중..."):
-                                p_url = upload_photo(e_photo, f"영수증_{e_vendor}") if e_photo else target.get('영수증사진','')
-                                r_idx = int(target['sheet_row'])
-                                chunked_update(ws_r, [gspread.Cell(r_idx, 2, e_date), gspread.Cell(r_idx, 3, e_vendor), gspread.Cell(r_idx, 4, e_detail), gspread.Cell(r_idx, 5, str(e_cost)), gspread.Cell(r_idx, 6, e_memo), gspread.Cell(r_idx, 7, p_url)])
-                                st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                try:
+                                    p_url = upload_photo(e_photo, f"영수증_{e_vendor}") if e_photo else target.get('영수증사진','')
+                                    r_idx = int(target['sheet_row'])
+                                    chunked_update(ws_r, [gspread.Cell(r_idx, 2, e_date), gspread.Cell(r_idx, 3, e_vendor), gspread.Cell(r_idx, 4, e_detail), gspread.Cell(r_idx, 5, str(e_cost)), gspread.Cell(r_idx, 6, e_memo), gspread.Cell(r_idx, 7, p_url)])
+                                    st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                except Exception as e:
+                                    st.error(f"🚨 수정 실패: {str(e)}")
+                                    st.stop()
 
         with r_tabs[3]:
             if not df_r.empty:
@@ -1506,9 +1534,13 @@ with tabs[9]:
                             st.error("🚨 지출 내용과 금액을 정확히 입력하세요.")
                         else:
                             with st.spinner("이미지 서버 전송 중..."):
-                                p_url = upload_photo(out_photo, f"회비지출_{out_detail}") if out_photo else ""
-                                new_num = len(df_out) + 1 if not df_out.empty else 1
-                                ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url]); st.success("지출 등록 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                try:
+                                    p_url = upload_photo(out_photo, f"회비지출_{out_detail}") if out_photo else ""
+                                    new_num = len(df_out) + 1 if not df_out.empty else 1
+                                    ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url]); st.success("지출 등록 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                except Exception as e:
+                                    st.error(f"🚨 등록 실패: {str(e)}")
+                                    st.stop()
         
         with l_tabs[2]:
             st.markdown("수정할 장부를 선택해주세요.")
@@ -1531,8 +1563,12 @@ with tabs[9]:
                         e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d"); e_c = st.text_input("내용", value=t.get('내용','')); e_a = st.number_input("지출액", value=parse_int_safe(t.get('지출액', 0)), step=1000); e_m = st.text_input("비고", value=t.get('비고','')); e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg'])
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("업로드 중..."):
-                                p_url = upload_photo(e_p, f"회비지출_{e_c}") if e_p else t.get('영수증사진','')
-                                r_idx = int(t['sheet_row']); chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)]); st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                try:
+                                    p_url = upload_photo(e_p, f"회비지출_{e_c}") if e_p else t.get('영수증사진','')
+                                    r_idx = int(t['sheet_row']); chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)]); st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                                except Exception as e:
+                                    st.error(f"🚨 수정 실패: {str(e)}")
+                                    st.stop()
 
         with l_tabs[3]:
             st.markdown("삭제할 장부를 선택해주세요.")
@@ -1650,23 +1686,26 @@ with tabs[10]:
             st.caption("✅ 권장 용량: 사진 당 5MB 이하")
             n_photo = st.file_uploader("사진 첨부", type=['png', 'jpg', 'jpeg'])
             if st.form_submit_button("✨ 등록하기"):
-                # ⭐ [개선 4] 필수입력란 누락시 에러표출 방지
                 if not n_name.strip() or not n_class.strip():
                     st.error("🚨 이름과 학년(담임) 정보를 입력해주세요!")
                 else:
-                    p_url = upload_photo(n_photo, n_name)
-                    new_row = [""] * len(headers)
-                    h_map = {str(h): idx for idx, h in enumerate(headers)}
-                    if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
-                    if '이름' in h_map: new_row[h_map['이름']] = n_name
-                    if class_col in h_map: new_row[h_map[class_col]] = n_class
-                    if '생년월일' in h_map: new_row[h_map['생년월일']] = "2015-01-01"
-                    if '등록일' in h_map: new_row[h_map['등록일']] = n_reg
-                    if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
-                    elif '상태' in h_map: new_row[h_map['상태']] = n_status
-                    if '사진' in h_map: new_row[h_map['사진']] = p_url
-                    ws.append_row(new_row)
-                    st.success("✅ 등록 완료!")
-                    time.sleep(1.5)
-                    st.cache_data.clear()
-                    st.rerun()
+                    try:
+                        p_url = upload_photo(n_photo, n_name)
+                        new_row = [""] * len(headers)
+                        h_map = {str(h): idx for idx, h in enumerate(headers)}
+                        if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
+                        if '이름' in h_map: new_row[h_map['이름']] = n_name
+                        if class_col in h_map: new_row[h_map[class_col]] = n_class
+                        if '생년월일' in h_map: new_row[h_map['생년월일']] = "2015-01-01"
+                        if '등록일' in h_map: new_row[h_map['등록일']] = n_reg
+                        if '학교상태' in h_map: new_row[h_map['학교상태']] = n_status
+                        elif '상태' in h_map: new_row[h_map['상태']] = n_status
+                        if '사진' in h_map: new_row[h_map['사진']] = p_url
+                        ws.append_row(new_row)
+                        st.success("✅ 등록 완료!")
+                        time.sleep(1.5)
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"🚨 등록 중 오류: {str(e)}")
+                        st.stop()
