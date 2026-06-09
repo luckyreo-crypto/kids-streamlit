@@ -16,11 +16,10 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon=
 # ✅ 모든 메뉴에서 항상 보이도록 우측 하단 고정형 "맨 위로" 버튼 추가
 st.markdown('<div id="top-anchor"></div><a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
 
-# [수정 1] 모바일 브라우저 줌(Zoom) 강제 방지 스크립트 추가
+# 모바일 브라우저 줌(Zoom) 강제 방지 스크립트 추가
 components.html(
     """
     <script>
-    // 부모 창(Streamlit 메인 앱)의 메타 태그를 조작하여 강제 확대 방지
     const parentDoc = window.parent.document;
     let metaViewport = parentDoc.querySelector('meta[name="viewport"]');
     if (!metaViewport) {
@@ -42,7 +41,7 @@ components.html(
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
 ALL_STATUS_OPTS = ["일반", "새친구", "교사", "교역자", "전도사", "목사", "이사", "졸업", "타교회", "비활성"]
 
-# [수정 2] 폰트 사이즈 세션 상태 관리 초기화 (기본값 16px)
+# 폰트 사이즈 세션 상태 관리 초기화 (기본값 16px)
 if "base_font_size" not in st.session_state: 
     st.session_state["base_font_size"] = 16
 
@@ -57,7 +56,6 @@ st.markdown("""
     <style>
     html { scroll-behavior: smooth; }
     
-    /* [수정 3] 입력창(비밀번호 포함) 터치 액션 및 폰트 강제 16px 유지 (아이폰 줌 방지) */
     button, input, select, textarea, div[data-testid="stToggle"] { touch-action: manipulation !important; font-size: 16px !important; }
     input[type="text"], input[type="password"], input[type="number"], textarea, div[data-baseweb="select"] { min-height: 50px !important; border-radius: 8px !important; font-size: 16px !important; }
     
@@ -67,7 +65,6 @@ st.markdown("""
     .media-link img:hover { transform: scale(1.02); filter: brightness(0.95); cursor: zoom-in; }
     .small-btn button { padding: 0px 5px !important; font-size: 0.8rem !important; height: auto !important; min-height: 28px !important; margin-top: 0px; }
     
-    /* 🔴 1. 탭 메뉴 글씨 크기 조절 및 줄바꿈(Wrap) 적용 */
     div[data-testid="stTabs"] { overflow: visible !important; }
     div[data-testid="stTabs"] > div:first-child {
         position: -webkit-sticky !important; position: sticky !important; top: 2.5rem !important; 
@@ -92,10 +89,8 @@ st.markdown("""
     }
     div[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: white !important; }
 
-    /* 맨위로 버튼 (우측 하단) */
     .fab-button { position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }
 
-    /* 🔴 2. 반별명단 학생 카드 */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) {
         position: relative !important;
         padding: 8px 10px !important; border-radius: 12px !important; margin-bottom: 10px !important; 
@@ -105,7 +100,6 @@ st.markdown("""
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row):hover {
         background-color: #f8fbff !important; border-color: #0366d6 !important;
     }
-    /* 투명 오버레이 버튼 */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] {
         position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
         opacity: 0 !important; z-index: 10 !important; width: 100% !important; height: 100% !important;
@@ -114,7 +108,6 @@ st.markdown("""
         width: 100% !important; height: 100% !important; cursor: pointer !important;
     }
     
-    /* 🔴 3. 출석부 UI (스위치 및 이름) */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {
         padding: 10px 12px !important; border-radius: 12px !important; margin-bottom: 10px !important;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important;
@@ -127,13 +120,11 @@ st.markdown("""
         font-size: clamp(1.1rem, 3.5vw, 1.5rem) !important; 
         font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
     }
-    /* 토글 스위치 기본 크기 */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {
         transform: scale(2.2) !important; transform-origin: left center !important; 
         margin-left: 15px !important; margin-right: 25px !important;
     }
 
-    /* 🔴 4. 닫기 및 수정하기 버튼 글자 크기 */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) button p {
         font-size: clamp(1.2rem, 4vw, 2.0rem) !important; font-weight: 800 !important;
     }
@@ -141,16 +132,13 @@ st.markdown("""
         min-height: 70px !important; border-radius: 12px !important;
     }
 
-    /* 모달 하단 버튼 Sticky 처리 */
     div[data-testid="stVerticalBlock"]:has(.sticky-footer-marker) {
         position: sticky !important; bottom: -25px !important; background-color: white !important; z-index: 99999 !important;
         padding-top: 15px !important; padding-bottom: 15px !important; border-top: 1px solid #eef2f6 !important;
     }
     
-    /* 버튼/입력폼 터치 영역 최적화 */
     div[data-testid="stButton"] button { min-height: 50px !important; font-size: 1.1rem !important; font-weight: 700 !important; border-radius: 8px !important; }
 
-    /* 📱 모바일 반응형 디테일 (가로 스크롤/넘어감 방지) */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"]:has(.keep-row),
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) { 
@@ -194,8 +182,12 @@ if not st.session_state["authenticated"]:
                 else: st.error("❌ 비밀번호가 일치하지 않습니다.")
     st.stop()
 
-# --- [수정 4] 시스템에 로그인된 후, 전체 페이지 상단에 폰트 조절 버튼 노출 ---
-col_f1, col_f2, col_f3 = st.columns([6, 2, 2])
+# --- [개선 3] 시스템 상단: 데이터 동기화 및 폰트 조절 ---
+col_f1, col_spacer, col_f2, col_f3 = st.columns([3, 3, 2, 2])
+with col_f1:
+    if st.button("🔄 서버 데이터 동기화", help="구글시트 최신 정보 불러오기", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 with col_f2:
     if st.button("A -", help="글자 작게", use_container_width=True):
         st.session_state["base_font_size"] = max(10, st.session_state["base_font_size"] - 1)
@@ -221,47 +213,42 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
-# ⭐ [오류 해결 핵심 수정] 안정적인 파일 업로드를 위한 upload_photo 로직 개선
+# ⭐ [오류 해결 및 개선 1, 5] 파일 업로드 안정성 확보 및 진행상태(Toast) 적용
 def upload_photo(file, name):
     if not file: return ""
     try:
-        # 1. 원본 파일 확장자 추출 및 파일명 안전망 처리 (공백/특수문자 정제)
+        # 진행상태 팝업 (UX 개선)
+        st.toast(f"⏳ '{file.name}' 전송 중...", icon="☁️")
+        
+        # 안전한 파일명 생성
         orig_ext = "." + file.name.split('.')[-1] if '.' in file.name else ".jpg"
         clean_name = re.sub(r'[^a-zA-Z0-9ㄱ-ㅣ가-힣_-]', '', str(name).strip())
         final_filename = f"{clean_name}_{int(time.time())}{orig_ext}"
         
-        # 2. Base64 인코딩 진행
         b64 = base64.b64encode(file.getvalue()).decode('utf-8')
-        
-        # 3. 요청 헤더 정의
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
         if "PROXY_AUTH_KEY" in st.secrets: 
             headers["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
             
-        # 4. 페이로드 구성
-        payload = {
-            "fileName": final_filename, 
-            "mimeType": file.type, 
-            "base64Data": b64
-        }
+        payload = {"fileName": final_filename, "mimeType": file.type, "base64Data": b64}
         
-        # 5. 프록시 서버 전송 및 예외처리 강화
+        # 업로드 전송 (타임아웃 여유 부여)
         res = requests.post(GOOGLE_PROXY_URL, json=payload, headers=headers, timeout=120)
         
         if res.status_code != 200:
-            st.error(f"❌ 파일 업로드 서버 에러 발생! (코드: {res.status_code}) - 디버깅용 응답: {res.text[:150]}")
+            st.error(f"❌ 업로드 서버 거부 (코드: {res.status_code}). 용량이 너무 크거나 네트워크 불안정일 수 있습니다.")
             return ""
             
         url = res.json().get("fileUrl", "")
         
-        # 6. 비디오 파일 핸들링 플래그 추가
         if file.type and file.type.startswith('video/') and "vid=1" not in url: 
             url += "&vid=1" if "?" in url else "?vid=1"
+            
+        # 성공 팝업 (UX 개선)
+        st.toast(f"✅ '{file.name}' 저장 완료!", icon="🎉")
         return url
     except Exception as e: 
-        st.error(f"❌ 업로드 프로세스 예외 발생: {str(e)}")
+        st.error(f"❌ 전송 오류: {str(e)}")
         return ""
 
 def chunked_update(worksheet, cells, chunk_size=200):
@@ -472,7 +459,7 @@ def manage_bulletin_dialog(w_str, d_str):
     
     with st.form(f"bulletin_form_{w_str}"):
         memo = st.text_input("📝 비고 (예: 신년감사예배, 야외예배 등)", value=existing_data.iloc[0].get('비고', '') if not existing_data.empty else "")
-        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다.")
+        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다. (권장용량: 5MB 이하)")
         img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg'])
         img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg'])
         
@@ -484,7 +471,7 @@ def manage_bulletin_dialog(w_str, d_str):
         else: old_img1, old_img2 = "", ""
         
         if st.form_submit_button("💾 주보 저장 및 업로드", type="primary", use_container_width=True):
-            with st.spinner("이미지 서버 전송 및 저장 중..."):
+            with st.spinner("이미지 서버 전송 및 저장 중... (창을 닫지 마세요)"):
                 url1 = upload_photo(img1, f"주보_{w_str}_1") if img1 else old_img1
                 url2 = upload_photo(img2, f"주보_{w_str}_2") if img2 else old_img2
                 now_str = str(datetime.datetime.now())
@@ -492,11 +479,11 @@ def manage_bulletin_dialog(w_str, d_str):
                     row_idx = int(existing_data.iloc[0]['sheet_row'])
                     chunked_update(ws_b, [gspread.Cell(row_idx, 3, url1), gspread.Cell(row_idx, 4, url2), gspread.Cell(row_idx, 5, memo), gspread.Cell(row_idx, 6, now_str)])
                 else: ws_b.append_row([w_str, d_str, url1, url2, memo, now_str])
-                st.success("✅ 저장이 완료되었습니다!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
+                st.success("✅ 저장이 완료되었습니다!"); time.sleep(1); st.cache_data.clear(); st.rerun()
     
     if not existing_data.empty:
         if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
-            ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); fetch_sheet_data.clear(); st.rerun()
+            ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
 # --- 다이얼로그 모달: 인원 정보 ---
 @st.dialog("👤 인원 정보 상세")
@@ -518,7 +505,6 @@ def edit_student_dialog(target_dict):
         c1.markdown(f"**이름:** {safe_str(target_dict.get('이름',''))}")
         c2.markdown(f"**반(담임):** {safe_str(target_dict.get(class_col,''))}")
         
-        # 상세보기 무조건 암호화 해제 (100% 정보 표출)
         p_phone = safe_str(target_dict.get('연락처',''))
         p_parent = safe_str(target_dict.get('부모(아빠/엄마)',''))
         p_addr = safe_str(target_dict.get('주소',''))
@@ -538,10 +524,8 @@ def edit_student_dialog(target_dict):
             st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
-                # 닫기 버튼은 단순히 rerun 처리 (가장 빠름)
                 if st.button("닫기", use_container_width=True): st.rerun()
             with btn_col2:
-                # '정보 수정하기' ➔ '수정' 으로 변경
                 st.button("✏️ 수정", use_container_width=True, on_click=set_edit_true)
             
     else:
@@ -565,7 +549,7 @@ def edit_student_dialog(target_dict):
             e_parents = col_f.text_input("부모", value=safe_str(target_dict.get('부모(아빠/엄마)','')))
             e_addr = col_f.text_input("주소", value=safe_str(target_dict.get('주소','')))
             e_memo = col_f.text_input("비고", value=safe_str(target_dict.get('비고','')))
-            e_photo = col_f.file_uploader("사진변경")
+            e_photo = col_f.file_uploader("사진변경", type=['png', 'jpg', 'jpeg'])
             
             if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
                 with st.spinner("저장 중..."):
@@ -589,7 +573,7 @@ def edit_student_dialog(target_dict):
                     if cells_to_update: chunked_update(ws, cells_to_update)
                     
                     st.session_state[edit_key] = False
-                    st.success("✅ 저장이 완료되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                    st.success("✅ 저장이 완료되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
                     
         with st.container():
             st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
@@ -619,11 +603,23 @@ with tabs[0]:
     st.subheader("🏫 반별 명단")
     st.info("💡 **아이콘 안내** &nbsp;|&nbsp; 👤 일반 &nbsp;&nbsp; 🌱 새친구 &nbsp;&nbsp; 🧑‍🏫 교사 &nbsp;&nbsp; ✝️ 교역자 &nbsp;&nbsp; 🚫 비활성(이사/졸업 등)")
     
+    # ⭐ [개선 2] 빠른 학생 찾기(필터) 기능 추가
+    search_query = st.text_input("🔍 특정 학생 이름 빠르게 찾기 (이름의 일부를 입력하세요)", placeholder="예: 김슈팅")
+    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+    
     all_classes = sorted([c for c in df[class_col].unique() if str(c).strip()], key=class_sort_key)
     
     for c_name in all_classes:
         group = df[df[class_col] == c_name].copy()
         
+        # 검색어가 있을 경우 해당 학생이 포함된 결과만 추출
+        if search_query:
+            group = group[group['이름'].str.contains(search_query, na=False)]
+        
+        # 검색 결과가 없는 반은 그리지 않고 패스
+        if group.empty:
+            continue
+            
         def get_sort_key(row):
             s = row[status_col]
             if s in INACTIVE_STATUS: return 100
@@ -659,7 +655,6 @@ with tabs[0]:
                     try: bd_disp = f" 🎂 {int(b_str.split('-')[1]):02d}/{int(b_str.split('-')[2]):02d}"
                     except: pass
                 
-                # 목사님, 전도사님 직분 명시 처리
                 if s in ['목사', '전도사'] and s not in n: n = f"{n} {s}님"
                 elif '목사' in str(r.get('비고', '')) and '목사' not in n: n = f"{n} 목사님"
                 elif '전도사' in str(r.get('비고', '')) and '전도사' not in n: n = f"{n} 전도사님"
@@ -674,7 +669,6 @@ with tabs[0]:
                     with st.container(border=True):
                         st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                         
-                        # [2] 이름 텍스트 옆에 생일과 상세기능(버튼) 통합 배치
                         c_img, c_info = st.columns([1.5, 4.5])
                         with c_img:
                             if p_url and p_url.startswith('http'):
@@ -682,7 +676,6 @@ with tabs[0]:
                             else:
                                 st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:30px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
                         with c_info:
-                            # 폰트 사이즈 조정 (이름 약 1.5배~2배 적용, clamp 사용으로 모바일 대응)
                             info_html = f'''
                             <div style="height:60px; display:flex; align-items:center; flex-wrap:wrap;">
                                 <span style="font-size: clamp(1.1rem, 4vw, 1.5rem); font-weight:800; color:#111; margin-right:8px; white-space:nowrap;">{n}{suffix}{new_friend_badge}</span>
@@ -691,7 +684,6 @@ with tabs[0]:
                             '''
                             st.markdown(info_html, unsafe_allow_html=True)
                             
-                        # 카드 전체를 덮어씌우는 투명 버튼 (오버레이 적용)
                         if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
                             edit_student_dialog(r.to_dict())
             
@@ -699,16 +691,20 @@ with tabs[0]:
                 with st.form(f"qa_{c_name}"):
                     col_n, col_btn = st.columns([3, 1])
                     new_n = col_n.text_input("이름", placeholder="이름 입력", label_visibility="collapsed")
-                    if col_btn.form_submit_button("등록") and new_n:
-                        new_row = [""] * len(headers)
-                        h_map = {str(h): idx for idx, h in enumerate(headers)}
-                        if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
-                        if '이름' in h_map: new_row[h_map['이름']] = new_n
-                        if class_col in h_map: new_row[h_map[class_col]] = c_name
-                        if '생년월일' in h_map: new_row[h_map['생년월일']] = datetime.date.today().strftime("%Y-%m-%d")
-                        if '학교상태' in h_map: new_row[h_map['학교상태']] = "새친구"
-                        elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
-                        ws.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                    if col_btn.form_submit_button("등록"):
+                        # ⭐ [개선 4] 빈값 등록 방지 처리
+                        if not new_n.strip():
+                            st.error("🚨 이름을 입력해주세요.")
+                        else:
+                            new_row = [""] * len(headers)
+                            h_map = {str(h): idx for idx, h in enumerate(headers)}
+                            if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
+                            if '이름' in h_map: new_row[h_map['이름']] = new_n
+                            if class_col in h_map: new_row[h_map[class_col]] = c_name
+                            if '생년월일' in h_map: new_row[h_map['생년월일']] = datetime.date.today().strftime("%Y-%m-%d")
+                            if '학교상태' in h_map: new_row[h_map['학교상태']] = "새친구"
+                            elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
+                            ws.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 1] 생일표
@@ -815,8 +811,12 @@ with tabs[2]:
             else: new_p_name = st.text_input("기도자 이름")
             new_p_memo = st.text_input("비고")
             if st.form_submit_button("💾 기도순서 저장", type="primary"):
-                new_p_num = len(df_p) + 1 if not df_p.empty else 1
-                ws_p.append_row([str(new_p_num), new_p_date, new_p_name, new_p_memo]); st.success("🙏 기도 일정이 성공적으로 기록되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                # ⭐ [개선 4] 빈값 등록 방지 처리
+                if not new_p_name.strip():
+                    st.error("🚨 기도자 이름을 입력해주세요!")
+                else:
+                    new_p_num = len(df_p) + 1 if not df_p.empty else 1
+                    ws_p.append_row([str(new_p_num), new_p_date, new_p_name, new_p_memo]); st.success("🙏 기도 일정이 성공적으로 기록되었습니다."); time.sleep(1.5); st.cache_data.clear(); st.rerun()
                 
     with p_tabs[2]:
         if not df_p.empty:
@@ -832,14 +832,14 @@ with tabs[2]:
                     else: e_p_name = st.text_input("기도자 수정", value=curr_p_name)
                     e_p_memo = st.text_input("비고 수정", value=target_p.get('비고',''))
                     if st.form_submit_button("📝 수정사항 반영", type="primary"):
-                        r_idx = int(target_p['sheet_row']); ws_p.update_cell(r_idx, 2, e_p_date); ws_p.update_cell(r_idx, 3, e_p_name); ws_p.update_cell(r_idx, 4, e_p_memo); st.success("✅ 변경사항이 구글시트에 기록되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                        r_idx = int(target_p['sheet_row']); ws_p.update_cell(r_idx, 2, e_p_date); ws_p.update_cell(r_idx, 3, e_p_name); ws_p.update_cell(r_idx, 4, e_p_memo); st.success("✅ 변경사항이 구글시트에 기록되었습니다."); time.sleep(1.5); st.cache_data.clear(); st.rerun()
                     
     with p_tabs[3]:
         if not df_p.empty:
             p_options = ["삭제할 일정을 고르세요"] + df_p.apply(lambda r: f"[{r.get('날짜','').strip()}] {r.get('이름','').strip()}", axis=1).tolist()
             sel_p_idx = st.selectbox("삭제 대상 선택", range(len(p_options)), format_func=lambda x: p_options[x], key="del_prayer_sel")
             if st.button("🚨 해당 기도 일정 삭제 실행", key="btn_del_prayer") and sel_p_idx > 0:
-                target_p = df_p.iloc[sel_p_idx - 1]; ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                target_p = df_p.iloc[sel_p_idx - 1]; ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 3] 주보 관리
@@ -979,30 +979,36 @@ with tabs[5]:
                         
     with e_tabs[1]:
         with st.form("new_e"):
-            a_d = st.date_input("날짜"); a_t = st.text_input("행사명"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
+            a_d = st.date_input("날짜"); a_t = st.text_input("행사명 (필수)"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
+            # ⭐ [개선 5] 업로드 크기 및 확장자 명확화
+            st.caption("✅ 권장 용량: 개당 10MB 이하 (구글 드라이브 정책)")
             a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
             if st.form_submit_button("저장"):
-                with st.spinner("저장 중..."):
-                    urls = [""] * 15
-                    if a_f: 
-                        for i, f in enumerate(a_f[:15]): urls[i] = upload_photo(f, a_t)
-                    act_sh_headers = ws_act.row_values(1)
-                    missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
-                    if missing_act:
-                        start_col = len(act_sh_headers) + 1
-                        h_cells = [gspread.Cell(1, start_col + idx_h, mh) for idx_h, mh in enumerate(missing_act)]
-                        for mh in missing_act: act_sh_headers.append(mh)
-                        try: chunked_update(ws_act, h_cells)
-                        except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
-                    h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}; new_row = [""] * len(act_sh_headers)
-                    if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
-                    if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
-                    if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
-                    if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
-                    if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
-                    for k in range(1, 16):
-                        if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
-                    ws_act.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                # ⭐ [개선 4] 필수입력란 누락시 에러표출 방지
+                if not a_t.strip():
+                    st.error("🚨 행사명을 반드시 입력해주세요.")
+                else:
+                    with st.spinner("미디어 파일 전송 및 저장 중... (창을 닫지 마세요)"):
+                        urls = [""] * 15
+                        if a_f: 
+                            for i, f in enumerate(a_f[:15]): urls[i] = upload_photo(f, a_t)
+                        act_sh_headers = ws_act.row_values(1)
+                        missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
+                        if missing_act:
+                            start_col = len(act_sh_headers) + 1
+                            h_cells = [gspread.Cell(1, start_col + idx_h, mh) for idx_h, mh in enumerate(missing_act)]
+                            for mh in missing_act: act_sh_headers.append(mh)
+                            try: chunked_update(ws_act, h_cells)
+                            except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
+                        h_map = {str(h): idx for idx, h in enumerate(act_sh_headers)}; new_row = [""] * len(act_sh_headers)
+                        if "날짜" in h_map: new_row[h_map["날짜"]] = str(a_d.strftime("%Y-%m-%d"))
+                        if "활동명" in h_map: new_row[h_map["활동명"]] = a_t
+                        if "세부내용" in h_map: new_row[h_map["세부내용"]] = a_c
+                        if "공지사항" in h_map: new_row[h_map["공지사항"]] = a_n
+                        if "등록일" in h_map: new_row[h_map["등록일"]] = str(datetime.datetime.now())
+                        for k in range(1, 16):
+                            if f"사진{k}" in h_map: new_row[h_map[f"사진{k}"]] = urls[k-1]
+                        ws_act.append_row(new_row); st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
     with e_tabs[2]:
         if not df_act.empty:
@@ -1018,7 +1024,7 @@ with tabs[5]:
                     e_d_val = parse_date_safe(target_event.get('날짜', ''))
                     e_d = st.date_input("날짜", value=e_d_val); e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
                     e_c = st.text_area("내용", value=target_event.get('세부내용', '')); e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
-                    bulk_files = st.file_uploader("🔄 일괄 덮어쓰기", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
+                    bulk_files = st.file_uploader("🔄 일괄 덮어쓰기 (권장: 개당 10MB 이하)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
                     old_urls = [target_event.get(f'사진{i}', "") for i in range(1, 16)]; new_files, delete_flags = [None] * 15, [False] * 15
                     for i in range(0, 15, 2):
                         p_cols = st.columns(2)
@@ -1033,28 +1039,31 @@ with tabs[5]:
                                     new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                                 else: new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
                     if st.form_submit_button("📝 행사 수정 저장", type="primary"):
-                        with st.spinner("미디어 반영 중..."):
-                            final_urls = old_urls.copy()
-                            if bulk_files:
-                                final_urls = [""] * 15
-                                for k, f in enumerate(bulk_files[:15]): final_urls[k] = upload_photo(f, e_t)
-                            else:
-                                for k in range(15):
-                                    if new_files[k] is not None: final_urls[k] = upload_photo(new_files[k], e_t)
-                                    elif delete_flags[k]: final_urls[k] = ""
-                            act_sh_headers = ws_act.row_values(1)
-                            missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
-                            if missing_act:
-                                start_col = len(act_sh_headers) + 1
-                                h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_act)]
-                                for mh in missing_act: act_sh_headers.append(mh)
-                                try: chunked_update(ws_act, h_cells)
-                                except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
-                            update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
-                            for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
-                            cells_to_update = [gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)) for k, v in update_map.items() if k in act_sh_headers]
-                            if cells_to_update: chunked_update(ws_act, cells_to_update)
-                            st.success("✅ 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                        if not e_t.strip():
+                            st.error("🚨 행사명은 지울 수 없습니다. 다시 입력해주세요.")
+                        else:
+                            with st.spinner("미디어 파일 전송 및 저장 중... (창을 닫지 마세요)"):
+                                final_urls = old_urls.copy()
+                                if bulk_files:
+                                    final_urls = [""] * 15
+                                    for k, f in enumerate(bulk_files[:15]): final_urls[k] = upload_photo(f, e_t)
+                                else:
+                                    for k in range(15):
+                                        if new_files[k] is not None: final_urls[k] = upload_photo(new_files[k], e_t)
+                                        elif delete_flags[k]: final_urls[k] = ""
+                                act_sh_headers = ws_act.row_values(1)
+                                missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
+                                if missing_act:
+                                    start_col = len(act_sh_headers) + 1
+                                    h_cells = [gspread.Cell(1, start_col + i, mh) for i, mh in enumerate(missing_act)]
+                                    for mh in missing_act: act_sh_headers.append(mh)
+                                    try: chunked_update(ws_act, h_cells)
+                                    except: ws_act.add_cols(15); chunked_update(ws_act, h_cells)
+                                update_map = {"날짜": str(e_d.strftime("%Y-%m-%d")), "활동명": e_t, "세부내용": e_c, "공지사항": e_n}
+                                for k in range(1, 16): update_map[f"사진{k}"] = final_urls[k-1]
+                                cells_to_update = [gspread.Cell(target_row_id, act_sh_headers.index(k)+1, str(v)) for k, v in update_map.items() if k in act_sh_headers]
+                                if cells_to_update: chunked_update(ws_act, cells_to_update)
+                                st.success("✅ 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
     with e_tabs[3]:
         if not df_act.empty:
@@ -1064,7 +1073,7 @@ with tabs[5]:
             event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
             sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event, key="event_del_sel")
             if st.button("🚨 삭제 실행", key="btn_del_event") and sel_del != "행사 선택": 
-                ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 6] 출석
@@ -1212,7 +1221,7 @@ with tabs[6]:
                     end_col = chr(65 + len(stat_headers) - 1) if len(stat_headers) <= 26 else 'Z'
                     ws_stat.update(f"A{row_idx}:{end_col}{row_idx}", [new_row])
                 else: ws_stat.append_row(new_row)
-                st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                st.success(f"✅ [{sel_w}] 기존 데이터 위치에 정확히 오버라이드 저장 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 7] 통계 
@@ -1380,13 +1389,18 @@ with tabs[8]:
                 rc_detail = st.text_input("내용 (품목)")
                 rc_cost = st.number_input("비용 (원)", min_value=0, step=1000)
                 rc_memo = st.text_input("비고")
+                st.caption("✅ 권장 용량: 영수증 사진 당 5MB 이하")
                 rc_photo = st.file_uploader("영수증 사진 업로드", type=['png', 'jpg', 'jpeg'])
                 if st.form_submit_button("등록 완료", type="primary"):
-                    with st.spinner("업로드 및 저장 중..."):
-                        p_url = upload_photo(rc_photo, f"영수증_{rc_vendor}") if rc_photo else ""
-                        new_num = len(df_r) + 1 if not df_r.empty else 1
-                        ws_r.append_row([new_num, rc_date, rc_vendor, rc_detail, rc_cost, rc_memo, p_url])
-                        st.success("등록되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                    # ⭐ [개선 4] 필수입력란 누락시 에러표출 방지
+                    if not rc_vendor.strip() or rc_cost == 0:
+                        st.error("🚨 구매처와 비용(원)을 정확히 입력해주세요!")
+                    else:
+                        with st.spinner("이미지 서버 업로드 및 저장 중..."):
+                            p_url = upload_photo(rc_photo, f"영수증_{rc_vendor}") if rc_photo else ""
+                            new_num = len(df_r) + 1 if not df_r.empty else 1
+                            ws_r.append_row([new_num, rc_date, rc_vendor, rc_detail, rc_cost, rc_memo, p_url])
+                            st.success("등록되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
         with r_tabs[2]:
             if not df_r.empty:
@@ -1406,14 +1420,14 @@ with tabs[8]:
                                 p_url = upload_photo(e_photo, f"영수증_{e_vendor}") if e_photo else target.get('영수증사진','')
                                 r_idx = int(target['sheet_row'])
                                 chunked_update(ws_r, [gspread.Cell(r_idx, 2, e_date), gspread.Cell(r_idx, 3, e_vendor), gspread.Cell(r_idx, 4, e_detail), gspread.Cell(r_idx, 5, str(e_cost)), gspread.Cell(r_idx, 6, e_memo), gspread.Cell(r_idx, 7, p_url)])
-                                st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                                st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
         with r_tabs[3]:
             if not df_r.empty:
                 sel_idx = st.selectbox("삭제할 내역", range(len(options)), format_func=lambda x: options[x], key="del_rcpt_sel")
                 if st.button("🚨 삭제 실행", key="btn_del_receipt") and sel_idx > 0:
                     target = df_r.iloc[sel_idx - 1]
-                    ws_r.delete_rows(int(target['sheet_row'])); st.success("삭제되었습니다!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                    ws_r.delete_rows(int(target['sheet_row'])); st.success("삭제되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 9] 교사 회비 사용내역
@@ -1476,18 +1490,25 @@ with tabs[9]:
                     col_i1, col_i2 = st.columns(2)
                     in_date = col_i1.date_input("입금 일자", datetime.date.today()).strftime("%Y-%m-%d"); in_name = col_i2.text_input("입금자명"); in_amount = col_i1.number_input("입금액 (원)", min_value=0, step=1000); in_memo = col_i2.text_input("비고")
                     if st.form_submit_button("입금 내역 추가", type="primary"):
-                        new_num = len(df_in) + 1 if not df_in.empty else 1
-                        ws_in.append_row([new_num, in_date, in_name, in_amount, in_memo]); st.success("입금 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                        if not in_name.strip() or in_amount == 0:
+                            st.error("🚨 입금자명과 금액을 정확히 입력하세요.")
+                        else:
+                            new_num = len(df_in) + 1 if not df_in.empty else 1
+                            ws_in.append_row([new_num, in_date, in_name, in_amount, in_memo]); st.success("입금 등록 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
             with tab_out:
                 with st.form("new_expense_form"):
                     col_o1, col_o2 = st.columns(2)
                     out_date = col_o1.date_input("지출 일자", datetime.date.today()).strftime("%Y-%m-%d"); out_detail = col_o2.text_input("내용"); out_amount = col_o1.number_input("지출액 (원)", min_value=0, step=1000); out_memo = col_o2.text_input("비고")
+                    st.caption("✅ 권장 용량: 영수증 사진 당 5MB 이하")
                     out_photo = st.file_uploader("지출 증빙(영수증) 업로드", type=['png', 'jpg', 'jpeg'])
                     if st.form_submit_button("지출 내역 추가", type="primary"):
-                        with st.spinner("업로드 중..."):
-                            p_url = upload_photo(out_photo, f"회비지출_{out_detail}") if out_photo else ""
-                            new_num = len(df_out) + 1 if not df_out.empty else 1
-                            ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url]); st.success("지출 등록 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                        if not out_detail.strip() or out_amount == 0:
+                            st.error("🚨 지출 내용과 금액을 정확히 입력하세요.")
+                        else:
+                            with st.spinner("이미지 서버 전송 중..."):
+                                p_url = upload_photo(out_photo, f"회비지출_{out_detail}") if out_photo else ""
+                                new_num = len(df_out) + 1 if not df_out.empty else 1
+                                ws_out.append_row([new_num, out_date, out_detail, out_amount, out_memo, p_url]); st.success("지출 등록 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
         
         with l_tabs[2]:
             st.markdown("수정할 장부를 선택해주세요.")
@@ -1500,7 +1521,7 @@ with tabs[9]:
                     with st.form("edit_in_form"):
                         e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d"); e_n = st.text_input("입금자명", value=t.get('입금자명','')); e_a = st.number_input("입금액", value=parse_int_safe(t.get('입금액', 0)), step=1000); e_m = st.text_input("비고", value=t.get('비고',''))
                         if st.form_submit_button("수정 저장", type="primary"):
-                            r_idx = int(t['sheet_row']); chunked_update(ws_in, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_n), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m)]); st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                            r_idx = int(t['sheet_row']); chunked_update(ws_in, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_n), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m)]); st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
             elif e_type == "지출 장부" and not df_out.empty:
                 opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("수정할 지출 내역", range(len(opts)), format_func=lambda x: opts[x])
@@ -1511,7 +1532,7 @@ with tabs[9]:
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("업로드 중..."):
                                 p_url = upload_photo(e_p, f"회비지출_{e_c}") if e_p else t.get('영수증사진','')
-                                r_idx = int(t['sheet_row']); chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)]); st.success("수정 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                                r_idx = int(t['sheet_row']); chunked_update(ws_out, [gspread.Cell(r_idx, 2, e_d), gspread.Cell(r_idx, 3, e_c), gspread.Cell(r_idx, 4, str(e_a)), gspread.Cell(r_idx, 5, e_m), gspread.Cell(r_idx, 6, p_url)]); st.success("수정 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
         with l_tabs[3]:
             st.markdown("삭제할 장부를 선택해주세요.")
@@ -1519,11 +1540,11 @@ with tabs[9]:
             if d_type == "입금 장부" and not df_in.empty:
                 opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {parse_int_safe(r.get('입금액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_in_sel")
-                if st.button("🚨 입금 삭제 실행", key="btn_del_in") and idx > 0: ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                if st.button("🚨 입금 삭제 실행", key="btn_del_in") and idx > 0: ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
             elif d_type == "지출 장부" and not df_out.empty:
                 opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_out_sel")
-                if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0: ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); fetch_sheet_data.clear(); st.rerun()
+                if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0: ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 11] 교적부 통합 관리
@@ -1553,7 +1574,7 @@ with tabs[10]:
     with col_dash2:
         st.markdown('<div class="small-btn">', unsafe_allow_html=True)
         if st.button("🔄 새로고침", use_container_width=True, key="refresh_tab1"):
-            fetch_sheet_data.clear(); st.rerun()
+            st.cache_data.clear(); st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
     active_sum_calc = len(df) - total_inact
@@ -1626,9 +1647,13 @@ with tabs[10]:
             n_class = col1.text_input("학년(담임) (필수)")
             n_status = col2.selectbox("구분", ALL_STATUS_OPTS, index=1)
             n_reg = col1.date_input("등록일자", value=datetime.date.today()).strftime("%Y-%m-%d")
-            n_photo = st.file_uploader("사진 첨부")
+            st.caption("✅ 권장 용량: 사진 당 5MB 이하")
+            n_photo = st.file_uploader("사진 첨부", type=['png', 'jpg', 'jpeg'])
             if st.form_submit_button("✨ 등록하기"):
-                if n_name and n_class:
+                # ⭐ [개선 4] 필수입력란 누락시 에러표출 방지
+                if not n_name.strip() or not n_class.strip():
+                    st.error("🚨 이름과 학년(담임) 정보를 입력해주세요!")
+                else:
                     p_url = upload_photo(n_photo, n_name)
                     new_row = [""] * len(headers)
                     h_map = {str(h): idx for idx, h in enumerate(headers)}
@@ -1643,5 +1668,5 @@ with tabs[10]:
                     ws.append_row(new_row)
                     st.success("✅ 등록 완료!")
                     time.sleep(1.5)
-                    fetch_sheet_data.clear()
+                    st.cache_data.clear()
                     st.rerun()
