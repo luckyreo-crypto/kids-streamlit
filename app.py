@@ -52,6 +52,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# [UI 개선] 모바일 가독성 및 탭 스크롤 최적화
 st.markdown("""
     <style>
     html { scroll-behavior: smooth; }
@@ -72,10 +73,15 @@ st.markdown("""
         padding-top: 5px !important; padding-bottom: 10px !important; border-bottom: 2px solid #eef2f6 !important;
         box-shadow: 0 4px 10px -2px rgba(0,0,0,0.05) !important;
     }
+    
+    /* 🔥 모바일 화면 최적화: 탭 한줄 횡스크롤 처리 (화면 낭비 방지) */
     div[data-testid="stTabs"] [role="tablist"] { 
-        display: flex !important; flex-wrap: wrap !important; justify-content: flex-start !important; 
+        display: flex !important; flex-wrap: nowrap !important; justify-content: flex-start !important; 
+        overflow-x: auto !important; -webkit-overflow-scrolling: touch;
         padding-bottom: 10px !important; gap: 8px !important;
     }
+    div[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar { display: none; }
+    
     div[data-testid="stTabs"] [role="tab"] { 
         flex: 0 0 auto !important; justify-content: center; padding: 12px 20px !important; margin: 0 !important; 
         background-color: #f8f9fa !important; border-radius: 12px !important; border: 1px solid #ddd !important;
@@ -213,33 +219,46 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
-# ⭐ [파일 업로드 오류 완벽 해결] 파일명에 포함된 이모지/특수문자로 인한 서버 충돌 원천 차단
+# ⭐ [모바일 파일 첨부 오류 완벽 해결] 이미지 자동 압축 및 확장자 대응
 def upload_photo(file, name):
     if not file: return ""
     try:
         st.toast(f"⏳ '{file.name}' 전송 중...", icon="☁️")
         
-        # 1. 파일 확장자 추출
         if '.' in file.name:
             orig_ext = "." + file.name.split('.')[-1].strip().lower()
         else:
             orig_ext = ".jpg" # 확장자가 불분명한 경우 강제 할당
             
-        # 2. 에러를 유발하는 특수문자, 괄호, 쉼표, 이모지 완전 제거 (영어, 숫자, 한글, _ , - 만 허용)
         clean_name = re.sub(r'[^a-zA-Z0-9ㄱ-ㅣ가-힣_-]', '', str(name).strip())
-        
-        # 특수문자로만 이루어져 파일명이 비어버리는 경우를 대비
         if not clean_name:
             clean_name = "첨부파일"
             
-        # 3. UUID(난수)와 시간값을 추가하여 이름 중복이나 파싱 에러 100% 방지
         unique_id = str(uuid.uuid4())[:4]
         final_filename = f"{clean_name}_{int(time.time())}_{unique_id}{orig_ext}"
-        
-        # 4. MIME Type 검사 (모바일 기기에서 type이 빈값으로 오는 버그 방어)
         safe_mime_type = file.type if file.type else "application/octet-stream"
         
-        b64 = base64.b64encode(file.getvalue()).decode('utf-8')
+        file_data = file.getvalue()
+
+        # 🚀 [핵심] 핸드폰 고용량 사진 자동 압축 (앱 스크립트 전송 실패 방지)
+        if any(ext in orig_ext for ext in ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']):
+            try:
+                from PIL import Image
+                import io
+                img = Image.open(file)
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                # 1024 해상도로 줄여 모바일에서의 데이터 전송 사이즈를 수십분의 1로 압축
+                img.thumbnail((1024, 1024))
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=85)
+                file_data = buf.getvalue()
+                safe_mime_type = "image/jpeg"
+                final_filename = final_filename.rsplit('.', 1)[0] + ".jpg"
+            except Exception as e:
+                pass # 만약 에러시 원본 그대로 진행
+        
+        b64 = base64.b64encode(file_data).decode('utf-8')
         headers = {"Content-Type": "application/json"}
         if "PROXY_AUTH_KEY" in st.secrets: 
             headers["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
@@ -250,7 +269,6 @@ def upload_photo(file, name):
             "base64Data": b64
         }
         
-        # 업로드 전송
         res = requests.post(GOOGLE_PROXY_URL, json=payload, headers=headers, timeout=120)
         
         if res.status_code != 200:
@@ -258,11 +276,10 @@ def upload_photo(file, name):
             return ""
             
         url = res.json().get("fileUrl", "")
-        
         if safe_mime_type.startswith('video/') and "vid=1" not in url: 
             url += "&vid=1" if "?" in url else "?vid=1"
             
-        st.toast(f"✅ '{file.name}' 저장 완료!", icon="🎉")
+        st.toast(f"✅ 첨부파일 저장 완료!", icon="🎉")
         return url
     except Exception as e: 
         st.error(f"❌ 전송 실패: {str(e)}")
@@ -476,9 +493,9 @@ def manage_bulletin_dialog(w_str, d_str):
     
     with st.form(f"bulletin_form_{w_str}"):
         memo = st.text_input("📝 비고 (예: 신년감사예배, 야외예배 등)", value=existing_data.iloc[0].get('비고', '') if not existing_data.empty else "")
-        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다. (권장용량: 5MB 이하)")
-        img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg'])
-        img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg'])
+        st.caption("고해상도 이미지(JPG/PNG/HEIC) 업로드를 권장합니다. (권장용량: 5MB 이하)")
+        img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg', 'webp', 'heic', 'heif'])
+        img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg', 'webp', 'heic', 'heif'])
         
         if not existing_data.empty:
             old_img1, old_img2 = existing_data.iloc[0].get('주보이미지1', ''), existing_data.iloc[0].get('주보이미지2', '')
@@ -502,16 +519,12 @@ def manage_bulletin_dialog(w_str, d_str):
         if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
             ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-# --- 다이얼로그 모달: 인원 정보 ---
-@st.dialog("👤 인원 정보 상세")
+# ⭐ [수정 팝업 오류 완벽 해결] 모달창 안에서 탭(Tab)으로 나누어 화면이 재시작/겹치는 버그 완전 차단
+@st.dialog("👤 인원 정보 상세 / 수정")
 def edit_student_dialog(target_dict):
-    row_id = target_dict['sheet_row']
-    edit_key = f"edit_mode_{row_id}"
-    if edit_key not in st.session_state: st.session_state[edit_key] = False
-    def set_edit_true(): st.session_state[edit_key] = True
-    def set_edit_false(): st.session_state[edit_key] = False
+    tab_info, tab_edit = st.tabs(["📄 현재 정보 보기", "✏️ 내역 수정하기"])
         
-    if not st.session_state[edit_key]:
+    with tab_info:
         st.info(f"💡 **{safe_str(target_dict.get('이름', ''))}** 님의 등록 정보입니다.")
         col_i, col_f = st.columns([1, 2])
         clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
@@ -537,16 +550,9 @@ def edit_student_dialog(target_dict):
         st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
         st.divider()
-        with st.container():
-            st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
-            btn_col1, btn_col2 = st.columns(2)
-            with btn_col1:
-                if st.button("닫기", use_container_width=True): st.rerun()
-            with btn_col2:
-                st.button("✏️ 수정", use_container_width=True, on_click=set_edit_true)
+        if st.button("닫기", use_container_width=True): st.rerun()
             
-    else:
-        st.warning("⚠️ 현재 정보를 수정 중입니다.")
+    with tab_edit:
         with st.form("modal_edit_form"):
             col_i, col_f = st.columns([1, 2])
             clean_p_url = safe_str(target_dict.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
@@ -566,7 +572,7 @@ def edit_student_dialog(target_dict):
             e_parents = col_f.text_input("부모", value=safe_str(target_dict.get('부모(아빠/엄마)','')))
             e_addr = col_f.text_input("주소", value=safe_str(target_dict.get('주소','')))
             e_memo = col_f.text_input("비고", value=safe_str(target_dict.get('비고','')))
-            e_photo = col_f.file_uploader("사진변경", type=['png', 'jpg', 'jpeg'])
+            e_photo = col_f.file_uploader("사진변경", type=['png', 'jpg', 'jpeg', 'webp', 'heic', 'heif'])
             
             if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
                 with st.spinner("저장 중..."):
@@ -589,16 +595,7 @@ def edit_student_dialog(target_dict):
                     elif '학교상태' in actual_headers: cells_to_update.append(gspread.Cell(r_idx, actual_headers.index('학교상태')+1, e_status))
                     if cells_to_update: chunked_update(ws, cells_to_update)
                     
-                    st.session_state[edit_key] = False
                     st.success("✅ 저장이 완료되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
-                    
-        with st.container():
-            st.markdown('<div class="sticky-footer-marker"></div>', unsafe_allow_html=True)
-            btn_col1, btn_col2 = st.columns(2)
-            with btn_col1:
-                if st.button("닫기", use_container_width=True): st.rerun()
-            with btn_col2:
-                st.button("❌ 수정 취소", use_container_width=True, on_click=set_edit_false)
 
 # --- 5. 화면(탭) 구성 ---
 tabs = st.tabs(["🏫 반", "🎂 생일", "🙏 기도순서", "📝 주보", "🌱 새친구", "⚙️ 행사", "✅ 출석", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역", "📋 교적부 관리"])
@@ -992,8 +989,8 @@ with tabs[5]:
     with e_tabs[1]:
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명 (필수)"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
-            st.caption("✅ 권장 용량: 개당 10MB 이하 (구글 드라이브 정책)")
-            a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
+            st.caption("✅ 권장 용량: 개당 10MB 이하 (구글 드라이브 정책). 모바일 사진은 자동 압축됩니다.")
+            a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','webp','heic','mp4','mov','avi'])
             if st.form_submit_button("저장"):
                 if not a_t.strip():
                     st.error("🚨 행사명을 반드시 입력해주세요.")
@@ -1034,7 +1031,7 @@ with tabs[5]:
                     e_d_val = parse_date_safe(target_event.get('날짜', ''))
                     e_d = st.date_input("날짜", value=e_d_val); e_t = st.text_input("행사명", value=target_event.get('활동명', ''))
                     e_c = st.text_area("내용", value=target_event.get('세부내용', '')); e_n = st.text_input("공지사항", value=target_event.get('공지사항', ''))
-                    bulk_files = st.file_uploader("🔄 일괄 덮어쓰기 (권장: 개당 10MB 이하)", accept_multiple_files=True, type=['png','jpg','jpeg','mp4','mov','avi'])
+                    bulk_files = st.file_uploader("🔄 일괄 덮어쓰기 (권장: 개당 10MB 이하)", accept_multiple_files=True, type=['png','jpg','jpeg','webp','heic','mp4','mov','avi'])
                     old_urls = [target_event.get(f'사진{i}', "") for i in range(1, 16)]; new_files, delete_flags = [None] * 15, [False] * 15
                     for i in range(0, 15, 2):
                         p_cols = st.columns(2)
@@ -1046,8 +1043,8 @@ with tabs[5]:
                                 if media_url and str(media_url).startswith('http'):
                                     st.write(f"사진 {idx+1}")
                                     delete_flags[idx] = st.checkbox(f"[{idx+1}] 삭제", key=f"del_img_{target_row_id}_{idx}")
-                                    new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
-                                else: new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','mp4','mov','avi'])
+                                    new_files[idx] = st.file_uploader(f"[{idx+1}] 변경", key=f"up_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','webp','heic','mp4','mov','avi'])
+                                else: new_files[idx] = st.file_uploader(f"[{idx+1}] 추가", key=f"add_img_{target_row_id}_{idx}", label_visibility="collapsed", type=['png','jpg','jpeg','webp','heic','mp4','mov','avi'])
                     if st.form_submit_button("📝 행사 수정 저장", type="primary"):
                         if not e_t.strip():
                             st.error("🚨 행사명은 지울 수 없습니다. 다시 입력해주세요.")
@@ -1399,8 +1396,8 @@ with tabs[8]:
                 rc_detail = st.text_input("내용 (품목)")
                 rc_cost = st.number_input("비용 (원)", min_value=0, step=1000)
                 rc_memo = st.text_input("비고")
-                st.caption("✅ 권장 용량: 영수증 사진 당 5MB 이하")
-                rc_photo = st.file_uploader("영수증 사진 업로드", type=['png', 'jpg', 'jpeg'])
+                st.caption("✅ 영수증 사진을 올려주세요. 휴대폰 사진은 자동으로 압축됩니다.")
+                rc_photo = st.file_uploader("영수증 사진 업로드", type=['png', 'jpg', 'jpeg', 'webp', 'heic'])
                 if st.form_submit_button("등록 완료", type="primary"):
                     if not rc_vendor.strip() or rc_cost == 0:
                         st.error("🚨 구매처와 비용(원)을 정확히 입력해주세요!")
@@ -1423,7 +1420,7 @@ with tabs[8]:
                         e_detail = st.text_input("내용 (품목)", value=target.get('내용',''))
                         e_cost = st.number_input("비용 (원)", value=parse_int_safe(target.get('비용', 0)), step=1000)
                         e_memo = st.text_input("비고", value=target.get('비고',''))
-                        e_photo = st.file_uploader("영수증 사진 변경 (새로 올리면 기존 사진 대체)", type=['png', 'jpg', 'jpeg'])
+                        e_photo = st.file_uploader("영수증 사진 변경 (새로 올리면 기존 사진 대체)", type=['png', 'jpg', 'jpeg', 'webp', 'heic'])
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("저장 중..."):
                                 p_url = upload_photo(e_photo, f"영수증_{e_vendor}") if e_photo else target.get('영수증사진','')
@@ -1508,8 +1505,8 @@ with tabs[9]:
                 with st.form("new_expense_form"):
                     col_o1, col_o2 = st.columns(2)
                     out_date = col_o1.date_input("지출 일자", datetime.date.today()).strftime("%Y-%m-%d"); out_detail = col_o2.text_input("내용"); out_amount = col_o1.number_input("지출액 (원)", min_value=0, step=1000); out_memo = col_o2.text_input("비고")
-                    st.caption("✅ 권장 용량: 영수증 사진 당 5MB 이하")
-                    out_photo = st.file_uploader("지출 증빙(영수증) 업로드", type=['png', 'jpg', 'jpeg'])
+                    st.caption("✅ 영수증 사진 업로드 (휴대폰 파일은 자동 압축됩니다)")
+                    out_photo = st.file_uploader("지출 증빙(영수증) 업로드", type=['png', 'jpg', 'jpeg', 'webp', 'heic'])
                     if st.form_submit_button("지출 내역 추가", type="primary"):
                         if not out_detail.strip() or out_amount == 0:
                             st.error("🚨 지출 내용과 금액을 정확히 입력하세요.")
@@ -1537,7 +1534,7 @@ with tabs[9]:
                 if idx > 0:
                     t = df_out.iloc[idx - 1]
                     with st.form("edit_out_form"):
-                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d"); e_c = st.text_input("내용", value=t.get('내용','')); e_a = st.number_input("지출액", value=parse_int_safe(t.get('지출액', 0)), step=1000); e_m = st.text_input("비고", value=t.get('비고','')); e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg'])
+                        e_d = st.date_input("날짜", parse_date_safe(t.get('날짜',''))).strftime("%Y-%m-%d"); e_c = st.text_input("내용", value=t.get('내용','')); e_a = st.number_input("지출액", value=parse_int_safe(t.get('지출액', 0)), step=1000); e_m = st.text_input("비고", value=t.get('비고','')); e_p = st.file_uploader("영수증 변경", type=['png', 'jpg', 'jpeg', 'webp', 'heic'])
                         if st.form_submit_button("수정 저장", type="primary"):
                             with st.spinner("업로드 중..."):
                                 p_url = upload_photo(e_p, f"회비지출_{e_c}") if e_p else t.get('영수증사진','')
@@ -1647,7 +1644,8 @@ with tabs[10]:
         sel_idx = st.selectbox("수정할 인원 선택", range(len(search_list)), format_func=lambda x: search_list[x])
         if sel_idx > 0:
             target = df.iloc[sel_idx - 1]
-            edit_student_dialog(target.to_dict())
+            if st.button("✏️ 이 인원 정보 수정/보기 창 열기", use_container_width=True):
+                edit_student_dialog(target.to_dict())
                     
     with m_tabs[2]:
         with st.form("add_new"):
@@ -1657,7 +1655,7 @@ with tabs[10]:
             n_status = col2.selectbox("구분", ALL_STATUS_OPTS, index=1)
             n_reg = col1.date_input("등록일자", value=datetime.date.today()).strftime("%Y-%m-%d")
             st.caption("✅ 권장 용량: 사진 당 5MB 이하")
-            n_photo = st.file_uploader("사진 첨부", type=['png', 'jpg', 'jpeg'])
+            n_photo = st.file_uploader("사진 첨부", type=['png', 'jpg', 'jpeg', 'webp', 'heic'])
             if st.form_submit_button("✨ 등록하기"):
                 if not n_name.strip() or not n_class.strip():
                     st.error("🚨 이름과 학년(담임) 정보를 입력해주세요!")
