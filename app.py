@@ -219,7 +219,7 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
-# ⭐ [모바일 파일 첨부 오류 완벽 해결] 이미지 자동 압축 및 확장자 대응
+# ⭐ [모바일 파일 첨부 오류 완벽 해결] 재시도 로직 및 압축 강화
 def upload_photo(file, name):
     if not file: return ""
     try:
@@ -240,7 +240,7 @@ def upload_photo(file, name):
         
         file_data = file.getvalue()
 
-        # 🚀 [핵심] 핸드폰 고용량 사진 자동 압축 (앱 스크립트 전송 실패 방지)
+        # 🚀 [핵심] 모바일 업로드 실패 방지: 이미지 강제 800px 압축
         if any(ext in orig_ext for ext in ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']):
             try:
                 from PIL import Image
@@ -248,10 +248,10 @@ def upload_photo(file, name):
                 img = Image.open(file)
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
-                # 1024 해상도로 줄여 모바일에서의 데이터 전송 사이즈를 수십분의 1로 압축
-                img.thumbnail((1024, 1024))
+                # 데이터 크기를 획기적으로 줄여 모바일 전송 안정성을 확보합니다.
+                img.thumbnail((800, 800))
                 buf = io.BytesIO()
-                img.save(buf, format='JPEG', quality=85)
+                img.save(buf, format='JPEG', quality=80)
                 file_data = buf.getvalue()
                 safe_mime_type = "image/jpeg"
                 final_filename = final_filename.rsplit('.', 1)[0] + ".jpg"
@@ -259,9 +259,9 @@ def upload_photo(file, name):
                 pass # 만약 에러시 원본 그대로 진행
         
         b64 = base64.b64encode(file_data).decode('utf-8')
-        headers = {"Content-Type": "application/json"}
+        headers_req = {"Content-Type": "application/json"}
         if "PROXY_AUTH_KEY" in st.secrets: 
-            headers["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
+            headers_req["Authorization"] = f"Bearer {st.secrets['PROXY_AUTH_KEY']}"
             
         payload = {
             "fileName": final_filename, 
@@ -269,20 +269,32 @@ def upload_photo(file, name):
             "base64Data": b64
         }
         
-        res = requests.post(GOOGLE_PROXY_URL, json=payload, headers=headers, timeout=120)
-        
-        if res.status_code != 200:
-            st.error(f"❌ 서버 오류 (코드: {res.status_code}). 용량 초과 또는 네트워크 문제입니다.")
-            return ""
-            
-        url = res.json().get("fileUrl", "")
-        if safe_mime_type.startswith('video/') and "vid=1" not in url: 
-            url += "&vid=1" if "?" in url else "?vid=1"
-            
-        st.toast(f"✅ 첨부파일 저장 완료!", icon="🎉")
-        return url
+        # 📡 [수정사항 적용] 네트워크 지연으로 인한 증발 현상을 막기 위한 최대 3회 재시도 로직
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                res = requests.post(GOOGLE_PROXY_URL, json=payload, headers=headers_req, timeout=60)
+                
+                if res.status_code == 200:
+                    url = res.json().get("fileUrl", "")
+                    if safe_mime_type.startswith('video/') and "vid=1" not in url: 
+                        url += "&vid=1" if "?" in url else "?vid=1"
+                        
+                    st.toast(f"✅ 첨부파일 저장 완료!", icon="🎉")
+                    return url
+                else:
+                    if attempt == max_retries - 1:
+                        st.error(f"❌ 서버 오류 (코드: {res.status_code}). 용량 초과 또는 네트워크 문제입니다.")
+                        return ""
+            except Exception as req_e:
+                if attempt == max_retries - 1:
+                    st.error(f"❌ 네트워크 연결 실패: {str(req_e)}")
+                    return ""
+                time.sleep(1.5) # 실패 시 1.5초 대기 후 재시도
+                
+        return ""
     except Exception as e: 
-        st.error(f"❌ 전송 실패: {str(e)}")
+        st.error(f"❌ 전송 중 오류 발생: {str(e)}")
         return ""
 
 def chunked_update(worksheet, cells, chunk_size=200):
@@ -465,7 +477,13 @@ if '이름' in df.columns:
         st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다!\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 weeks_list = [f"{i}주" for i in range(1, 53)]
+
+# [수정 1] 글로벌 변수: 수기 입력된 커스텀 날짜를 헤더에서 추출하여 메뉴 리스트에 추가
+custom_dates_list = [str(h) for h in headers if re.match(r'^\d{4}-\d{2}-\d{2}$', str(h))]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
+for cd in custom_dates_list:
+    week_display_map[cd] = f"📅 {cd} (수기입력)"
+extended_weeks_list = weeks_list + sorted(custom_dates_list, reverse=True) + ["✏️ 직접 입력 (새 날짜)"]
 
 # --- 다이얼로그 모달: 주보 보기 ---
 @st.dialog("📖 주보 보기", width="large")
@@ -519,7 +537,6 @@ def manage_bulletin_dialog(w_str, d_str):
         if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
             ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-# ⭐ [수정 팝업 오류 완벽 해결] 모달창 안에서 탭(Tab)으로 나누어 화면이 재시작/겹치는 버그 완전 차단
 @st.dialog("👤 인원 정보 상세 / 수정")
 def edit_student_dialog(target_dict):
     tab_info, tab_edit = st.tabs(["📄 현재 정보 보기", "✏️ 내역 수정하기"])
@@ -1087,14 +1104,25 @@ with tabs[5]:
 # ==========================================
 with tabs[6]:
     st.subheader("📅 주간 출석 현황")
-    extended_weeks_list = weeks_list + ["✏️ 직접 입력 (새 날짜)"]
     
     with st.container(border=True):
         c1, c2 = st.columns(2)
         with c1: 
+            # [수정 1] 글로벌 변수에서 설정한 리스트를 사용하여 수기 입력 날짜도 드롭다운에 표시
             sel_w_raw = st.selectbox("출석 주차 / 기준일", extended_weeks_list, index=max(0, min(51, datetime.date.today().isocalendar()[1] - 1)), format_func=lambda x: week_display_map.get(x, x))
-            if sel_w_raw == "✏️ 직접 입력 (새 날짜)": target_date = st.date_input("새로운 날짜 선택", datetime.date.today()); sel_w = target_date.strftime("%Y-%m-%d")
-            else: sel_w = sel_w_raw; w_num = int(sel_w_raw.replace("주", "")); target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
+            
+            if sel_w_raw == "✏️ 직접 입력 (새 날짜)": 
+                target_date = st.date_input("새로운 날짜 선택", datetime.date.today())
+                sel_w = target_date.strftime("%Y-%m-%d")
+            else: 
+                sel_w = sel_w_raw
+                # n주차인 경우와 커스텀 날짜인 경우 날짜 계산 분기 처리
+                if "주" in sel_w_raw:
+                    w_num = int(sel_w_raw.replace("주", ""))
+                    target_date = start_date + datetime.timedelta(days=(w_num-1)*7)
+                else:
+                    target_date = parse_date_safe(sel_w_raw)
+                    
         with c2: 
             sel_class = st.selectbox("반 필터", ["전체보기"] + sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
         show_inactive = st.checkbox("👀 강제 전체명단 표시 (이사/졸업 포함)")
@@ -1288,7 +1316,7 @@ with tabs[7]:
 
     st.write("👤 **개인별 누적 출석**")
     report_df = df[~df[status_col].isin(INACTIVE_STATUS)].copy()
-    week_cols = [c for c in report_df.columns if c.endswith('주')]
+    week_cols = [c for c in report_df.columns if c.endswith('주') or re.match(r'^\d{4}-\d{2}-\d{2}$', str(c))]
     report_df['출석수'] = report_df[week_cols].apply(lambda x: x.astype(str).str.strip().eq('1').sum(), axis=1)
     
     student_report = report_df[report_df.apply(get_role, axis=1) == 'student']
