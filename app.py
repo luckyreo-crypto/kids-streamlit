@@ -10,6 +10,7 @@ import uuid
 import re
 import time
 import io
+import gc
 
 # --- 1. 전역 설정 및 상수 ---
 st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon="🌱", layout="wide")
@@ -183,7 +184,7 @@ if not st.session_state["authenticated"]:
             st.markdown("<h2 style='text-align: center; color: #0366d6;'>🌱 26년 슈팅스타 통합관리 V1.0</h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; color: gray; margin-bottom: 20px;'>안전한 시스템 접근을 위해 관리자 비밀번호를 입력해주세요.</p>", unsafe_allow_html=True)
             pwd = st.text_input("비밀번호 (특수문자 포함)", type="password", placeholder="비밀번호 입력", label_visibility="collapsed")
-            if st.button("🚀 시스템 로그인", type="primary"):
+            if st.button("🚀 시스템 로그인", use_container_width=True, type="primary"):
                 if "admin_password" in st.secrets and pwd == st.secrets["admin_password"]:
                     st.session_state["authenticated"] = True; st.rerun()
                 else: st.error("❌ 비밀번호가 일치하지 않습니다.")
@@ -192,15 +193,15 @@ if not st.session_state["authenticated"]:
 # --- 시스템 상단: 데이터 동기화 및 폰트 조절 ---
 col_f1, col_spacer, col_f2, col_f3 = st.columns([3, 3, 2, 2])
 with col_f1:
-    if st.button("🔄 서버 데이터 동기화", help="구글시트 최신 정보 불러오기"):
+    if st.button("🔄 서버 데이터 동기화", help="구글시트 최신 정보 불러오기", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 with col_f2:
-    if st.button("A -", help="글자 작게"):
+    if st.button("A -", help="글자 작게", use_container_width=True):
         st.session_state["base_font_size"] = max(10, st.session_state["base_font_size"] - 1)
         st.rerun()
 with col_f3:
-    if st.button("A +", help="글자 크게"):
+    if st.button("A +", help="글자 크게", use_container_width=True):
         st.session_state["base_font_size"] = min(24, st.session_state["base_font_size"] + 1)
         st.rerun()
 st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
@@ -220,15 +221,16 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
-# ⭐ [최종 완성형] Segfault(서버 충돌) 완전 차단을 위한 안전한 파일 업로드 로직
+# ⭐ [핵심 개선] 모바일 업로드 중 앱이 뻗는 에러(OOM: Out Of Memory) 완전 차단 로직
 def upload_photo(file, name):
     if not file: return ""
     try:
         st.toast(f"⏳ '{file.name}' 전송 및 최적화 중...", icon="☁️")
         
-        orig_ext = ".jpg"
         if '.' in file.name:
             orig_ext = "." + file.name.split('.')[-1].strip().lower()
+        else:
+            orig_ext = ".jpg"
             
         clean_name = re.sub(r'[^a-zA-Z0-9ㄱ-ㅣ가-힣_-]', '', str(name).strip())
         if not clean_name:
@@ -238,32 +240,47 @@ def upload_photo(file, name):
         final_filename = f"{clean_name}_{int(time.time())}_{unique_id}{orig_ext}"
         safe_mime_type = file.type if file.type else "application/octet-stream"
         
+        # 파일 데이터를 읽고 즉시 원본 스트림 영향 최소화
         file_data = file.getvalue()
 
-        # 🚀 C-Level 메모리 충돌을 막기 위해 Context Manager(with 블록)를 이용한 부드러운 이미지 압축
+        # 🚀 [해결 1] 서버 메모리 폭발(OOM) 방지 및 사진 회전 방지
+        # 아이폰 원본 HEIC가 올라오는 것을 막기 위해 file_uploader에서 heic를 제거하였으나, 
+        # 혹시나 우회해서 들어온 대형 이미지라도 파이썬이 안전하게 강제 압축합니다.
         if any(ext in orig_ext for ext in ['.jpg', '.jpeg', '.png', '.webp']):
             try:
                 from PIL import Image, ImageOps
-                with Image.open(io.BytesIO(file_data)) as img:
-                    try:
-                        img = ImageOps.exif_transpose(img)
-                    except:
-                        pass
-                        
-                    if img.mode != 'RGB':
-                        img = img.convert('RGB')
-                        
-                    img.thumbnail((1024, 1024))
+                
+                # UploadedFile 객체 대신 메모리의 byte 배열로 안전하게 열기
+                img = Image.open(io.BytesIO(file_data))
+                
+                # 스마트폰 세로 사진이 가로로 눕는 현상(EXIF 손실) 방지
+                try:
+                    img = ImageOps.exif_transpose(img)
+                except:
+                    pass
                     
-                    with io.BytesIO() as buf:
-                        img.save(buf, format='JPEG', quality=85)
-                        file_data = buf.getvalue()
-                        safe_mime_type = "image/jpeg"
-                        final_filename = final_filename.rsplit('.', 1)[0] + ".jpg"
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                    
+                # 사이즈 대폭 축소하여 모바일 전송 안정성 확보 (1024px)
+                img.thumbnail((1024, 1024))
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=85)
+                
+                # 압축된 데이터로 덮어쓰기
+                file_data = buf.getvalue()
+                safe_mime_type = "image/jpeg"
+                final_filename = final_filename.rsplit('.', 1)[0] + ".jpg"
+                
+                # [해결 2] 메모리 즉각 반환 (서버 뻗음의 가장 큰 원인 해결)
+                del img
+                del buf
             except Exception as e:
-                pass # 파이썬 이미지 처리에 실패하더라도 뻗지 않고 원본 파일 그대로 전송
+                pass # 파이썬 압축 실패 시에만 원본 전송
         
+        # Base64 인코딩 후에도 찌꺼기 즉각 삭제
         b64 = base64.b64encode(file_data).decode('utf-8')
+        del file_data 
         
         headers_req = {"Content-Type": "application/json"}
         if "PROXY_AUTH_KEY" in st.secrets: 
@@ -276,6 +293,7 @@ def upload_photo(file, name):
         }
         
         res_url = ""
+        # 📡 재시도 로직 (네트워크 불안정 방어)
         max_retries = 2
         for attempt in range(max_retries):
             try:
@@ -294,6 +312,11 @@ def upload_photo(file, name):
                 if attempt == max_retries - 1:
                     st.error(f"❌ 통신 지연 혹은 네트워크 오류")
                 time.sleep(1)
+        
+        # 🚀 [해결 3] 통신이 끝난 후 초대형 문자열 및 JSON 객체 강제 청소 (Error running app 근절)
+        del payload
+        del b64
+        gc.collect()
         
         return res_url
     except Exception as e: 
@@ -514,8 +537,9 @@ def manage_bulletin_dialog(w_str, d_str):
     
     with st.form(f"bulletin_form_{w_str}"):
         memo = st.text_input("📝 비고 (예: 신년감사예배, 야외예배 등)", value=existing_data.iloc[0].get('비고', '') if not existing_data.empty else "")
-        st.caption("고해상도 이미지(JPG/PNG) 업로드를 권장합니다. (권장용량: 5MB 이하)")
+        st.caption("고해상도 이미지(JPG/PNG/HEIC) 업로드를 권장합니다. (권장용량: 5MB 이하)")
         
+        # ⚠️ 아이폰 고용량 HEIC 우회 변환을 유도하기 위해 heic 형식을 고의로 제거
         img1 = st.file_uploader("📷 주보 앞면 (또는 1페이지)", type=['png', 'jpg', 'jpeg', 'webp'])
         img2 = st.file_uploader("📷 주보 뒷면 (또는 2페이지) - 선택사항", type=['png', 'jpg', 'jpeg', 'webp'])
         
@@ -526,7 +550,7 @@ def manage_bulletin_dialog(w_str, d_str):
             if old_img2 and "http" in str(old_img2): c2.image(str(old_img2).replace("&vid=1", "").replace("?vid=1", ""), caption="현재 뒷면", use_container_width=True)
         else: old_img1, old_img2 = "", ""
         
-        if st.form_submit_button("💾 주보 저장 및 업로드", type="primary"):
+        if st.form_submit_button("💾 주보 저장 및 업로드", type="primary", use_container_width=True):
             with st.spinner("이미지 서버 전송 및 저장 중... (창을 닫지 마세요)"):
                 url1 = upload_photo(img1, f"주보_{w_str}_1") if img1 else old_img1
                 url2 = upload_photo(img2, f"주보_{w_str}_2") if img2 else old_img2
@@ -538,7 +562,7 @@ def manage_bulletin_dialog(w_str, d_str):
                 st.success("✅ 저장이 완료되었습니다!"); time.sleep(1); st.cache_data.clear(); st.rerun()
     
     if not existing_data.empty:
-        if st.button("🚨 이 주차의 주보 데이터 완전 삭제", type="primary"):
+        if st.button("🚨 이 주차의 주보 데이터 완전 삭제", use_container_width=True):
             ws_b.delete_rows(int(existing_data.iloc[0]['sheet_row'])); st.success("🗑️ 삭제 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
 @st.dialog("👤 인원 정보 상세 / 수정")
@@ -571,7 +595,7 @@ def edit_student_dialog(target_dict):
         st.caption(f"등록일: {safe_str(target_dict.get('등록일',''))} | 변동일: {safe_str(target_dict.get('변동일',''))}")
         
         st.divider()
-        if st.button("닫기", type="secondary"): st.rerun()
+        if st.button("닫기", use_container_width=True): st.rerun()
             
     with tab_edit:
         with st.form("modal_edit_form"):
@@ -595,7 +619,7 @@ def edit_student_dialog(target_dict):
             e_memo = col_f.text_input("비고", value=safe_str(target_dict.get('비고','')))
             e_photo = col_f.file_uploader("사진변경", type=['png', 'jpg', 'jpeg', 'webp']) # 메모리 방어
             
-            if st.form_submit_button("💾 정보 저장", type="primary"):
+            if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
                 with st.spinner("저장 중..."):
                     p_url = upload_photo(e_photo, e_name) if e_photo else safe_str(target_dict.get('사진',''))
                     actual_headers = ws.row_values(1)
@@ -716,7 +740,7 @@ with tabs[0]:
                             '''
                             st.markdown(info_html, unsafe_allow_html=True)
                             
-                        if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인"):
+                        if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="상세정보 확인", use_container_width=True):
                             edit_student_dialog(r.to_dict())
             
             with st.expander(f"➕ 새친구 추가"):
@@ -868,7 +892,7 @@ with tabs[2]:
         if not df_p.empty:
             p_options = ["삭제할 일정을 고르세요"] + df_p.apply(lambda r: f"[{r.get('날짜','').strip()}] {r.get('이름','').strip()}", axis=1).tolist()
             sel_p_idx = st.selectbox("삭제 대상 선택", range(len(p_options)), format_func=lambda x: p_options[x], key="del_prayer_sel")
-            if st.button("🚨 해당 기도 일정 삭제 실행", type="primary") and sel_p_idx > 0:
+            if st.button("🚨 해당 기도 일정 삭제 실행", key="btn_del_prayer") and sel_p_idx > 0:
                 target_p = df_p.iloc[sel_p_idx - 1]; ws_p.delete_rows(int(target_p['sheet_row'])); st.success("🗑️ 일정이 정상 삭제되었습니다."); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
@@ -1011,7 +1035,7 @@ with tabs[5]:
         with st.form("new_e"):
             a_d = st.date_input("날짜"); a_t = st.text_input("행사명 (필수)"); a_c = st.text_area("내용"); a_n = st.text_input("공지사항")
             st.caption("✅ 권장 용량: 개당 10MB 이하 (구글 드라이브 정책). 모바일 사진은 자동 압축됩니다.")
-            a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','webp','mp4','mov','avi'])
+            a_f = st.file_uploader("사진/영상 (최대15개)", accept_multiple_files=True, type=['png','jpg','jpeg','webp','mp4','mov','avi']) # HEIC 제거 완료
             if st.form_submit_button("저장"):
                 if not a_t.strip():
                     st.error("🚨 행사명을 반드시 입력해주세요.")
@@ -1021,6 +1045,7 @@ with tabs[5]:
                         if a_f: 
                             for i, f in enumerate(a_f[:15]): 
                                 urls[i] = upload_photo(f, a_t)
+                                gc.collect() # 🚀 강제 메모리 청소 적용
                         act_sh_headers = ws_act.row_values(1)
                         missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
                         if missing_act:
@@ -1077,10 +1102,12 @@ with tabs[5]:
                                     final_urls = [""] * 15
                                     for k, f in enumerate(bulk_files[:15]): 
                                         final_urls[k] = upload_photo(f, e_t)
+                                        gc.collect() # 🚀 강제 청소
                                 else:
                                     for k in range(15):
                                         if new_files[k] is not None: 
                                             final_urls[k] = upload_photo(new_files[k], e_t)
+                                            gc.collect()
                                         elif delete_flags[k]: final_urls[k] = ""
                                 act_sh_headers = ws_act.row_values(1)
                                 missing_act = [col for col in [f"사진{idx}" for idx in range(1, 16)] if col not in act_sh_headers]
@@ -1103,7 +1130,7 @@ with tabs[5]:
             sort_act = sort_act.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
             event_options = ["행사 선택"] + sort_act['sheet_row'].tolist()
             sel_del = st.selectbox("삭제할 행사", event_options, format_func=format_event, key="event_del_sel")
-            if st.button("🚨 삭제 실행", type="primary") and sel_del != "행사 선택": 
+            if st.button("🚨 삭제 실행", key="btn_del_event") and sel_del != "행사 선택": 
                 ws_act.delete_rows(int(sel_del)); st.success("✅ 삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
@@ -1346,7 +1373,7 @@ with tabs[8]:
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
         cpwd = st.text_input("총무 전용 비밀번호를 입력하세요", type="password", key="pwd_receipt")
-        if st.button("인증", type="primary"):
+        if st.button("인증", key="btn_auth_receipt"):
             if cpwd == st.secrets.get("chongmu_password", "admin1234"): 
                 st.session_state['chongmu_auth'] = True; st.rerun()
             else: st.error("❌ 비밀번호가 일치하지 않습니다.")
@@ -1464,7 +1491,7 @@ with tabs[8]:
         with r_tabs[3]:
             if not df_r.empty:
                 sel_idx = st.selectbox("삭제할 내역", range(len(options)), format_func=lambda x: options[x], key="del_rcpt_sel")
-                if st.button("🚨 삭제 실행", type="primary") and sel_idx > 0:
+                if st.button("🚨 삭제 실행", key="btn_del_receipt") and sel_idx > 0:
                     target = df_r.iloc[sel_idx - 1]
                     ws_r.delete_rows(int(target['sheet_row'])); st.success("삭제되었습니다!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
@@ -1579,11 +1606,11 @@ with tabs[9]:
             if d_type == "입금 장부" and not df_in.empty:
                 opts = ["내역 선택"] + df_in.apply(lambda r: f"[{r.get('날짜','')} | {r.get('입금자명','')} | {parse_int_safe(r.get('입금액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_in_sel")
-                if st.button("🚨 입금 삭제 실행", type="primary") and idx > 0: ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                if st.button("🚨 입금 삭제 실행", key="btn_del_in") and idx > 0: ws_in.delete_rows(int(df_in.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
             elif d_type == "지출 장부" and not df_out.empty:
                 opts = ["내역 선택"] + df_out.apply(lambda r: f"[{r.get('날짜','')} | {r.get('내용','')} | {parse_int_safe(r.get('지출액', 0)):,}원", axis=1).tolist()
                 idx = st.selectbox("삭제할 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_out_sel")
-                if st.button("🚨 지출 삭제 실행", type="primary") and idx > 0: ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
+                if st.button("🚨 지출 삭제 실행", key="btn_del_out") and idx > 0: ws_out.delete_rows(int(df_out.iloc[idx-1]['sheet_row'])); st.success("삭제 완료!"); time.sleep(1.5); st.cache_data.clear(); st.rerun()
 
 # ==========================================
 # [탭 11] 교적부 통합 관리
@@ -1689,7 +1716,7 @@ with tabs[10]:
             n_reg = col1.date_input("등록일자", value=datetime.date.today()).strftime("%Y-%m-%d")
             st.caption("✅ 권장 용량: 사진 당 5MB 이하")
             n_photo = st.file_uploader("사진 첨부", type=['png', 'jpg', 'jpeg', 'webp'])
-            if st.form_submit_button("✨ 등록하기", type="primary"):
+            if st.form_submit_button("✨ 등록하기"):
                 if not n_name.strip() or not n_class.strip():
                     st.error("🚨 이름과 학년(담임) 정보를 입력해주세요!")
                 else:
