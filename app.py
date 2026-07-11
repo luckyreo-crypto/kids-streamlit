@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -18,8 +17,8 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon=
 # ✅ 모든 메뉴에서 항상 보이도록 우측 하단 고정형 "맨 위로" 버튼 추가
 st.markdown('<div id="top-anchor"></div><a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
 
-# 모바일 브라우저 줌(Zoom) 강제 방지 스크립트 추가
-components.html(
+# [수정] 경고/에러를 유발하던 components.html을 최신 문법인 st.html로 교체 (모바일 줌 방지 스크립트)
+st.html(
     """
     <script>
     const parentDoc = window.parent.document;
@@ -36,8 +35,7 @@ components.html(
         window.history.pushState(null, "", window.location.href);
     };
     </script>
-    """,
-    height=0, width=0
+    """
 )
 
 INACTIVE_STATUS = ['이사', '비활성', '졸업', '타교회']
@@ -799,8 +797,9 @@ with tabs[1]:
                             st.markdown(f"<div style='display:flex; justify-content:space-between; margin-bottom:5px;'>{n_disp} <span style='font-size:0.8rem; color:gray;'>({c_only})</span><strong style='color:#e65100;'>{p['day']}일</strong></div>", unsafe_allow_html=True)
                     else:
                         st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
-                        
-    components.html("""
+
+    # [수정] 경고를 유발하던 components.html을 st.html로 교체 (현재 월 스크롤 이동 기능)
+    st.html("""
         <script>
         let scrollDoneMonth = false;
         setInterval(() => {
@@ -810,7 +809,7 @@ with tabs[1]:
             } else if (el && el.offsetParent === null) { scrollDoneMonth = false; }
         }, 500);
         </script>
-    """, height=0, width=0)
+    """)
 
 # ==========================================
 # [탭 2] 기도순서
@@ -939,7 +938,8 @@ with tabs[3]:
                         else: st.warning(f"⚠️ {w_str} ({d_str}) 주보는 아직 등록되지 않았습니다. [⚙️ 주보 등록/수정] 탭에서 먼저 올려주세요.")
                     else: manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
 
-    components.html("""
+    # [수정] 경고를 유발하던 components.html을 st.html로 교체 (현재 주차 스크롤 이동 기능)
+    st.html("""
         <script>
         let scrollDoneWeek = false;
         setInterval(() => {
@@ -948,7 +948,7 @@ with tabs[3]:
             else if (el && el.offsetParent === null) { scrollDoneWeek = false; }
         }, 500);
         </script>
-    """, height=0, width=0)
+    """)
 
 # ==========================================
 # [탭 4] 새친구
