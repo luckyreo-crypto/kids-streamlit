@@ -440,11 +440,10 @@ def get_worksheets():
     except: ws_b = sh.add_worksheet("주보관리", 60, 10); ws_b.append_row(["주차", "날짜", "주보이미지1", "주보이미지2", "비고", "업데이트일시"])
     return ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p, ws_b
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, max_entries=1)
 def fetch_sheet_data():
     ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p, ws_b = get_worksheets()
     return ws_m.get_all_values(), ws_a.get_all_values(), ws_s.get_all_values(), ws_r.get_all_values(), ws_in.get_all_values(), ws_out.get_all_values(), ws_p.get_all_values(), ws_b.get_all_values()
-
 def get_all_data():
     try:
         ws_m, ws_a, ws_s, ws_r, ws_in, ws_out, ws_p, ws_b = get_worksheets()
