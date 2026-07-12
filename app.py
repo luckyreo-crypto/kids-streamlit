@@ -17,7 +17,7 @@ st.set_page_config(page_title="26년 슈팅스타 통합관리 V1.0", page_icon=
 # ✅ 모든 메뉴에서 항상 보이도록 우측 하단 고정형 "맨 위로" 버튼 추가
 st.markdown('<div id="top-anchor"></div><a href="#top-anchor" class="fab-button">⬆ 맨 위로</a>', unsafe_allow_html=True)
 
-# [수정] 모바일 화면 확대/축소(줌) 허용으로 변경 (user-scalable=yes)
+# 모바일 화면 확대/축소(줌) 허용으로 변경 (user-scalable=yes)
 st.html(
     """
     <script>
@@ -53,7 +53,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# [UI 개선] 모바일 가독성 및 탭 스크롤 최적화
+# [UI 개선] 모바일 가독성 및 탭 스크롤 최적화 + 2/3열 그리드 배치
 st.markdown("""
     <style>
     html { scroll-behavior: smooth; }
@@ -75,7 +75,6 @@ st.markdown("""
         box-shadow: 0 4px 10px -2px rgba(0,0,0,0.05) !important;
     }
     
-    /* 🔥 모바일 화면 최적화: 탭 한줄 횡스크롤 처리 (화면 낭비 방지) */
     div[data-testid="stTabs"] [role="tablist"] { 
         display: flex !important; flex-wrap: nowrap !important; justify-content: flex-start !important; 
         overflow-x: auto !important; -webkit-overflow-scrolling: touch;
@@ -147,19 +146,50 @@ st.markdown("""
     div[data-testid="stButton"] button { min-height: 50px !important; font-size: 1.1rem !important; font-weight: 700 !important; border-radius: 8px !important; }
 
     @media (max-width: 768px) {
+        /* 모바일 2열 배치를 위한 래퍼 자동 줄바꿈 허용 */
         div[data-testid="stHorizontalBlock"]:has(.keep-row),
         div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) { 
             display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; 
-            align-items: center !important; 
+            gap: 2% !important; margin-bottom: 0 !important;
+        }
+        /* 3열을 모바일에서는 48%로 강제하여 2열로 깔끔하게 배치 */
+        div[data-testid="stHorizontalBlock"]:has(.keep-row) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"] {
+            min-width: 48% !important; flex: 1 1 48% !important; margin-bottom: 8px !important;
         }
         
+        /* 카드 내부의 이미지+텍스트 영역은 가로로 묶기(세로로 무너지지 않도록) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stHorizontalBlock"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important; gap: 5px !important; align-items: center !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 0 !important; flex: 1 1 auto !important;
+        }
+        
+        /* 모바일 출석체크 컴포넌트 압축 */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) { padding: 5px 8px !important; }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] { min-height: 50px !important; }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {
-            transform: scale(1.5) !important; 
-            margin-left: 5px !important; margin-right: 10px !important;
+            transform: scale(1.3) !important; margin-left: 0 !important; margin-right: 8px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
+            white-space: normal !important; word-break: keep-all; font-size: 0.95rem !important; line-height: 1.1; margin-left: 0 !important;
         }
         
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {
-            white-space: normal !important; word-break: keep-all; font-size: 1.1rem !important;
+        /* 모바일 반 명단 컴포넌트 압축 */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) { padding: 5px 8px !important; }
+        
+        /* 이미지 사이즈 축소 및 텍스트 맞춤 */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) img,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[style*="border-radius:50%"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) img,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[style*="border-radius:50%"] {
+            width: 35px !important; height: 35px !important; font-size: 18px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) span {
+            font-size: 0.85rem !important; white-space: normal !important; word-break: keep-all; line-height: 1.1;
         }
         
         div[role="dialog"] > div { padding: 1rem !important; } 
@@ -220,7 +250,7 @@ def parse_int_safe(val):
     try: return int(float(str(val).replace(',', '')))
     except: return 0
 
-# ⭐ [핵심 개선] 모바일 업로드 중 앱이 뻗는 에러(OOM: Out Of Memory) 완전 차단 로직
+# ⭐ 모바일 업로드 중 앱이 뻗는 에러(OOM) 완전 차단 로직
 def upload_photo(file, name):
     if not file: return ""
     try:
@@ -239,44 +269,31 @@ def upload_photo(file, name):
         final_filename = f"{clean_name}_{int(time.time())}_{unique_id}{orig_ext}"
         safe_mime_type = file.type if file.type else "application/octet-stream"
         
-        # 파일 데이터를 읽고 즉시 원본 스트림 영향 최소화
         file_data = file.getvalue()
 
-        # 🚀 [해결 1] 서버 메모리 폭발(OOM) 방지 및 사진 회전 방지
+        # 서버 메모리 폭발(OOM) 방지 및 사진 회전 방지
         if any(ext in orig_ext for ext in ['.jpg', '.jpeg', '.png', '.webp']):
             try:
                 from PIL import Image, ImageOps
-                
-                # UploadedFile 객체 대신 메모리의 byte 배열로 안전하게 열기
                 img = Image.open(io.BytesIO(file_data))
-                
-                # 스마트폰 세로 사진이 가로로 눕는 현상(EXIF 손실) 방지
-                try:
-                    img = ImageOps.exif_transpose(img)
-                except:
-                    pass
+                try: img = ImageOps.exif_transpose(img)
+                except: pass
                     
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                    
-                # 사이즈 대폭 축소하여 모바일 전송 안정성 확보 (1024px)
+                if img.mode != 'RGB': img = img.convert('RGB')
                 img.thumbnail((1024, 1024))
                 buf = io.BytesIO()
                 img.save(buf, format='JPEG', quality=85)
                 
-                # 압축된 데이터로 덮어쓰기
                 file_data = buf.getvalue()
                 safe_mime_type = "image/jpeg"
                 final_filename = final_filename.rsplit('.', 1)[0] + ".jpg" if '.' in final_filename else final_filename + ".jpg"
                 
-                # [해결 2] 메모리 즉각 반환 방어 코드 추가
                 img.close()
                 del img
                 del buf
             except Exception as e:
-                pass # 파이썬 압축 실패 시에만 원본 전송
+                pass
         
-        # Base64 인코딩 후에도 찌꺼기 즉각 삭제
         b64 = base64.b64encode(file_data).decode('utf-8')
         del file_data 
         
@@ -291,7 +308,6 @@ def upload_photo(file, name):
         }
         
         res_url = ""
-        # 📡 재시도 로직 (네트워크 불안정 방어)
         max_retries = 2
         for attempt in range(max_retries):
             try:
@@ -311,7 +327,6 @@ def upload_photo(file, name):
                     st.error(f"❌ 통신 지연 혹은 네트워크 오류")
                 time.sleep(1)
         
-        # 🚀 [해결 3] 통신이 끝난 후 초대형 문자열 및 JSON 객체 강제 청소
         del payload
         del b64
         gc.collect()
@@ -495,7 +510,7 @@ if '이름' in df.columns:
     active_sum_calc = len(df) - total_inact
 
     valid_names_df = df[df['이름'].astype(str).str.strip() != '']
-    if not valid_names_df.empty: # 방어 코드 적용
+    if not valid_names_df.empty: 
         dup_names = valid_names_df[valid_names_df.duplicated('이름', keep=False)]['이름'].unique()
         if len(dup_names) > 0:
             dup_details = []
@@ -505,8 +520,6 @@ if '이름' in df.columns:
             st.error(f"🚨 **더블카운트 원인 발견 (데이터 중복):** 교적부 시트에 똑같은 이름이 2번 이상 등록된 사람이 있습니다!\n\n**🔍 중복 명단: {', '.join(dup_details)}**")
 
 weeks_list = [f"{i}주" for i in range(1, 53)]
-
-# 수기 입력 커스텀 날짜 관리
 custom_dates_list = [str(h) for h in headers if re.match(r'^\d{4}-\d{2}-\d{2}$', str(h))]
 week_display_map = {f"{i}주": format_week_display(f"{i}주") for i in range(1, 53)}
 for cd in custom_dates_list:
@@ -523,7 +536,7 @@ def view_bulletin_dialog(w_str, d_str, row_data):
     img1, img2 = str(row_data.get('주보이미지1', '')), str(row_data.get('주보이미지2', ''))
     t1, t2 = st.tabs(["앞면 (1쪽)", "뒷면 (2쪽)"])
     with t1:
-        if img1 and "http" in img1: # 이미지 사이즈 절반(50%) 축소 적용
+        if img1 and "http" in img1:
             st.markdown(f"<img src='{img1.replace('&vid=1', '').replace('?vid=1', '')}' style='max-width: 50%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: block; margin: auto;'>", unsafe_allow_html=True)
         else: st.write("등록된 앞면 이미지가 없습니다.")
     with t2:
@@ -618,7 +631,7 @@ def edit_student_dialog(target_dict):
             e_parents = col_f.text_input("부모", value=safe_str(target_dict.get('부모(아빠/엄마)','')))
             e_addr = col_f.text_input("주소", value=safe_str(target_dict.get('주소','')))
             e_memo = col_f.text_input("비고", value=safe_str(target_dict.get('비고','')))
-            e_photo = col_f.file_uploader("사진변경", type=['png', 'jpg', 'jpeg', 'webp']) # 메모리 방어
+            e_photo = col_f.file_uploader("사진변경", type=['png', 'jpg', 'jpeg', 'webp'])
             
             if st.form_submit_button("💾 정보 저장", type="primary", use_container_width=True):
                 with st.spinner("저장 중..."):
@@ -703,7 +716,8 @@ with tabs[0]:
         with st.container(border=True):
             st.markdown(f"<h4 style='color:#0366d6; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;'>{header_title}</h4>", unsafe_allow_html=True)
             
-            stu_cols = st.columns(2)
+            # [변경] 데스크톱에서는 3열 배치 (모바일에서는 CSS가 2열로 자동 변경함)
+            stu_cols = st.columns(3)
             
             for idx_j, (_, r) in enumerate(group.iterrows()):
                 s, n = r[status_col], r['이름']
@@ -722,7 +736,7 @@ with tabs[0]:
                 icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                 p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                 
-                with stu_cols[idx_j % 2]:
+                with stu_cols[idx_j % 3]:
                     with st.container(border=True):
                         st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                         
@@ -801,7 +815,6 @@ with tabs[1]:
                     else:
                         st.markdown("<div style='text-align:center; color:#ccc; font-size:0.9rem; padding: 10px 0;'>생일자가 없습니다</div>", unsafe_allow_html=True)
 
-    # 안전하게 동작하도록 JS 코드 블록 감싸기
     st.html("""
         <script>
         try {
@@ -945,7 +958,6 @@ with tabs[3]:
                         else: st.warning(f"⚠️ {w_str} ({d_str}) 주보는 아직 등록되지 않았습니다. [⚙️ 주보 등록/수정] 탭에서 먼저 올려주세요.")
                     else: manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
 
-    # 자바스크립트 안전 적용
     st.html("""
         <script>
         try {
@@ -994,7 +1006,7 @@ with tabs[5]:
             view_act_df['sort_date'] = pd.to_datetime(view_act_df['날짜'], errors='coerce')
             view_act_df = view_act_df.sort_values(by=['sort_date', 'sheet_row'], ascending=[False, False])
             
-            html_event = """<html><head><meta charset="utf-8"><title>행사 일정 요약</title><style>body { font-family: 'Malgun Gothic', sans-serif; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f1f8ff; text-align:center; } .page-break { page-break-before: always; } img { max-width: 50%; max-height: 400px; margin: 10px; border-radius: 8px; border: 1px solid #eee; }</style></head><body>"""
+            html_event = """<html><head><meta charset="utf-8"><title>행사 일정 요약</title><style>body { font-family: 'Malgun Gothic', sans-serif; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f1f8ff; text-align:center; } .page-break { page-break-before: always; } img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; width: 100%; margin-top: 15px; }</style></head><body>"""
             html_event += "<h1 style='text-align:center; color:#0366d6;'>행사 일정 요약표</h1><table><tr><th>날짜</th><th>행사명</th><th>세부 내용</th></tr>"
             
             for _, row in view_act_df.iterrows():
@@ -1009,10 +1021,11 @@ with tabs[5]:
                 
                 v_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                 if v_urls:
-                    html_event += "<div style='text-align:center;'>"
+                    html_event += "<div class='grid-container'>"
                     for url in v_urls:
                         cl_url = str(url).replace("&vid=1", "").replace("?vid=1", "")
-                        if not any(ext in cl_url.lower() for ext in ['vid=1', '.mp4', '.mov']): html_event += f"<img src='{cl_url}'>"
+                        if not any(ext in cl_url.lower() for ext in ['vid=1', '.mp4', '.mov']): 
+                            html_event += f"<div style='aspect-ratio: 1/1;'><img src='{cl_url}'></div>"
                     html_event += "</div>"
             html_event += "</body></html>"
             
@@ -1027,21 +1040,20 @@ with tabs[5]:
                     valid_urls = [row.get(f'사진{i}', "") for i in range(1, 16) if str(row.get(f'사진{i}', "")).startswith('http')]
                     if valid_urls:
                         st.markdown("---")
-                        gallery_html = '<div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">'
+                        # [변경] 빈 공간 없이 꽉 차게 표시되는 CSS 그리드(Grid) 레이아웃 적용
+                        gallery_html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; width: 100%;">'
                         for media_url in valid_urls:
                             clean_url = str(media_url).replace("&vid=1", "").replace("?vid=1", "")
                             if 'vid=1' in str(media_url).lower() or any(ext in str(media_url).lower() for ext in ['.mp4', '.mov', '.avi', '.webm', '.mkv']):
                                 file_id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', clean_url) or re.search(r'id=([a-zA-Z0-9_-]+)', clean_url)
                                 if file_id_match:
                                     f_id = file_id_match.group(1)
-                                    # iframe 사이즈 축소 (높이 250, 너비 제한)
-                                    gallery_html += f'''<div style="width: 100%; max-width: 400px; margin-bottom: 10px;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="250" style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe><div style="text-align: right; padding-top: 5px;"><a href="https://drive.google.com/file/d/{f_id}/view" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 원본 열기</a></div></div>'''
+                                    gallery_html += f'''<div style="grid-column: 1 / -1; width: 100%; margin-bottom: 10px;"><iframe src="https://drive.google.com/file/d/{f_id}/preview" width="100%" height="250" style="border: none; border-radius: 8px; background-color: black; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" allow="autoplay; fullscreen" playsinline webkitallowfullscreen mozallowfullscreen></iframe><div style="text-align: right; padding-top: 5px;"><a href="https://drive.google.com/file/d/{f_id}/view" target="_blank" style="color: #bbb; font-size: 0.8rem; text-decoration: none; font-weight: bold;">⚙️ 원본 열기</a></div></div>'''
                                 else:
-                                    # video 사이즈 축소
-                                    gallery_html += f'''<div style="width: 100%; max-width: 400px; margin-bottom: 10px;"><video src="{clean_url}" controls playsinline preload="metadata" style="width: 100%; height: 250px; object-fit: contain; border-radius: 8px; background-color: black; display: block;"></video></div>'''
+                                    gallery_html += f'''<div style="grid-column: 1 / -1; width: 100%; margin-bottom: 10px;"><video src="{clean_url}" controls playsinline preload="metadata" style="width: 100%; height: 250px; object-fit: contain; border-radius: 8px; background-color: black; display: block;"></video></div>'''
                             else:
-                                # 이미지 사이즈 절반(50%) 축소
-                                gallery_html += f'''<div style="width: 100%; margin-bottom: 5px;"><a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block;"><img src="{clean_url}" loading="lazy" style="width: 50%; max-width: 400px; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block;"></a></div>'''
+                                # 이미지를 정사각형(aspect-ratio)으로 맞추어 타일 형태로 꽉 차게 렌더링
+                                gallery_html += f'''<a href="{clean_url}" target="_blank" title="클릭하여 원본 크게 보기" style="display: block; width: 100%; aspect-ratio: 1/1;"><img src="{clean_url}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: #f8f9fa; display: block;"></a>'''
                         gallery_html += '</div>'
                         st.markdown(gallery_html, unsafe_allow_html=True)
                         
@@ -1225,9 +1237,10 @@ with tabs[6]:
             grouped = att_df.sort_values(by=['이름']).groupby(class_col)
             for c_name in sorted(grouped.groups.keys(), key=class_sort_key):
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
-                cols = st.columns(2)
+                # [변경] 데스크톱에서는 3열 배치 (모바일에서는 CSS가 2열로 자동 변경함)
+                cols = st.columns(3)
                 for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
-                    with cols[i % 2]:
+                    with cols[i % 3]:
                         with st.container(border=True):
                             st.markdown('<div class="attendance-card-container"></div>', unsafe_allow_html=True)
                             c_img, c_tgl = st.columns([1.5, 4.5])
@@ -1243,7 +1256,6 @@ with tabs[6]:
                             with c_tgl:
                                 is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
                                 new_friend_badge = " 🌱" if row[status_col] == '새친구' else ""
-                                # 에러를 피하기 위해 강제 문자열 변환 적용
                                 new_att[str(row['sheet_row'])] = st.toggle(f"{row['이름']}{new_friend_badge}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
@@ -1256,7 +1268,6 @@ with tabs[6]:
                 final_s_p = 0; final_t_p = 0; cells_to_update = []
                 if not is_skip:
                     for r, v in new_att.items():
-                        # r 은 위에서 문자열로 바꿨으므로 인트형 변환 후 쿼리
                         row_data = att_df[att_df['sheet_row'] == int(r)]
                         if not row_data.empty and v:
                             role = row_data.iloc[0]['role']
@@ -1334,7 +1345,6 @@ with tabs[7]:
         df_stat_renamed.columns = [str(c).strip() for c in df_stat_renamed.columns]
         df_stat_renamed = df_stat_renamed.loc[:, ~df_stat_renamed.columns.duplicated()]
         
-        # [수정] 빈 데이터로 인한 int 캐스팅 에러 차단
         numeric_cols = ['유년부 재적', '유년부 출석', '추가', '유년부 합계', '교사재적', '교사출석', '총합']
         for col in numeric_cols:
             if col in df_stat_renamed.columns:
@@ -1451,7 +1461,6 @@ with tabs[8]:
                     st.download_button(label="📊 현재 조회 내역 엑셀(CSV) 다운로드", data=display_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"비용집행내역_{s_date}_{e_date}.csv", mime="text/csv", use_container_width=True)
                     st.info("💡 아래 버튼을 눌러 인쇄용 문서를 다운로드한 후 브라우저에서 열고 `Ctrl + P` (PDF로 저장)를 진행하세요.")
                     
-                    # [수정] PDF 내 영수증 이미지 사이즈 축소(max-width 50%)
                     html_content = f"""<html><head><meta charset="utf-8"><title>슈팅스타 유년부 집행내역(요약본)</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }} .receipt-box img {{ width: 50%; max-width: 400px; height: auto; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }} @media print {{ body {{ margin: 0; }} }}</style></head><body><h1>슈팅스타 유년부 집행내역(요약본)</h1><div class="summary">조회 기간: {s_date} ~ {e_date} &nbsp;&nbsp;|&nbsp;&nbsp; 기간 내 총합계금액: {int(total_filtered_cost):,}원</div><h2>📊 지출 내역 요약 일람표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr></thead><tbody>"""
                     for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
                         html_content += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-center">{row.get('구매처','')}</td><td class="align-left">{row.get('내용','')}</td><td class="align-right">{parse_int_safe(row.get('비용', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
@@ -1517,7 +1526,6 @@ with tabs[8]:
 # [탭 9] 교사 회비 사용내역
 # ==========================================
 with tabs[9]:
-    # [핵심 개선] 교사 회비 탭에도 동일한 인증 폼 강제 적용
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
         cpwd_dues = st.text_input("총무 전용 비밀번호를 입력하세요 (이 탭에서도 입력 가능)", type="password", key="pwd_dues")
@@ -1556,7 +1564,6 @@ with tabs[9]:
             
             st.markdown("---")
             st.markdown("##### 📄 회비장부 보고서 출력 (인쇄/PDF 저장)")
-            # [수정] PDF 영수증 이미지 사이즈 역시 축소
             html_ledger = f"""<html><head><meta charset="utf-8"><title>교사 회비 사용내역 보고서</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} .summary-box {{ padding: 15px; background-color: #f1f8ff; border: 1px solid #cce5ff; border-radius: 8px; margin-bottom: 25px; font-size: 15px; font-weight: bold; text-align: center; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }} .receipt-box img {{ width: 50%; max-width: 400px; height: auto; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}</style></head><body><h1>교사 회비 사용내역 보고서</h1><div class="summary-box">보고서 출력일: {datetime.date.today().strftime('%Y-%m-%d')} &nbsp;&nbsp;|&nbsp;&nbsp; 🟢 누적 수입: {int(total_in):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 🔴 누적 지출: {int(total_out):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 💲 현재 잔액: {int(balance):,}원</div><h2>📥 1. 회비 입금 내역 요약표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr></thead><tbody>"""
             if not df_in.empty:
                 for idx, (_, row) in enumerate(df_in.iterrows(), start=1): html_ledger += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-center">{row.get('입금자명','')}</td><td class="align-right">{parse_int_safe(row.get('입금액', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
