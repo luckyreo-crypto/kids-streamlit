@@ -420,7 +420,7 @@ with st.sidebar:
 selected_menu = st.session_state["current_menu"]
 
 # ==========================================
-# 7. 메인 렌더링 (모든 탭 기능 100% 복구 적용)
+# 7. 메인 렌더링
 # ==========================================
 if selected_menu == "🏫 반":
     st.markdown(f"""
@@ -961,12 +961,30 @@ elif selected_menu == "🧾 비용집행관리":
                 
                 df_r_filtered = df_r_calc[(df_r_calc['날짜_dt'].dt.date >= s_date) & (df_r_calc['날짜_dt'].dt.date <= e_date)].copy()
                 if keyword: df_r_filtered = df_r_filtered[df_r_filtered.apply(lambda row: keyword in str(row.get('구매처','')) or keyword in str(row.get('내용','')), axis=1)]
+                total_filtered_cost = pd.to_numeric(df_r_filtered['비용'], errors='coerce').sum() if not df_r_filtered.empty else 0
                 
                 if not df_r_filtered.empty:
                     display_df = df_r_filtered[['번호', '날짜', '구매처', '내용', '비용', '비고']].copy()
                     display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    
+                    # [복구된 부분 1] 엑셀 다운로드 및 HTML(PDF) 보고서 출력 기능
+                    st.download_button(label="📊 조회 내역 엑셀 다운로드", data=display_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"비용집행내역_{s_date}_{e_date}.csv", mime="text/csv", use_container_width=True)
+                    
+                    html_content = f"""<html><head><meta charset="utf-8"><title>슈팅스타 유년부 집행내역(요약본)</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }} .receipt-box img {{ width: 50%; max-width: 400px; height: auto; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }} @media print {{ body {{ margin: 0; }} }}</style></head><body><h1>슈팅스타 유년부 집행내역(요약본)</h1><div class="summary">조회 기간: {s_date} ~ {e_date} &nbsp;&nbsp;|&nbsp;&nbsp; 기간 내 총합계금액: {int(total_filtered_cost):,}원</div><h2>📊 지출 내역 요약 일람표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr></thead><tbody>"""
+                    for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
+                        html_content += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-center">{row.get('구매처','')}</td><td class="align-left">{row.get('내용','')}</td><td class="align-right">{parse_int_safe(row.get('비용', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
+                    html_content += "</tbody></table>"
+                    html_content += "<div class='receipt-section'><h2>📸 지출 증빙 영수증 사본 첨부 (순차 정렬)</h2>"
+                    for idx, (_, row) in enumerate(df_r_filtered.iterrows(), start=1):
+                        img_url = str(row.get('영수증사진',''))
+                        if img_url and str(img_url).startswith('http'):
+                            clean_url = img_url.replace("&vid=1", "").replace("?vid=1", "")
+                            html_content += f"""<div class="receipt-box"><strong>[순번 No.{idx}] {row.get('날짜','')} - {row.get('구매처','')} ({parse_int_safe(row.get('비용', 0)):,}원)</strong><br><small>지출내역: {row.get('내용','')} | 비고: {row.get('비고','')}</small><img src="{clean_url}" alt="영수증 사본"></div>"""
+                    html_content += "</div></body></html>"
+                    st.download_button(label="📄 PDF/인쇄용 보고서 다운로드 (HTML)", data=html_content.encode("utf-8"), file_name=f"슈팅스타_집행내역_{s_date}_{e_date}.html", mime="text/html", use_container_width=True)
                 else: st.warning("조건에 맞는 내역이 없습니다.")
+        
         with r_tabs[1]:
             with st.form("new_receipt_form"):
                 rc_date = st.date_input("날짜", datetime.date.today()).strftime("%Y-%m-%d"); rc_vendor = st.text_input("구매처"); rc_detail = st.text_input("내용"); rc_cost = st.number_input("비용 (원)", min_value=0, step=1000); rc_memo = st.text_input("비고")
@@ -1016,11 +1034,35 @@ elif selected_menu == "💰 교사 회비 사용내역":
                 if not df_in.empty: 
                     disp_in = df_in[['날짜', '입금자명', '입금액', '비고']].copy()
                     st.dataframe(disp_in, use_container_width=True, hide_index=True)
+                    st.download_button("📥 수입내역 엑셀 다운로드", data=df_in.to_csv(index=False).encode('utf-8-sig'), file_name="회비_수입내역.csv", mime="text/csv", use_container_width=True)
             with col_l2:
                 st.markdown("##### 📤 지출 (집행 내역)")
                 if not df_out.empty: 
                     disp_out = df_out[['날짜', '내용', '지출액', '비고']].copy()
                     st.dataframe(disp_out, use_container_width=True, hide_index=True)
+                    st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
+
+            # [복구된 부분 2] 회비 장부 PDF 보고서 출력 기능 추가
+            st.markdown("---")
+            st.markdown("##### 📄 회비장부 전체 출력 (인쇄/PDF 저장)")
+            html_ledger = f"""<html><head><meta charset="utf-8"><title>교사 회비 사용내역 보고서</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} .summary-box {{ padding: 15px; background-color: #f1f8ff; border: 1px solid #cce5ff; border-radius: 8px; margin-bottom: 25px; font-size: 15px; font-weight: bold; text-align: center; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }} .receipt-box img {{ width: 50%; max-width: 400px; height: auto; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}</style></head><body><h1>교사 회비 사용내역 보고서</h1><div class="summary-box">보고서 출력일: {datetime.date.today().strftime('%Y-%m-%d')} &nbsp;&nbsp;|&nbsp;&nbsp; 🟢 누적 수입: {int(total_in):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 🔴 누적 지출: {int(total_out):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 💲 현재 잔액: {int(balance):,}원</div><h2>📥 1. 회비 입금 내역 요약표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr></thead><tbody>"""
+            if not df_in.empty:
+                for idx, (_, row) in enumerate(df_in.iterrows(), start=1): html_ledger += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-center">{row.get('입금자명','')}</td><td class="align-right">{parse_int_safe(row.get('입금액', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
+            else: html_ledger += "<tr><td colspan='5' class='align-center'>입금 내역이 존재하지 않습니다.</td></tr>"
+            html_ledger += """</tbody></table><h2>📤 2. 회비 지출 내역 요약표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>내용</th><th>지출액(원)</th><th>비고</th></tr></thead><tbody>"""
+            if not df_out.empty:
+                for idx, (_, row) in enumerate(df_out.iterrows(), start=1): html_ledger += f"""<tr><td class="align-center">{idx}</td><td class="align-center">{row.get('날짜','')}</td><td class="align-left">{row.get('내용','')}</td><td class="align-right">{parse_int_safe(row.get('지출액', 0)):,}</td><td class="align-left">{row.get('비고','')}</td></tr>"""
+            else: html_ledger += "<tr><td colspan='5' class='align-center'>지출 내역이 존재하지 않습니다.</td></tr>"
+            html_ledger += """</tbody></table><div class="receipt-section"><h2>📸 3. 회비 지출 증빙 영수증 사본 목록</h2>"""
+            if not df_out.empty:
+                for idx, (_, row) in enumerate(df_out.iterrows(), start=1):
+                    img_url = str(row.get('영수증사진',''))
+                    if img_url and img_url.startswith('http'): html_ledger += f"""<div class="receipt-box"><strong>[지출 No.{idx}] {row.get('날짜','')} - {row.get('내용','')} ({parse_int_safe(row.get('지출액', 0)):,}원)</strong><br><small>비고 내역: {row.get('비고','')}</small><img src="{img_url.replace("&vid=1", "").replace("?vid=1", "")}" alt="회비 영수증"></div>"""
+            else: html_ledger += "<p style='text-align:center; color:gray;'>증빙된 영수증 사본이 존재하지 않습니다.</p>"
+            html_ledger += """</div></body></html>"""
+            
+            st.download_button(label="📄 회비장부 전체 PDF 인쇄용 다운로드 (HTML 형식)", data=html_ledger.encode("utf-8"), file_name=f"교사회비사용내역_{datetime.date.today()}.html", mime="text/html", use_container_width=True)
+
         with l_tabs[1]:
             tab_in, tab_out = st.tabs(["📥 입금 등록", "📤 지출 등록"])
             with tab_in:
