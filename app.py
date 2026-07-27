@@ -46,25 +46,80 @@ if 'privacy_mode' not in st.session_state: st.session_state['privacy_mode'] = Tr
 if 'chongmu_auth' not in st.session_state: st.session_state['chongmu_auth'] = False
 if "current_menu" not in st.session_state: st.session_state["current_menu"] = "🏫 반"
 
-# 글로벌 CSS (모바일 최적화 및 카드 뷰)
+# 글로벌 CSS (모바일 최적화 및 얼굴/아이콘 표시 카드 뷰 완벽 복구)
 st.markdown(f"""
     <style>
     html {{ font-size: {st.session_state["base_font_size"]}px !important; scroll-behavior: smooth; }}
     button, input, select, textarea, div[data-testid="stToggle"] {{ touch-action: manipulation !important; font-size: 16px !important; }}
-    input[type="text"], input[type="password"], input[type="number"], textarea, div[data-baseweb="select"] {{ min-height: 50px !important; border-radius: 8px !important; }}
+    input[type="text"], input[type="password"], input[type="number"], textarea, div[data-baseweb="select"] {{ min-height: 50px !important; border-radius: 8px !important; font-size: 16px !important; }}
     div[data-testid="stButton"] button {{ min-height: 50px !important; font-size: 1.1rem !important; font-weight: 700 !important; border-radius: 8px !important; }}
     
     .class-header {{ background-color: #f1f8ff; padding: 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 25px; margin-bottom: 15px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .fab-button {{ position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }}
     
-    .keep-row, .attendance-card-container {{ display: none; }}
+    /* 🏫 반 탭 얼굴 카드 CSS 복구 */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) {{
+        position: relative !important; padding: 8px 10px !important; border-radius: 12px !important; margin-bottom: 10px !important; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important; background-color: #ffffff !important; transition: background-color 0.2s;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row):hover {{ background-color: #f8fbff !important; border-color: #0366d6 !important; }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] {{
+        position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+        opacity: 0 !important; z-index: 10 !important; width: 100% !important; height: 100% !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] button {{
+        width: 100% !important; height: 100% !important; cursor: pointer !important;
+    }}
     
+    /* ✅ 출석체크 탭 얼굴 카드 CSS 복구 */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {{
+        padding: 10px 12px !important; border-radius: 12px !important; margin-bottom: 10px !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {{
+        padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; 
+        background-color: transparent !important; min-height: 70px !important; display: flex; align-items: center;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {{
+        font-size: clamp(1.1rem, 3.5vw, 1.5rem) !important; font-weight: 800 !important; color: #111 !important; margin-left: 10px !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {{
+        transform: scale(2.2) !important; transform-origin: left center !important; margin-left: 15px !important; margin-right: 25px !important;
+    }}
+    
+    /* 모바일 그리드 2열 래핑 처리를 위한 미디어 쿼리 */
     @media (max-width: 768px) {{
-        div[data-testid="stHorizontalBlock"] {{ display: flex !important; flex-wrap: wrap !important; gap: 2% !important; }}
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{ min-width: 48% !important; flex: 1 1 48% !important; margin-bottom: 8px !important; }}
+        div[data-testid="stHorizontalBlock"]:has(.keep-row), div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {{ 
+            display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 2% !important; margin-bottom: 0 !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.keep-row) > div[data-testid="column"], div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"] {{
+            min-width: 48% !important; flex: 1 1 48% !important; margin-bottom: 8px !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stHorizontalBlock"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] {{
+            flex-wrap: nowrap !important; gap: 5px !important; align-items: center !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+            min-width: 0 !important; flex: 1 1 auto !important;
+        }}
+        
+        /* 모바일 이미지 사이즈 축소 */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) img, div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[style*="border-radius:50%"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) img, div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[style*="border-radius:50%"] {{
+            width: 35px !important; height: 35px !important; font-size: 18px !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {{ min-height: 50px !important; }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {{
+            transform: scale(1.3) !important; margin-left: 0 !important; margin-right: 8px !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {{
+            white-space: normal !important; word-break: keep-all; font-size: 0.95rem !important; line-height: 1.1; margin-left: 0 !important;
+        }}
         div[role="dialog"] > div {{ padding: 1rem !important; max-width:100% !important; }} 
         div[data-testid="stMetricValue"] {{ font-size: 1.8rem !important; }} 
     }}
+    .keep-row, .attendance-card-container {{ display: none; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -92,7 +147,9 @@ start_date = datetime.date(2026, 1, 4)
 # ==========================================
 # 3. 공통 유틸리티 함수
 # ==========================================
-def change_menu(menu_name): st.session_state["current_menu"] = menu_name
+# [에러수정] StreamlitAPIException 방지를 위해 메뉴 이동 함수 수정
+def change_menu(menu_name): 
+    st.session_state["current_menu"] = menu_name
 
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
@@ -404,7 +461,7 @@ def edit_student_dialog(target_dict):
                     st.success("✅ 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
 # ==========================================
-# 6. 사이드바 (메뉴 연동)
+# 6. 사이드바 (메뉴 연동 및 에러 방지)
 # ==========================================
 menu_options = ["🏫 반", "✅ 출석", "📋 교적부 관리", "🌱 새친구", "🎂 생일", "🙏 기도순서", "📝 주보", "⚙️ 행사", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"]
 
@@ -415,14 +472,19 @@ with st.sidebar:
     if col_s2.button("-", help="작게"): st.session_state["base_font_size"] = max(10, st.session_state["base_font_size"] - 1); st.rerun()
     if col_s3.button("+", help="크게"): st.session_state["base_font_size"] = min(24, st.session_state["base_font_size"] + 1); st.rerun()
     st.divider()
-    st.radio("📌 메뉴 선택", menu_options, key="current_menu")
-
-selected_menu = st.session_state["current_menu"]
+    
+    # [에러수정] StreamlitAPIException을 막기 위해 직접 바인딩 대신 간접 동기화 사용
+    idx = menu_options.index(st.session_state["current_menu"]) if st.session_state["current_menu"] in menu_options else 0
+    selected_menu = st.radio("📌 메뉴 선택", menu_options, index=idx, key="menu_radio")
+    
+    if selected_menu != st.session_state["current_menu"]:
+        st.session_state["current_menu"] = selected_menu
+        st.rerun()
 
 # ==========================================
 # 7. 메인 렌더링
 # ==========================================
-if selected_menu == "🏫 반":
+if st.session_state["current_menu"] == "🏫 반":
     st.markdown(f"""
     <div style="font-size: 1.05rem; color: #444; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
         <strong style="color:#0366d6;">📊 유년부 현황</strong>
@@ -457,19 +519,42 @@ if selected_menu == "🏫 반":
             stu_cols = st.columns(3) 
             for idx_j, (_, r) in enumerate(group.iterrows()):
                 s, n = r[status_col], r['이름']
+                # [복구] 아이콘 표시 로직 정상화
                 icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                 p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                 with stu_cols[idx_j % 3]:
                     with st.container(border=True):
+                        # [복구] 모바일 카드를 위한 keep-row 강제 삽입
+                        st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                         c_img, c_info = st.columns([1.5, 4.5])
                         with c_img:
-                            if p_url and p_url.startswith('http'): st.markdown(f'<img src="{p_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">', unsafe_allow_html=True)
-                            else: st.markdown(f'<div style="width:50px; height:50px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:24px;">{icon}</div>', unsafe_allow_html=True)
+                            if p_url and p_url.startswith('http'): 
+                                st.markdown(f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
+                            else: 
+                                st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:30px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
                         with c_info:
-                            st.markdown(f"**{n}** <span style='font-size:0.8rem; color:gray;'>{s if s in INACTIVE_STATUS else ''}</span>", unsafe_allow_html=True)
-                            if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="수정"): edit_student_dialog(r.to_dict())
+                            st.markdown(f"**{n}** {'🌱' if s == '새친구' else ''} <br><span style='font-size:0.8rem; color:gray;'>{s if s in INACTIVE_STATUS else ''}</span>", unsafe_allow_html=True)
+                        if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="수정"): edit_student_dialog(r.to_dict())
 
-elif selected_menu == "✅ 출석":
+            # [복구] 반별 새친구 즉시 추가 기능
+            with st.expander(f"➕ '{c_name}' 새친구 빠른 추가"):
+                with st.form(f"qa_{c_name.replace(' ', '_')}"):
+                    col_n, col_btn = st.columns([3, 1])
+                    new_n = col_n.text_input("이름", placeholder="새친구 이름 입력", label_visibility="collapsed")
+                    if col_btn.form_submit_button("등록"):
+                        if not new_n.strip(): st.error("이름을 입력해주세요.")
+                        else:
+                            new_row = [""] * len(headers)
+                            h_map = {str(h): idx for idx, h in enumerate(headers)}
+                            if '학생ID' in h_map: new_row[h_map['학생ID']] = f"S-{datetime.datetime.now().strftime('%y%m')}-{str(uuid.uuid4())[:4].upper()}"
+                            if '이름' in h_map: new_row[h_map['이름']] = new_n
+                            if class_col in h_map: new_row[h_map[class_col]] = c_name
+                            if '등록일' in h_map: new_row[h_map['등록일']] = datetime.date.today().strftime("%Y-%m-%d")
+                            if '학교상태' in h_map: new_row[h_map['학교상태']] = "새친구"
+                            elif '상태' in h_map: new_row[h_map['상태']] = "새친구"
+                            ws.append_row(new_row); st.success("✅ 추가 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
+
+elif st.session_state["current_menu"] == "✅ 출석":
     st.subheader("📅 주간 출석 체크")
     with st.container(border=True):
         c1, c2 = st.columns(2)
@@ -527,8 +612,24 @@ elif selected_menu == "✅ 출석":
                 cols = st.columns(3)
                 for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
                     with cols[i % 3]:
-                        is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                        new_att[str(row['sheet_row'])] = st.toggle(f"{row['이름']} {'🌱' if row[status_col]=='새친구' else ''}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
+                        with st.container(border=True):
+                            # [복구] 아이들 얼굴 표시 및 모바일 터치 토글
+                            st.markdown('<div class="attendance-card-container"></div>', unsafe_allow_html=True)
+                            c_img, c_tgl = st.columns([1.5, 4.5])
+                            
+                            s = row[status_col]
+                            icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
+                            p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+
+                            with c_img:
+                                if p_url and p_url.startswith('http'):
+                                    st.markdown(f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:26px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
+                                    
+                            with c_tgl:
+                                is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
+                                new_att[str(row['sheet_row'])] = st.toggle(f"{row['이름']} {'🌱' if s=='새친구' else ''}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
@@ -576,7 +677,7 @@ elif selected_menu == "✅ 출석":
                 else: ws_stat.append_row(new_row)
                 st.success("✅ 저장 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-elif selected_menu == "📋 교적부 관리":
+elif st.session_state["current_menu"] == "📋 교적부 관리":
     st.subheader("📋 전체 교적부 데이터 관리")
     m_tabs = st.tabs(["👀 전체보기", "➕ 인원추가"])
     with m_tabs[0]:
@@ -597,7 +698,8 @@ elif selected_menu == "📋 교적부 관리":
         with st.form("add_new"):
             col1, col2 = st.columns(2)
             n_name = col1.text_input("이름 (필수)")
-            n_class = col1.text_input("학년(담임) (필수)")
+            # [복구] 텍스트 입력이 아닌 기존 반 목록에서 선택하도록 수정
+            n_class = col1.selectbox("학년(담임) (필수)", sorted([str(c) for c in df[class_col].unique() if str(c).strip()], key=class_sort_key))
             n_status = col2.selectbox("구분", ALL_STATUS_OPTS, index=1)
             n_reg = col1.date_input("등록일자", value=datetime.date.today()).strftime("%Y-%m-%d")
             n_photo = st.file_uploader("사진 첨부 (5MB 이하 권장)", type=['png', 'jpg', 'jpeg'])
@@ -616,7 +718,7 @@ elif selected_menu == "📋 교적부 관리":
                     if '사진' in h_map: new_row[h_map['사진']] = p_url
                     ws.append_row(new_row); st.success("등록 완료"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-elif selected_menu == "🌱 새친구":
+elif st.session_state["current_menu"] == "🌱 새친구":
     st.subheader("🌱 최근 등록 새친구")
     news = df[df[status_col] == '새친구'].copy()
     if not news.empty: 
@@ -627,7 +729,7 @@ elif selected_menu == "🌱 새친구":
         st.dataframe(news_display, use_container_width=True, hide_index=True)
     else: st.info("등록된 새친구가 없습니다.")
 
-elif selected_menu == "🎂 생일":
+elif st.session_state["current_menu"] == "🎂 생일":
     st.subheader("🎂 월별 생일 명단")
     b_map = {i: [] for i in range(1, 13)}
     bd_df = df[~df[status_col].isin(INACTIVE_STATUS)].copy()
@@ -662,7 +764,7 @@ elif selected_menu == "🎂 생일":
 
     st.html("""<script>try { let scrollDoneMonth = false; setInterval(() => { const parentEl = window.parent.document; if (!parentEl) return; const el = parentEl.getElementById('current-month-anchor'); if (el && el.offsetParent !== null && !scrollDoneMonth) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); scrollDoneMonth = true; } else if (el && el.offsetParent === null) { scrollDoneMonth = false; } }, 500); } catch(e) {}</script>""")
 
-elif selected_menu == "🙏 기도순서":
+elif st.session_state["current_menu"] == "🙏 기도순서":
     st.subheader("🙏 예배 기도순서 관리")
     if not df_p.empty:
         df_p_calc = df_p.copy(); df_p_calc['날짜_dt'] = pd.to_datetime(df_p_calc['날짜'], errors='coerce')
@@ -717,7 +819,7 @@ elif selected_menu == "🙏 기도순서":
             if st.button("🚨 삭제 실행") and sel_p_idx > 0:
                 ws_p.delete_rows(int(df_p.iloc[sel_p_idx - 1]['sheet_row'])); st.success("삭제 완료"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-elif selected_menu == "📝 주보":
+elif st.session_state["current_menu"] == "📝 주보":
     st.subheader("📝 주보 관리 및 조회")
     b_mode = st.radio("작업 모드 선택", ["👀 보기", "⚙️ 등록/수정"], horizontal=True)
     st.divider()
@@ -749,7 +851,7 @@ elif selected_menu == "📝 주보":
                     else: manage_bulletin_dialog(w_str, w_date.strftime("%Y-%m-%d"))
     st.html("""<script>try { let scrollDoneWeek = false; setInterval(() => { const parentEl = window.parent.document; if (!parentEl) return; const el = parentEl.getElementById('current-week-anchor'); if (el && el.offsetParent !== null && !scrollDoneWeek) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); scrollDoneWeek = true; } else if (el && el.offsetParent === null) { scrollDoneWeek = false; } }, 500); } catch(e) {}</script>""")
 
-elif selected_menu == "⚙️ 행사":
+elif st.session_state["current_menu"] == "⚙️ 행사":
     st.subheader("⚙️ 행사 기록 관리")
     e_tabs = st.tabs(["📂 보기 및 PDF", "➕ 등록", "📝 수정", "🚨 삭제"])
     
@@ -875,7 +977,7 @@ elif selected_menu == "⚙️ 행사":
             if st.button("🚨 삭제 실행") and sel_del != "선택": 
                 ws_act.delete_rows(int(sel_del)); st.success("삭제 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-elif selected_menu == "📊 통계":
+elif st.session_state["current_menu"] == "📊 통계":
     st.subheader("📊 통계 흐름 및 개인 누적 출석")
     if not df_stat.empty:
         df_stat_calc = df_stat.copy()
@@ -929,7 +1031,7 @@ elif selected_menu == "📊 통계":
             st.markdown("</div>", unsafe_allow_html=True)
     st.dataframe(report_df[[class_col, '이름', '출석수']], use_container_width=True, hide_index=True)
 
-elif selected_menu == "🧾 비용집행관리":
+elif st.session_state["current_menu"] == "🧾 비용집행관리":
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
         cpwd = st.text_input("총무 전용 비밀번호", type="password", key="pwd_receipt")
@@ -968,7 +1070,6 @@ elif selected_menu == "🧾 비용집행관리":
                     display_df['비용'] = pd.to_numeric(display_df['비용'], errors='coerce').fillna(0).astype(int)
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
                     
-                    # [복구된 부분 1] 엑셀 다운로드 및 HTML(PDF) 보고서 출력 기능
                     st.download_button(label="📊 조회 내역 엑셀 다운로드", data=display_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"비용집행내역_{s_date}_{e_date}.csv", mime="text/csv", use_container_width=True)
                     
                     html_content = f"""<html><head><meta charset="utf-8"><title>슈팅스타 유년부 집행내역(요약본)</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 14px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 14px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .summary {{ font-size: 18px; font-weight: bold; text-align: right; margin-bottom: 20px; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fafafa; text-align: center; }} .receipt-box img {{ width: 50%; max-width: 400px; height: auto; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }} @media print {{ body {{ margin: 0; }} }}</style></head><body><h1>슈팅스타 유년부 집행내역(요약본)</h1><div class="summary">조회 기간: {s_date} ~ {e_date} &nbsp;&nbsp;|&nbsp;&nbsp; 기간 내 총합계금액: {int(total_filtered_cost):,}원</div><h2>📊 지출 내역 요약 일람표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>구매처</th><th>내용</th><th>비용(원)</th><th>비고</th></tr></thead><tbody>"""
@@ -1009,7 +1110,7 @@ elif selected_menu == "🧾 비용집행관리":
                 sel_idx = st.selectbox("삭제 내역", range(len(opts)), format_func=lambda x: opts[x], key="del_r")
                 if st.button("🚨 삭제") and sel_idx > 0: ws_r.delete_rows(int(df_r.iloc[sel_idx - 1]['sheet_row'])); st.success("삭제됨!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
-elif selected_menu == "💰 교사 회비 사용내역":
+elif st.session_state["current_menu"] == "💰 교사 회비 사용내역":
     if not st.session_state['chongmu_auth']:
         st.warning("🔒 총무 권한이 필요한 메뉴입니다.")
         cpwd_dues = st.text_input("총무 전용 비밀번호 (이 탭에서도 입력 가능)", type="password", key="pwd_dues")
@@ -1042,7 +1143,6 @@ elif selected_menu == "💰 교사 회비 사용내역":
                     st.dataframe(disp_out, use_container_width=True, hide_index=True)
                     st.download_button("📤 지출내역 엑셀 다운로드", data=df_out.to_csv(index=False).encode('utf-8-sig'), file_name="회비_지출내역.csv", mime="text/csv", use_container_width=True)
 
-            # [복구된 부분 2] 회비 장부 PDF 보고서 출력 기능 추가
             st.markdown("---")
             st.markdown("##### 📄 회비장부 전체 출력 (인쇄/PDF 저장)")
             html_ledger = f"""<html><head><meta charset="utf-8"><title>교사 회비 사용내역 보고서</title><style>body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; color: #333; }} h1, h2 {{ text-align: center; color: #0366d6; }} .summary-box {{ padding: 15px; background-color: #f1f8ff; border: 1px solid #cce5ff; border-radius: 8px; margin-bottom: 25px; font-size: 15px; font-weight: bold; text-align: center; }} table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; page-break-inside: auto; }} tr {{ page-break-inside: avoid; page-break-after: auto; }} th {{ background-color: #f1f8ff; text-align: center; padding: 10px; font-size: 13px; border: 1px solid #ddd; }} td {{ padding: 10px; font-size: 13px; border: 1px solid #ddd; }} .align-center {{ text-align: center; }} .align-right {{ text-align: right; }} .align-left {{ text-align: left; }} .receipt-section {{ page-break-before: always; }} .receipt-box {{ margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #eee; padding: 15px; border-radius: 8px; background-color: #fbfbfb; text-align: center; }} .receipt-box img {{ width: 50%; max-width: 400px; height: auto; display: block; margin: 15px auto; object-fit: contain; border: 1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); background-color: #fff; }}</style></head><body><h1>교사 회비 사용내역 보고서</h1><div class="summary-box">보고서 출력일: {datetime.date.today().strftime('%Y-%m-%d')} &nbsp;&nbsp;|&nbsp;&nbsp; 🟢 누적 수입: {int(total_in):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 🔴 누적 지출: {int(total_out):,}원 &nbsp;&nbsp;|&nbsp;&nbsp; 💲 현재 잔액: {int(balance):,}원</div><h2>📥 1. 회비 입금 내역 요약표</h2><table><thead><tr><th>순번</th><th>날짜</th><th>입금자명</th><th>입금액(원)</th><th>비고</th></tr></thead><tbody>"""
