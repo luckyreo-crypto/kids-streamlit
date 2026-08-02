@@ -54,70 +54,54 @@ if "rcpt_sub" not in st.session_state: st.session_state["rcpt_sub"] = "👀 조�
 if "dues_sub" not in st.session_state: st.session_state["dues_sub"] = "👀 전체 조회"
 if "dues_reg_sub" not in st.session_state: st.session_state["dues_reg_sub"] = "📥 입금 등록"
 
-# 글로벌 CSS (모바일 최적화 및 카드 뷰 + Roster 자동정렬 적용)
+# ✅ 모바일 반응형 2열 분할 및 카드 디자인 복구 CSS
 st.markdown(f"""
     <style>
     html {{ font-size: {st.session_state["base_font_size"]}px !important; scroll-behavior: smooth; }}
     button, input, select, textarea, div[data-testid="stToggle"] {{ touch-action: manipulation !important; font-size: 16px !important; }}
     input[type="text"], input[type="password"], input[type="number"], textarea, div[data-baseweb="select"] {{ min-height: 45px !important; border-radius: 8px !important; font-size: 16px !important; }}
-    div[data-testid="stButton"] button {{ min-height: 45px !important; font-size: 1.1rem !important; font-weight: 700 !important; border-radius: 8px !important; margin-bottom: 2px !important; }}
     
     .class-header {{ background-color: #f1f8ff; padding: 10px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 15px; margin-bottom: 10px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .fab-button {{ position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }}
     
-    /* 🚀 자동 줄바꿈 맞춤형 CSS Grid (출석체크 토글 화면용) */
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] .auto-grid) {{
-        display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
-        align-items: start !important;
-        gap: 0.5rem !important;
+    /* 🚀 명단 및 출석체크 박스 디자인 (여백 축소) */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card) {{ 
+        position: relative !important; padding: 6px 8px !important; border-radius: 12px !important; 
+        margin-bottom: 5px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; 
+        border: 1px solid #e0e0e0 !important; background-color: #ffffff !important; transition: background-color 0.2s; 
     }}
-    div[data-testid="stVerticalBlock"] > div[data-testid="element-container"]:has(.auto-grid) {{ display: none !important; }}
-
-    /* 🚀 [새로 추가됨] 반 명단 한 줄에 꽉 채우기 (텍스트형 버튼 + | 구분자) */
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) {{
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: wrap !important;
-        gap: 0px !important;
-        padding: 5px 0 !important;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) > div[data-testid="element-container"] {{
-        width: auto !important;
-        flex: 0 0 auto !important;
-    }}
-    div[data-testid="element-container"]:has(span.inline-roster) {{ display: none !important; }}
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) div[data-testid="stButton"] button {{
-        border: none !important; background: transparent !important; box-shadow: none !important;
-        padding: 4px 10px !important; min-height: 20px !important; height: auto !important;
-        font-size: 1.05rem !important; font-weight: 600 !important; color: #333 !important;
-        border-right: 2px solid #ddd !important; border-radius: 0 !important; margin: 4px 0 !important;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) div[data-testid="stButton"] button:hover {{
-        color: #0366d6 !important; background-color: #f1f8ff !important; border-radius: 4px !important;
-    }}
-
-    div[data-testid="stVerticalBlockBorderWrapper"] {{ padding: 5px 10px !important; }}
-    div[data-testid="stVerticalBlock"] {{ gap: 0.3rem !important; }}
-
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {{ padding: 5px 8px !important; border-radius: 12px !important; margin-bottom: 5px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important; }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {{ padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; background-color: transparent !important; min-height: 50px !important; display: flex; align-items: center; }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {{ font-size: clamp(1rem, 3vw, 1.2rem) !important; font-weight: 800 !important; color: #111 !important; margin-left: 10px !important; }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {{ transform: scale(1.8) !important; transform-origin: left center !important; margin-left: 10px !important; margin-right: 15px !important; }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card):hover {{ background-color: #f8fbff !important; border-color: #0366d6 !important; }}
     
-    @media (max-width: 768px) {{
-        div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {{ display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 2% !important; margin-bottom: 0 !important; }}
-        div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"] {{ min-width: 48% !important; flex: 1 1 48% !important; margin-bottom: 5px !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] {{ flex-wrap: nowrap !important; gap: 5px !important; align-items: center !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{ min-width: 0 !important; flex: 1 1 auto !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) img, div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[style*="border-radius:50%"] {{ width: 35px !important; height: 35px !important; font-size: 18px !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {{ min-height: 45px !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {{ transform: scale(1.3) !important; margin-left: 0 !important; margin-right: 8px !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {{ white-space: normal !important; word-break: keep-all; font-size: 0.95rem !important; line-height: 1.1; margin-left: 0 !important; }}
-        div[role="dialog"] > div {{ padding: 1rem !important; max-width:100% !important; }} 
-        div[data-testid="stMetricValue"] {{ font-size: 1.5rem !important; }} 
+    /* 명단 박스 전체를 클릭 가능하게 만드는 트릭 */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card) div[data-testid="stButton"] {{ 
+        position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
+        opacity: 0 !important; z-index: 10 !important; width: 100% !important; height: 100% !important; 
     }}
-    .keep-row, .attendance-card-container {{ display: none; }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card) div[data-testid="stButton"] button {{ width: 100% !important; height: 100% !important; cursor: pointer !important; }}
+    
+    /* 출석 토글 디자인 조절 */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card) div[data-testid="stToggle"] {{ 
+        padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; 
+        background-color: transparent !important; min-height: 50px !important; display: flex; align-items: center; 
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card) div[data-testid="stToggle"] label p {{ font-size: 1.1rem !important; font-weight: 800 !important; color: #111 !important; margin-left: 5px !important; }}
+    
+    /* 🚀 모바일 환경에서 자동으로 2열 정렬되도록 조정 */
+    @media (max-width: 768px) {{
+        div[data-testid="stHorizontalBlock"]:has(.student-card) {{ 
+            flex-direction: row !important; flex-wrap: wrap !important; gap: 5px !important; 
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.student-card) > div[data-testid="column"] {{ 
+            width: 48% !important; min-width: 48% !important; flex: 0 0 48% !important; 
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card) img, 
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.student-card) div[style*="border-radius:50%"] {{ 
+            width: 40px !important; height: 40px !important; font-size: 20px !important; 
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card) div[data-testid="stToggle"] label > div:first-child {{ transform: scale(1.3) !important; margin-left: 0 !important; margin-right: 5px !important; }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card) div[data-testid="stToggle"] label p {{ font-size: 0.95rem !important; white-space: normal !important; line-height: 1.1; margin-left: 0 !important; }}
+    }}
+    .student-card, .attendance-card {{ display: none; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -145,12 +129,10 @@ start_date = datetime.date(2026, 1, 4)
 # ==========================================
 # 3. 공통 유틸리티 함수
 # ==========================================
-# ✅ [수정 1] 메뉴 이동 시 발생하는 StreamlitAPIException 에러 방지 해결
-def change_menu(menu_name): 
+# ✅ [에러 해결] 메뉴 이동 시 콜백 함수를 이용해 안전하게 이동하도록 처리
+def switch_menu_callback(menu_name):
     st.session_state["current_menu"] = menu_name
-    # 라디오 버튼의 키값을 직접 덮어쓰지 않고, 삭제하여 인덱스가 갱신되도록 처리합니다.
-    if "menu_radio" in st.session_state:
-        del st.session_state["menu_radio"]
+    st.session_state["menu_radio"] = menu_name
 
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
@@ -434,7 +416,9 @@ def edit_student_dialog(target_dict):
         st.markdown(f"**주소:** {safe_str(target_dict.get('주소',''))}")
         st.markdown(f"**비고:** {safe_str(target_dict.get('비고',''))}")
         
-        if st.button("✅ 이 인원 출석체크 가기", use_container_width=True): change_menu("✅ 출석"); st.rerun()
+        # 콜백 함수로 전환하여 에러 완벽 차단
+        if st.button("✅ 이 인원 출석체크 가기", use_container_width=True, on_click=switch_menu_callback, args=("✅ 출석",)):
+            pass
             
     with tab_edit:
         with st.form("modal_edit_form"):
@@ -466,7 +450,7 @@ def edit_student_dialog(target_dict):
                     st.success("✅ 완료!"); time.sleep(1); st.cache_data.clear(); st.rerun()
 
 # ==========================================
-# 6. 사이드바 (메뉴 연동 및 에러 방지)
+# 6. 사이드바 (메뉴 연동)
 # ==========================================
 menu_options = ["🏫 반", "✅ 출석", "📋 교적부 관리", "🌱 새친구", "🎂 생일", "🙏 기도순서", "📝 주보", "⚙️ 행사", "📊 통계", "🧾 비용집행관리", "💰 교사 회비 사용내역"]
 
@@ -500,7 +484,8 @@ if st.session_state["current_menu"] == "🏫 반":
     """, unsafe_allow_html=True)
     col_hdr1, col_hdr2 = st.columns([3, 1], gap="small")
     col_hdr1.subheader("🏫 반별 명단")
-    if col_hdr2.button("✅ 출석체크 가기", type="primary", use_container_width=True): change_menu("✅ 출석"); st.rerun()
+    # 콜백 함수 적용
+    col_hdr2.button("✅ 출석체크 가기", type="primary", use_container_width=True, on_click=switch_menu_callback, args=("✅ 출석",))
         
     st.info("💡 아이콘 안내 | 👤 일반 | 🌱 새친구 | 🧑‍🏫 교사 | ✝️ 교역자 | 🚫 비활성")
     search_query = st.text_input("🔍 특정 이름 빠르게 찾기", placeholder="예: 김슈팅")
@@ -519,21 +504,33 @@ if st.session_state["current_menu"] == "🏫 반":
         group['sort_key'] = group.apply(get_sort_key, axis=1); group = group.sort_values(by=['sort_key', '이름'])
         
         with st.container(border=True):
-            st.markdown(f"<h4 style='color:#0366d6; border-bottom:1px solid #eee; margin-bottom:5px; padding-bottom:5px;'>{c_name} ({len(group[~group[status_col].isin(INACTIVE_STATUS)])}명)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color:#0366d6; border-bottom:1px solid #eee; margin-bottom:15px; padding-bottom:5px;'>{c_name} ({len(group[~group[status_col].isin(INACTIVE_STATUS)])}명)</h4>", unsafe_allow_html=True)
             
-            # ✅ [수정 2] 화면 너비에 맞게 텍스트 버튼들이 한 줄에 최대한 꽉꽉 채워집니다.
-            with st.container():
-                st.markdown('<span class="inline-roster"></span>', unsafe_allow_html=True)
-                for idx_j, (_, r) in enumerate(group.iterrows()):
-                    s, n = r[status_col], r['이름']
-                    icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
-                    
-                    label = f"{icon} {n}"
-                    if s in INACTIVE_STATUS: label += f" ({s})"
-                    elif s == '새친구': label += " 🌱"
-                    
-                    if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭 시 상세정보/수정 창이 뜹니다"):
-                        edit_student_dialog(r.to_dict())
+            # ✅ 명단을 4개씩 잘라서 출력 -> PC 4열 / 모바일 2열 자동 정렬 완벽 적용
+            students_list = list(group.iterrows())
+            for i in range(0, len(students_list), 4):
+                cols = st.columns(4, gap="small")
+                for j in range(4):
+                    if i + j < len(students_list):
+                        idx_j, r = students_list[i + j]
+                        s, n = r[status_col], r['이름']
+                        icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
+                        p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+                        
+                        with cols[j]:
+                            with st.container(border=True):
+                                st.markdown('<div class="student-card"></div>', unsafe_allow_html=True)
+                                c_img, c_info = st.columns([1.5, 4.5], gap="small")
+                                with c_img:
+                                    if p_url and p_url.startswith('http'): 
+                                        st.markdown(f'<img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
+                                    else: 
+                                        st.markdown(f'<div style="width:45px; height:45px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:20px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
+                                with c_info:
+                                    st.markdown(f"<div style='line-height:1.2; margin-top:2px;'><b>{n}</b> {'🌱' if s == '새친구' else ''} <br><span style='font-size:0.75rem; color:gray;'>{s if s in INACTIVE_STATUS else ''}</span></div>", unsafe_allow_html=True)
+                                
+                                if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="수정"): 
+                                    edit_student_dialog(r.to_dict())
 
             with st.expander(f"➕ '{c_name}' 새친구 빠른 추가"):
                 with st.form(f"qa_{c_name.replace(' ', '_')}"):
@@ -608,26 +605,31 @@ elif st.session_state["current_menu"] == "✅ 출석":
             for c_name in sorted(grouped.groups.keys(), key=class_sort_key):
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
                 
-                with st.container():
-                    st.markdown('<div class="auto-grid"></div>', unsafe_allow_html=True)
-                    for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
-                        with st.container(border=True):
-                            st.markdown('<div class="attendance-card-container"></div>', unsafe_allow_html=True)
-                            c_img, c_tgl = st.columns([1.5, 4.5], gap="small")
-                            
+                # ✅ 출석부 역시 4개씩 나누어 모바일에서 완벽 호환되게 처리
+                students_list = list(grouped.get_group(c_name).iterrows())
+                for i in range(0, len(students_list), 4):
+                    cols = st.columns(4, gap="small")
+                    for j in range(4):
+                        if i + j < len(students_list):
+                            idx, row = students_list[i + j]
                             s = row[status_col]
                             icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if row['role'] == 'pastor' else "🧑‍🏫" if row['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
                             p_url = str(row.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
 
-                            with c_img:
-                                if p_url and p_url.startswith('http'):
-                                    st.markdown(f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
-                                else:
-                                    st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:26px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
-                                    
-                            with c_tgl:
-                                is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
-                                new_att[str(row['sheet_row'])] = st.toggle(f"{row['이름']} {'🌱' if s=='새친구' else ''}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
+                            with cols[j]:
+                                with st.container(border=True):
+                                    st.markdown('<div class="student-card attendance-card"></div>', unsafe_allow_html=True)
+                                    c_img, c_tgl = st.columns([1.5, 4.5], gap="small")
+
+                                    with c_img:
+                                        if p_url and p_url.startswith('http'):
+                                            st.markdown(f'<img src="{p_url}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
+                                        else:
+                                            st.markdown(f'<div style="width:45px; height:45px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:20px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
+                                            
+                                    with c_tgl:
+                                        is_on = True if str(row.get(sel_w, "")).strip() == "1" else False
+                                        new_att[str(row['sheet_row'])] = st.toggle(f"{row['이름']} {'🌱' if s=='새친구' else ''}", value=is_on, key=f"tgl_{row['sheet_row']}_{sel_w}")
         
         if st.form_submit_button("💾 데이터 저장 (교적부/통계 반영)", type="primary", use_container_width=True):
             with st.spinner("저장 중..."):
