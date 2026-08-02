@@ -46,7 +46,7 @@ if 'privacy_mode' not in st.session_state: st.session_state['privacy_mode'] = Tr
 if 'chongmu_auth' not in st.session_state: st.session_state['chongmu_auth'] = False
 if "current_menu" not in st.session_state: st.session_state["current_menu"] = "🏫 반"
 
-# [핵심 수정] 등록/수정/삭제 후 "조회" 탭으로 자동 복귀하기 위한 서브메뉴 상태값 초기화
+# 서브메뉴 상태값 초기화
 if "m_sub" not in st.session_state: st.session_state["m_sub"] = "👀 전체보기"
 if "p_sub" not in st.session_state: st.session_state["p_sub"] = "👀 보기"
 if "b_sub" not in st.session_state: st.session_state["b_sub"] = "👀 보기"
@@ -55,7 +55,7 @@ if "rcpt_sub" not in st.session_state: st.session_state["rcpt_sub"] = "👀 조�
 if "dues_sub" not in st.session_state: st.session_state["dues_sub"] = "👀 전체 조회"
 if "dues_reg_sub" not in st.session_state: st.session_state["dues_reg_sub"] = "📥 입금 등록"
 
-# 글로벌 CSS (모바일 최적화 및 카드 뷰 + [여백 압축 CSS 반영])
+# 글로벌 CSS (모바일 최적화 및 반응형 그리드)
 st.markdown(f"""
     <style>
     html {{ font-size: {st.session_state["base_font_size"]}px !important; scroll-behavior: smooth; }}
@@ -66,7 +66,17 @@ st.markdown(f"""
     .class-header {{ background-color: #f1f8ff; padding: 10px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 15px; margin-bottom: 10px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .fab-button {{ position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }}
     
-    /* 🚀 컨테이너 및 수직 여백 압축 */
+    /* 🚀 자동 줄바꿈 맞춤형 CSS Grid (화면 크기에 따라 열 개수 자동 조절) */
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] .auto-grid) {{
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+        align-items: start !important;
+        gap: 0.5rem !important;
+    }}
+    div[data-testid="stVerticalBlock"] > div[data-testid="element-container"]:has(.auto-grid) {{
+        display: none !important;
+    }}
+
     div[data-testid="stVerticalBlockBorderWrapper"] {{ padding: 5px 10px !important; }}
     div[data-testid="stVerticalBlock"] {{ gap: 0.3rem !important; }}
 
@@ -120,8 +130,10 @@ start_date = datetime.date(2026, 1, 4)
 # ==========================================
 # 3. 공통 유틸리티 함수
 # ==========================================
+# ✅ [수정 1] 메뉴 라디오 버튼 상태 충돌(무시 현상) 완벽 해결
 def change_menu(menu_name): 
     st.session_state["current_menu"] = menu_name
+    st.session_state["menu_radio"] = menu_name
 
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
@@ -491,12 +503,15 @@ if st.session_state["current_menu"] == "🏫 반":
         
         with st.container(border=True):
             st.markdown(f"<h4 style='color:#0366d6; border-bottom:1px solid #eee;'>{c_name} ({len(group[~group[status_col].isin(INACTIVE_STATUS)])}명)</h4>", unsafe_allow_html=True)
-            stu_cols = st.columns(3, gap="small") 
-            for idx_j, (_, r) in enumerate(group.iterrows()):
-                s, n = r[status_col], r['이름']
-                icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
-                p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
-                with stu_cols[idx_j % 3]:
+            
+            # ✅ [수정 2] 3열 고정 제거 -> 화면 크기에 따른 Auto-Grid 컨테이너 적용
+            with st.container():
+                st.markdown('<div class="auto-grid"></div>', unsafe_allow_html=True)
+                for idx_j, (_, r) in enumerate(group.iterrows()):
+                    s, n = r[status_col], r['이름']
+                    icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
+                    p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
+                    
                     with st.container(border=True):
                         st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
                         c_img, c_info = st.columns([1.5, 4.5], gap="small")
@@ -581,9 +596,11 @@ elif st.session_state["current_menu"] == "✅ 출석":
             grouped = att_df.sort_values(by=['이름']).groupby(class_col)
             for c_name in sorted(grouped.groups.keys(), key=class_sort_key):
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
-                cols = st.columns(3, gap="small")
-                for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
-                    with cols[i % 3]:
+                
+                # ✅ [수정 2] 3열 고정 제거 -> 화면 크기에 따른 Auto-Grid 컨테이너 적용
+                with st.container():
+                    st.markdown('<div class="auto-grid"></div>', unsafe_allow_html=True)
+                    for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
                         with st.container(border=True):
                             st.markdown('<div class="attendance-card-container"></div>', unsafe_allow_html=True)
                             c_img, c_tgl = st.columns([1.5, 4.5], gap="small")
@@ -651,7 +668,6 @@ elif st.session_state["current_menu"] == "✅ 출석":
 elif st.session_state["current_menu"] == "📋 교적부 관리":
     st.subheader("📋 전체 교적부 데이터 관리")
     
-    # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
     m_opts = ["👀 전체보기", "➕ 인원추가"]
     m_sub_val = st.radio("메뉴", m_opts, index=m_opts.index(st.session_state["m_sub"]), horizontal=True, label_visibility="collapsed", key="m_sub_radio")
     if m_sub_val != st.session_state["m_sub"]: st.session_state["m_sub"] = m_sub_val; st.rerun()
@@ -696,7 +712,7 @@ elif st.session_state["current_menu"] == "📋 교적부 관리":
                     if '사진' in h_map: new_row[h_map['사진']] = p_url
                     ws.append_row(new_row); st.success("✅ 등록 완료!")
                     
-                    st.session_state["m_sub"] = "👀 전체보기" # 안전한 리다이렉트
+                    st.session_state["m_sub"] = "👀 전체보기" 
                     time.sleep(1); st.cache_data.clear(); st.rerun()
 
 elif st.session_state["current_menu"] == "🌱 새친구":
@@ -771,7 +787,6 @@ elif st.session_state["current_menu"] == "🙏 기도순서":
         
     st.divider()
     
-    # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
     p_opts = ["👀 보기", "➕ 등록", "📝 수정", "🚨 삭제"]
     p_sub_val = st.radio("메뉴", p_opts, index=p_opts.index(st.session_state["p_sub"]), horizontal=True, label_visibility="collapsed", key="p_sub_radio")
     if p_sub_val != st.session_state["p_sub"]: st.session_state["p_sub"] = p_sub_val; st.rerun()
@@ -818,7 +833,6 @@ elif st.session_state["current_menu"] == "🙏 기도순서":
 elif st.session_state["current_menu"] == "📝 주보":
     st.subheader("📝 주보 관리 및 조회")
     
-    # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
     b_opts = ["👀 보기", "⚙️ 등록/수정"]
     b_mode_val = st.radio("작업 모드 선택", b_opts, index=b_opts.index(st.session_state["b_sub"]), horizontal=True, key="b_sub_radio")
     if b_mode_val != st.session_state["b_sub"]: st.session_state["b_sub"] = b_mode_val; st.rerun()
@@ -856,7 +870,6 @@ elif st.session_state["current_menu"] == "📝 주보":
 elif st.session_state["current_menu"] == "⚙️ 행사":
     st.subheader("⚙️ 행사 기록 관리")
     
-    # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
     e_opts = ["📂 보기 및 PDF", "➕ 등록", "📝 수정", "🚨 삭제"]
     e_sub_val = st.radio("메뉴", e_opts, index=e_opts.index(st.session_state["e_sub"]), horizontal=True, label_visibility="collapsed", key="e_sub_radio")
     if e_sub_val != st.session_state["e_sub"]: st.session_state["e_sub"] = e_sub_val; st.rerun()
@@ -1070,7 +1083,6 @@ elif st.session_state["current_menu"] == "🧾 비용집행관리":
             mc2.metric("전체 누적 집행액", f"{int(total_cost):,}원")
             st.divider()
 
-        # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
         r_opts = ["👀 조회", "➕ 등록", "📝 수정", "🚨 삭제"]
         r_sub_val = st.radio("메뉴", r_opts, index=r_opts.index(st.session_state["rcpt_sub"]), horizontal=True, label_visibility="collapsed", key="rcpt_sub_radio")
         if r_sub_val != st.session_state["rcpt_sub"]: st.session_state["rcpt_sub"] = r_sub_val; st.rerun()
@@ -1162,7 +1174,6 @@ elif st.session_state["current_menu"] == "💰 교사 회비 사용내역":
             col_m1.metric("🟢 누적 수입 (입금액)", f"{int(total_in):,}원"); col_m2.metric("🔴 누적 지출 (지출액)", f"{int(total_out):,}원"); col_m3.metric("💲 현재 잔액 (총 합계)", f"{int(balance):,}원")
         st.divider()
         
-        # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
         l_opts = ["👀 전체 조회", "➕ 등록", "📝 수정", "🚨 삭제"]
         l_sub_val = st.radio("메뉴", l_opts, index=l_opts.index(st.session_state["dues_sub"]), horizontal=True, label_visibility="collapsed", key="dues_sub_radio")
         if l_sub_val != st.session_state["dues_sub"]: st.session_state["dues_sub"] = l_sub_val; st.rerun()
@@ -1206,7 +1217,6 @@ elif st.session_state["current_menu"] == "💰 교사 회비 사용내역":
             st.download_button(label="📄 회비장부 전체 PDF 인쇄용 다운로드 (HTML 형식)", data=html_ledger.encode("utf-8"), file_name=f"교사회비사용내역_{datetime.date.today()}.html", mime="text/html", use_container_width=True)
 
         elif l_sub == "➕ 등록":
-            # [핵심 수정] 위젯 상태 관리를 통한 에러 방지
             reg_opts = ["📥 입금 등록", "📤 지출 등록"]
             reg_sub_val = st.radio("등록 유형 선택", reg_opts, index=reg_opts.index(st.session_state["dues_reg_sub"]), horizontal=True, key="dues_reg_sub_radio")
             if reg_sub_val != st.session_state["dues_reg_sub"]: st.session_state["dues_reg_sub"] = reg_sub_val; st.rerun()
