@@ -46,7 +46,6 @@ if 'privacy_mode' not in st.session_state: st.session_state['privacy_mode'] = Tr
 if 'chongmu_auth' not in st.session_state: st.session_state['chongmu_auth'] = False
 if "current_menu" not in st.session_state: st.session_state["current_menu"] = "🏫 반"
 
-# 서브메뉴 상태값 초기화
 if "m_sub" not in st.session_state: st.session_state["m_sub"] = "👀 전체보기"
 if "p_sub" not in st.session_state: st.session_state["p_sub"] = "👀 보기"
 if "b_sub" not in st.session_state: st.session_state["b_sub"] = "👀 보기"
@@ -55,7 +54,7 @@ if "rcpt_sub" not in st.session_state: st.session_state["rcpt_sub"] = "👀 조�
 if "dues_sub" not in st.session_state: st.session_state["dues_sub"] = "👀 전체 조회"
 if "dues_reg_sub" not in st.session_state: st.session_state["dues_reg_sub"] = "📥 입금 등록"
 
-# 글로벌 CSS (모바일 최적화 및 반응형 그리드)
+# 글로벌 CSS (모바일 최적화 및 카드 뷰 + Roster 자동정렬 적용)
 st.markdown(f"""
     <style>
     html {{ font-size: {st.session_state["base_font_size"]}px !important; scroll-behavior: smooth; }}
@@ -66,36 +65,52 @@ st.markdown(f"""
     .class-header {{ background-color: #f1f8ff; padding: 10px 15px; border-radius: 8px; color: #0366d6; font-weight: 800; font-size: 1.3rem; margin-top: 15px; margin-bottom: 10px; border-left: 6px solid #0366d6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .fab-button {{ position: fixed; bottom: 25px; right: 25px; left: auto; background-color: rgba(3, 102, 214, 0.9); color: white !important; padding: 15px 20px; border-radius: 30px; text-decoration: none; font-weight: 800; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999999; backdrop-filter: blur(5px); }}
     
-    /* 🚀 자동 줄바꿈 맞춤형 CSS Grid (화면 크기에 따라 열 개수 자동 조절) */
+    /* 🚀 자동 줄바꿈 맞춤형 CSS Grid (출석체크 토글 화면용) */
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] .auto-grid) {{
         display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
         align-items: start !important;
         gap: 0.5rem !important;
     }}
-    div[data-testid="stVerticalBlock"] > div[data-testid="element-container"]:has(.auto-grid) {{
-        display: none !important;
+    div[data-testid="stVerticalBlock"] > div[data-testid="element-container"]:has(.auto-grid) {{ display: none !important; }}
+
+    /* 🚀 [새로 추가됨] 반 명단 한 줄에 꽉 채우기 (텍스트형 버튼 + | 구분자) */
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) {{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 0px !important;
+        padding: 5px 0 !important;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) > div[data-testid="element-container"] {{
+        width: auto !important;
+        flex: 0 0 auto !important;
+    }}
+    div[data-testid="element-container"]:has(span.inline-roster) {{ display: none !important; }}
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) div[data-testid="stButton"] button {{
+        border: none !important; background: transparent !important; box-shadow: none !important;
+        padding: 4px 10px !important; min-height: 20px !important; height: auto !important;
+        font-size: 1.05rem !important; font-weight: 600 !important; color: #333 !important;
+        border-right: 2px solid #ddd !important; border-radius: 0 !important; margin: 4px 0 !important;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] span.inline-roster) div[data-testid="stButton"] button:hover {{
+        color: #0366d6 !important; background-color: #f1f8ff !important; border-radius: 4px !important;
     }}
 
     div[data-testid="stVerticalBlockBorderWrapper"] {{ padding: 5px 10px !important; }}
     div[data-testid="stVerticalBlock"] {{ gap: 0.3rem !important; }}
 
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) {{ position: relative !important; padding: 6px 8px !important; border-radius: 12px !important; margin-bottom: 5px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important; background-color: #ffffff !important; transition: background-color 0.2s; }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row):hover {{ background-color: #f8fbff !important; border-color: #0366d6 !important; }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] {{ position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; opacity: 0 !important; z-index: 10 !important; width: 100% !important; height: 100% !important; }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stButton"] button {{ width: 100% !important; height: 100% !important; cursor: pointer !important; }}
-    
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) {{ padding: 5px 8px !important; border-radius: 12px !important; margin-bottom: 5px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important; border: 1px solid #e0e0e0 !important; }}
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {{ padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; background-color: transparent !important; min-height: 50px !important; display: flex; align-items: center; }}
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {{ font-size: clamp(1rem, 3vw, 1.2rem) !important; font-weight: 800 !important; color: #111 !important; margin-left: 10px !important; }}
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {{ transform: scale(1.8) !important; transform-origin: left center !important; margin-left: 10px !important; margin-right: 15px !important; }}
     
     @media (max-width: 768px) {{
-        div[data-testid="stHorizontalBlock"]:has(.keep-row), div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {{ display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 2% !important; margin-bottom: 0 !important; }}
-        div[data-testid="stHorizontalBlock"]:has(.keep-row) > div[data-testid="column"], div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"] {{ min-width: 48% !important; flex: 1 1 48% !important; margin-bottom: 5px !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stHorizontalBlock"], div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] {{ flex-wrap: nowrap !important; gap: 5px !important; align-items: center !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[data-testid="stHorizontalBlock"] > div[data-testid="column"], div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{ min-width: 0 !important; flex: 1 1 auto !important; }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) img, div[data-testid="stVerticalBlockBorderWrapper"]:has(.keep-row) div[style*="border-radius:50%"], div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) img, div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[style*="border-radius:50%"] {{ width: 35px !important; height: 35px !important; font-size: 18px !important; }}
+        div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) {{ display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 2% !important; margin-bottom: 0 !important; }}
+        div[data-testid="stHorizontalBlock"]:has(.attendance-card-container) > div[data-testid="column"] {{ min-width: 48% !important; flex: 1 1 48% !important; margin-bottom: 5px !important; }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] {{ flex-wrap: nowrap !important; gap: 5px !important; align-items: center !important; }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{ min-width: 0 !important; flex: 1 1 auto !important; }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) img, div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[style*="border-radius:50%"] {{ width: 35px !important; height: 35px !important; font-size: 18px !important; }}
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] {{ min-height: 45px !important; }}
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label > div:first-child {{ transform: scale(1.3) !important; margin-left: 0 !important; margin-right: 8px !important; }}
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.attendance-card-container) div[data-testid="stToggle"] label p {{ white-space: normal !important; word-break: keep-all; font-size: 0.95rem !important; line-height: 1.1; margin-left: 0 !important; }}
@@ -130,10 +145,12 @@ start_date = datetime.date(2026, 1, 4)
 # ==========================================
 # 3. 공통 유틸리티 함수
 # ==========================================
-# ✅ [수정 1] 메뉴 라디오 버튼 상태 충돌(무시 현상) 완벽 해결
+# ✅ [수정 1] 메뉴 이동 시 발생하는 StreamlitAPIException 에러 방지 해결
 def change_menu(menu_name): 
     st.session_state["current_menu"] = menu_name
-    st.session_state["menu_radio"] = menu_name
+    # 라디오 버튼의 키값을 직접 덮어쓰지 않고, 삭제하여 인덱스가 갱신되도록 처리합니다.
+    if "menu_radio" in st.session_state:
+        del st.session_state["menu_radio"]
 
 def safe_str(val):
     if pd.isna(val) or str(val).strip() in ['None', 'nan', 'NaT', '']: return ''
@@ -502,27 +519,21 @@ if st.session_state["current_menu"] == "🏫 반":
         group['sort_key'] = group.apply(get_sort_key, axis=1); group = group.sort_values(by=['sort_key', '이름'])
         
         with st.container(border=True):
-            st.markdown(f"<h4 style='color:#0366d6; border-bottom:1px solid #eee;'>{c_name} ({len(group[~group[status_col].isin(INACTIVE_STATUS)])}명)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color:#0366d6; border-bottom:1px solid #eee; margin-bottom:5px; padding-bottom:5px;'>{c_name} ({len(group[~group[status_col].isin(INACTIVE_STATUS)])}명)</h4>", unsafe_allow_html=True)
             
-            # ✅ [수정 2] 3열 고정 제거 -> 화면 크기에 따른 Auto-Grid 컨테이너 적용
+            # ✅ [수정 2] 화면 너비에 맞게 텍스트 버튼들이 한 줄에 최대한 꽉꽉 채워집니다.
             with st.container():
-                st.markdown('<div class="auto-grid"></div>', unsafe_allow_html=True)
+                st.markdown('<span class="inline-roster"></span>', unsafe_allow_html=True)
                 for idx_j, (_, r) in enumerate(group.iterrows()):
                     s, n = r[status_col], r['이름']
                     icon = "🚫" if s in INACTIVE_STATUS else ("✝️" if r['role'] == 'pastor' else "🧑‍🏫" if r['role'] == 'teacher' else "🌱" if s == '새친구' else "👤")
-                    p_url = str(r.get('사진', '')).replace("&vid=1", "").replace("?vid=1", "")
                     
-                    with st.container(border=True):
-                        st.markdown('<div class="keep-row"></div>', unsafe_allow_html=True)
-                        c_img, c_info = st.columns([1.5, 4.5], gap="small")
-                        with c_img:
-                            if p_url and p_url.startswith('http'): 
-                                st.markdown(f'<img src="{p_url}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; display:block; margin:auto;">', unsafe_allow_html=True)
-                            else: 
-                                st.markdown(f'<div style="width:60px; height:60px; border-radius:50%; background-color:#f1f8ff; display:flex; align-items:center; justify-content:center; font-size:30px; margin:auto;">{icon}</div>', unsafe_allow_html=True)
-                        with c_info:
-                            st.markdown(f"**{n}** {'🌱' if s == '새친구' else ''} <br><span style='font-size:0.8rem; color:gray;'>{s if s in INACTIVE_STATUS else ''}</span>", unsafe_allow_html=True)
-                        if st.button("상세", key=f"btn_link_{r['sheet_row']}", help="수정"): edit_student_dialog(r.to_dict())
+                    label = f"{icon} {n}"
+                    if s in INACTIVE_STATUS: label += f" ({s})"
+                    elif s == '새친구': label += " 🌱"
+                    
+                    if st.button(label, key=f"btn_link_{r['sheet_row']}", help="클릭 시 상세정보/수정 창이 뜹니다"):
+                        edit_student_dialog(r.to_dict())
 
             with st.expander(f"➕ '{c_name}' 새친구 빠른 추가"):
                 with st.form(f"qa_{c_name.replace(' ', '_')}"):
@@ -597,7 +608,6 @@ elif st.session_state["current_menu"] == "✅ 출석":
             for c_name in sorted(grouped.groups.keys(), key=class_sort_key):
                 st.markdown(f"<div class='class-header'>🏷️ {c_name}</div>", unsafe_allow_html=True)
                 
-                # ✅ [수정 2] 3열 고정 제거 -> 화면 크기에 따른 Auto-Grid 컨테이너 적용
                 with st.container():
                     st.markdown('<div class="auto-grid"></div>', unsafe_allow_html=True)
                     for i, (idx, row) in enumerate(grouped.get_group(c_name).iterrows()):
